@@ -69,6 +69,25 @@ Testing is mandatory for every feature — see `AGENTS.md`.
     local dev server, stop it first — Playwright's `webServer` needs the
     port and only reuses an existing server outside of `CI`.
 
+## CI
+
+Every PR targeting `develop` or `main` (and every push to those branches) runs
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) as four parallel jobs,
+each surfaced as its own status check on the PR:
+
+| Job       | What it runs                                                  |
+| --------- | ------------------------------------------------------------- |
+| `quality` | `pnpm lint` → `pnpm format:check` → `pnpm typecheck`          |
+| `unit`    | `pnpm test`                                                   |
+| `build`   | `pnpm build`                                                  |
+| `e2e`     | `pnpm test:e2e` (builds and serves a production build itself) |
+
+The `e2e` job uploads the Playwright HTML report as a build artifact if any
+spec fails. `develop` and `main` both require all four checks to pass before a
+PR can be merged. Reproduce any of them locally with the matching `pnpm`
+script from the [Code quality](#code-quality) and [Testing](#testing) tables
+above.
+
 ## Learn more
 
 - [Next.js Documentation](https://nextjs.org/docs)
