@@ -1,36 +1,51 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Keystroke Hub
 
-## Getting Started
+A single-user personal app for a full-stack developer who is also a gaming
+content creator. It keeps two worlds side by side without mixing them:
 
-First, run the development server:
+- **Work life** — tasks, daily/weekly logs, meetings, projects.
+- **Content creation** — video ideas, scripts, video/stream schedule.
+
+Both tracks share one calendar UI but stay strictly separated everywhere else.
+
+## Tech stack
+
+- [Next.js](https://nextjs.org) (App Router) + React
+- Tailwind CSS + [shadcn/ui](https://ui.shadcn.com)
+- Postgres on [Neon](https://neon.tech), deployed on [Vercel](https://vercel.com)
+- TypeScript
+
+## Getting started
+
+This project uses **pnpm only** — do not use npm or yarn.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Code quality
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Script              | What it does                                |
+| ------------------- | ------------------------------------------- |
+| `pnpm lint`         | Lint the codebase with ESLint               |
+| `pnpm lint:fix`     | Lint and auto-fix what it can               |
+| `pnpm format`       | Format the codebase with Prettier           |
+| `pnpm format:check` | Check formatting without writing changes    |
+| `pnpm typecheck`    | Type-check the codebase with `tsc --noEmit` |
+| `pnpm test`         | Run unit tests with Vitest                  |
+| `pnpm test:e2e`     | Run end-to-end tests with Playwright        |
+| `pnpm build`        | Build the production app                    |
 
-## Learn More
+ESLint (flat config, `eslint-config-next` + `eslint-config-prettier`) and
+Prettier (with `prettier-plugin-tailwindcss` for deterministic Tailwind class
+ordering) are configured to never disagree — ESLint defers all stylistic
+concerns to Prettier. All of the above must pass before a PR is opened; see
+`AGENTS.md` for the full workflow contract.
 
-To learn more about Next.js, take a look at the following resources:
+## Learn more
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [Next.js Documentation](https://nextjs.org/docs)
+- [shadcn/ui Documentation](https://ui.shadcn.com/docs)
