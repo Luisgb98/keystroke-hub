@@ -38,7 +38,7 @@ export default function RootLayout({
       className={`${fontDisplay.variable} ${fontBody.variable} ${fontMonoIdentity.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+      <body className="flex min-h-full flex-col" suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <TooltipProvider>{children}</TooltipProvider>
           <Toaster />
