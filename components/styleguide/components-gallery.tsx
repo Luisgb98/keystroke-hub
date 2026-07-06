@@ -1,7 +1,9 @@
 "use client";
 
+import { LayoutDashboard, NotebookPen } from "lucide-react";
 import { toast } from "sonner";
 
+import { NavLink } from "@/components/shell/nav-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,6 +45,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import type { NavItem } from "@/lib/navigation";
+
+// href matches this page so NavLink's real active-state logic renders one item active.
+const demoNavItems: NavItem[] = [
+  { href: "/styleguide", label: "Current section", icon: LayoutDashboard },
+  { href: "/styleguide/other", label: "Other section", icon: NotebookPen },
+];
 
 export function ComponentsGallery() {
   return (
@@ -138,6 +147,31 @@ export function ComponentsGallery() {
       <div className="flex flex-col gap-2">
         <Skeleton className="h-4 w-48" />
         <Skeleton className="h-4 w-32" />
+      </div>
+
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+        <div className="flex w-56 flex-col gap-1 rounded-lg border border-border p-2">
+          {demoNavItems.map(({ href, label, icon: Icon }) => (
+            <NavLink
+              key={href}
+              href={href}
+              label={label}
+              icon={<Icon aria-hidden className="size-5" />}
+              variant="sidebar"
+            />
+          ))}
+        </div>
+        <div className="flex max-w-xs rounded-lg border border-border">
+          {demoNavItems.map(({ href, label, icon: Icon }) => (
+            <NavLink
+              key={href}
+              href={href}
+              label={label}
+              icon={<Icon aria-hidden className="size-5" />}
+              variant="bottom"
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
