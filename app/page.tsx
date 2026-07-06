@@ -8,7 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 
 export default function Home() {
   return (
@@ -57,9 +57,12 @@ export default function Home() {
           </Card>
         </div>
 
-        <Button render={<Link href="/styleguide" />}>
+        <Link
+          href="/styleguide"
+          className={buttonVariants({ variant: "default" })}
+        >
           View the styleguide
-        </Button>
+        </Link>
       </main>
     </div>
   );
