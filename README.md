@@ -45,6 +45,30 @@ ordering) are configured to never disagree — ESLint defers all stylistic
 concerns to Prettier. All of the above must pass before a PR is opened; see
 `AGENTS.md` for the full workflow contract.
 
+## Testing
+
+Testing is mandatory for every feature — see `AGENTS.md`.
+
+- **Unit tests** are colocated next to the code they test, as `*.test.ts` /
+  `*.test.tsx` files (e.g. `lib/utils.test.ts`,
+  `components/theme-toggle.test.tsx`). They run with
+  [Vitest](https://vitest.dev) + [Testing Library](https://testing-library.com)
+  in a jsdom environment. Prefer Testing Library's user-facing queries
+  (`getByRole`, `getByText`, …) over implementation details.
+  - `pnpm test` — run all unit tests once (CI-ready, headless).
+  - `pnpm test:watch` — re-run on file changes while developing.
+  - `pnpm test:coverage` — run with a v8 coverage report.
+- **E2e tests** live in `e2e/` as `*.spec.ts` files and exercise real user
+  flows with [Playwright](https://playwright.dev) against the actual
+  production build (`pnpm build && pnpm start`), not the dev server. Every
+  spec runs against both a desktop (`chromium`) and a mobile (`Pixel 7`)
+  project to enforce the mobile-first contract.
+  - One-time setup: `pnpm exec playwright install --with-deps chromium`.
+  - `pnpm test:e2e` — build, start, and run all e2e specs headlessly
+    (CI-ready). If port 3000 is already in use by something other than your
+    local dev server, stop it first — Playwright's `webServer` needs the
+    port and only reuses an existing server outside of `CI`.
+
 ## Learn more
 
 - [Next.js Documentation](https://nextjs.org/docs)
