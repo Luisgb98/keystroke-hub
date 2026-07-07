@@ -14,6 +14,7 @@ function makeEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     startsAt: new Date("2026-07-08T00:00:00"),
     endsAt: new Date("2026-07-08T00:00:00"),
     allDay: true,
+    conflictNote: null,
     ...overrides,
   };
 }

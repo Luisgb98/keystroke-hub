@@ -15,13 +15,19 @@ import { quickAddFromNow } from "@/lib/calendar/quick-add";
 import type { CalendarView } from "@/lib/calendar/types";
 
 import { EventEditor } from "./event-editor";
+import { SyncStatusRow, type SyncStatusSummary } from "./sync-status-row";
 
 interface CalendarHeaderProps {
   view: CalendarView;
   date: Date;
+  syncStatus?: SyncStatusSummary[];
 }
 
-export function CalendarHeader({ view, date }: CalendarHeaderProps) {
+export function CalendarHeader({
+  view,
+  date,
+  syncStatus = [],
+}: CalendarHeaderProps) {
   const router = useRouter();
   const [newEventOpen, setNewEventOpen] = useState(false);
 
@@ -40,6 +46,7 @@ export function CalendarHeader({ view, date }: CalendarHeaderProps) {
           New event
         </Button>
       </div>
+      <SyncStatusRow connections={syncStatus} />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Button

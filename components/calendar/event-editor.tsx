@@ -1,11 +1,18 @@
 "use client";
 
-import { useActionState, useEffect, useId, useState } from "react";
+import {
+  useActionState,
+  useEffect,
+  useId,
+  useState,
+  useTransition,
+} from "react";
 import { toast } from "sonner";
 
 import { createEvent, updateEvent } from "@/lib/calendar/actions";
 import type { QuickAddDefaults } from "@/lib/calendar/quick-add";
 import type { CalendarEvent, Track } from "@/lib/calendar/types";
+import { dismissConflictNote } from "@/lib/sync/actions";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -95,6 +102,14 @@ export function EventEditor({
 
   const [values, setValues] = useState(() => initialValues(event, defaults));
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [conflictDismissed, setConflictDismissed] = useState(false);
+  const [dismissPending, startDismissTransition] = useTransition();
+
+  function handleDismissConflict() {
+    if (!event) return;
+    setConflictDismissed(true);
+    startDismissTransition(() => dismissConflictNote(event.id));
+  }
 
   // EventChip/EventBlock keep the same EventEditor instance mounted across
   // opens (only `open` toggles), so field values must be recomputed on each
@@ -106,6 +121,7 @@ export function EventEditor({
     setPrevOpen(open);
     if (open) {
       setValues(initialValues(event, defaults));
+      setConflictDismissed(false);
     }
   }
 
@@ -153,6 +169,21 @@ export function EventEditor({
                 Every event belongs to exactly one track.
               </DialogDescription>
             </DialogHeader>
+
+            {mode === "edit" && event?.conflictNote && !conflictDismissed ? (
+              <div className="flex items-start justify-between gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-caption text-destructive">
+                <p>{event.conflictNote}</p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  disabled={dismissPending}
+                  onClick={handleDismissConflict}
+                >
+                  Dismiss
+                </Button>
+              </div>
+            ) : null}
 
             <div className="flex flex-col gap-2">
               <TrackPicker
