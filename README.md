@@ -69,6 +69,26 @@ Testing is mandatory for every feature — see `AGENTS.md`.
     local dev server, stop it first — Playwright's `webServer` needs the
     port and only reuses an existing server outside of `CI`.
 
+## Versioning
+
+The project version in `package.json` is bumped once per feature, semver
+driven by the branch's Conventional Commits: `feat` → minor, `fix` → patch,
+a `!` marker or `BREAKING CHANGE:` footer → major. Every other branch
+(`chore`/`docs`/`test`/`refactor`/`style`-only) still owes a patch bump, so
+every PR carries exactly one version bump.
+
+Convention for the branch that implements a feature:
+
+1. Bump with `pnpm version <level> --no-git-tag-version` and commit the
+   result as `chore(release): v<X.Y.Z>` — the final commit on the branch.
+2. Run `pnpm version:check` to confirm the bump is present against `develop`,
+   is exactly one semver step, and is at least the level the branch's
+   commits require.
+
+No git tags or CHANGELOG are generated — GitHub's compare view covers
+history for this single-user repo. See `AGENTS.md` for the full workflow
+contract this fits into.
+
 ## CI
 
 Every PR targeting `develop` or `main` (and every push to those branches) runs
