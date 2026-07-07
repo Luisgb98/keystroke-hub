@@ -69,6 +69,14 @@ Testing is mandatory for every feature — see `AGENTS.md`.
     local dev server, stop it first — Playwright's `webServer` needs the
     port and only reuses an existing server outside of `CI`.
 
+## Database
+
+Postgres on [Neon](https://neon.tech), accessed through
+[Drizzle ORM](https://orm.drizzle.team) with a plain-SQL migration workflow
+(`pnpm db:generate` / `pnpm db:migrate` / `pnpm db:studio`). See
+[`docs/database.md`](docs/database.md) for env vars, the full migration
+workflow, and known gaps. `GET /api/health` verifies the connection is live.
+
 ## Versioning
 
 The project version in `package.json` is bumped once per feature, semver
