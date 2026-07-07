@@ -42,7 +42,9 @@ describe("EventBlock", () => {
       />
     );
 
-    const block = screen.getByText("Record voiceover").closest("div.absolute");
+    const block = screen
+      .getByText("Record voiceover")
+      .closest("button.absolute");
     expect(block).toHaveClass("bg-track-content");
     expect(block).toHaveClass("border-track-content-border");
   });

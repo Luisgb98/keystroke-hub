@@ -1,8 +1,18 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 
 import { getMonthGridDays } from "@/lib/calendar/range";
 import type { CalendarEvent } from "@/lib/calendar/types";
+
+const createEvent = vi.hoisted(() => vi.fn());
+const updateEvent = vi.hoisted(() => vi.fn());
+const deleteEvent = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/calendar/actions", () => ({
+  createEvent,
+  updateEvent,
+  deleteEvent,
+}));
 
 import { MonthView } from "./month-view";
 
@@ -43,10 +53,11 @@ describe("MonthView", () => {
         now={today}
       />
     );
-    const todayCell = screen.getByRole("link", {
+    const todayLink = screen.getByRole("link", {
       name: "Wednesday, July 8, 2026",
     });
-    expect(todayCell.querySelector("span")).toHaveClass("bg-primary");
+    const todayCell = todayLink.closest(".group");
+    expect(todayCell?.querySelector("span")).toHaveClass("bg-primary");
   });
 
   it("collapses events beyond the per-cell max into a +n overflow chip", () => {
@@ -79,11 +90,34 @@ describe("MonthView", () => {
       />
     );
     // The grid for July 2026 starts on Monday June 29.
-    const spilloverCell = screen.getByRole("link", {
+    const spilloverLink = screen.getByRole("link", {
       name: "Monday, June 29, 2026",
     });
-    expect(spilloverCell.querySelector("span")).toHaveClass(
+    const spilloverCell = spilloverLink.closest(".group");
+    expect(spilloverCell?.querySelector("span")).toHaveClass(
       "text-muted-foreground"
     );
+  });
+
+  it("opens a prefilled all-day create dialog from a cell's + affordance, without navigating", async () => {
+    const anchor = new Date("2026-07-08");
+    const user = userEvent.setup();
+    render(
+      <MonthView
+        days={getMonthGridDays(anchor)}
+        anchorMonth={anchor}
+        events={[]}
+        now={anchor}
+      />
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Add event on July 8, 2026" })
+    );
+
+    expect(
+      screen.getByRole("dialog", { name: "New event" })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "All day" })).toBeChecked();
   });
 });
