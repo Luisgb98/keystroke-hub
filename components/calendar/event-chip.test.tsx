@@ -24,7 +24,7 @@ describe("EventChip", () => {
 
     expect(screen.getByText("Sprint planning")).toBeInTheDocument();
     expect(screen.getByText("Work:")).toBeInTheDocument();
-    const chip = screen.getByText("Sprint planning").closest("div");
+    const chip = screen.getByText("Sprint planning").closest("button");
     expect(chip).toHaveClass("bg-track-work");
     expect(chip).toHaveClass("border-track-work-border");
     expect(chip?.querySelector("svg")).toBeInTheDocument();
@@ -39,7 +39,7 @@ describe("EventChip", () => {
 
     expect(screen.getByText("Record voiceover")).toBeInTheDocument();
     expect(screen.getByText("Content:")).toBeInTheDocument();
-    const chip = screen.getByText("Record voiceover").closest("div");
+    const chip = screen.getByText("Record voiceover").closest("button");
     expect(chip).toHaveClass("bg-track-content");
     expect(chip).toHaveClass("border-track-content-border");
   });

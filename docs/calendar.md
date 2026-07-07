@@ -2,10 +2,9 @@
 
 The shared calendar (issue #10) is the app's defining concept: one set of
 day/week/month views rendering both the work and content tracks together,
-strictly separated but visually side by side. This issue owns the `events`
-data model, the read path, and the three views. Event creation/editing is a
-separate issue (#11) — for now, events are added via the seed script below or
-directly in Drizzle Studio (`pnpm db:studio`).
+strictly separated but visually side by side. Issue #10 owns the `events`
+data model, the read path, and the three views; issue #11 (below) owns
+creating, editing, and deleting events.
 
 ## Data model
 
@@ -66,8 +65,8 @@ primary navigation and exercised unconditionally by `e2e/shell-navigation.spec.t
 ## Seeding events for local dev/e2e
 
 `scripts/seed-events.mts` inserts fixture events (both tracks, all-day and
-timed, deliberate overlaps) anchored on the current date, so the calendar is
-demoable before #11 ships a real creation UI:
+timed, deliberate overlaps) anchored on the current date, useful for
+demoing/exercising the read path without clicking through the creation UI:
 
 ```bash
 pnpm seed:events
@@ -81,3 +80,52 @@ It connects directly (not through `lib/db/index.ts`, which is guarded by the
 run (see `e2e/support/events-db.ts`) — it doesn't depend on this script.
 Those DB-backed e2e tests skip (like the health check) when `DATABASE_URL`
 isn't set, e.g. in CI.
+
+## Creating, editing, and deleting events (#11)
+
+Mutations go through Server Functions in `lib/calendar/actions.ts`
+(`createEvent`, `updateEvent`, `deleteEvent`) — same shape as
+`lib/auth/actions.ts`: each calls `verifySession()` first (Server Functions
+are reachable via direct POST, not just the UI), validates with the single
+Zod schema in `lib/calendar/event-schema.ts` (shared so validation rules
+live in exactly one place), writes via Drizzle, and calls
+`revalidatePath("/calendar")` on success. `updateEvent`/`deleteEvent` treat
+"no row matched" as a returned field error, not a thrown exception — the
+row may have been deleted concurrently (e.g. from Drizzle Studio).
+
+There's no optimistic UI: a single round-trip plus a `pending` flag from
+`useActionState` (surfaced as a disabled/"Saving…" submit button) is fast
+enough for a personal app. Delete is a hard delete — no audit trail.
+
+**Form surface**: `EventEditor` (`components/calendar/event-editor.tsx`) is
+the shared create/edit form, rendered inside the existing `Dialog` primitive
+for both mobile and desktop. This project's shadcn/Base UI setup has no
+drawer/sheet component, and `DialogContent` is already responsive enough
+for a mobile-first form — adding a bespoke bottom-sheet component wasn't
+worth the extra surface. `TrackPicker` never pre-selects a track; submit
+stays disabled until one is chosen, which is how "the track choice can
+never be ambiguous" is enforced.
+
+**Making events tappable**: `EventChip` and `EventBlock` are each
+self-contained client components — a `<button>` wrapping the existing
+visual markup, with their own local `EventEditor` (edit mode) dialog state.
+There's no lifted/global dialog controller. This mattered for `MonthView`:
+each day cell used to be one big `<Link>` wrapping its chips, which would
+now nest a `<button>` inside an `<a>` (invalid HTML). The cell was
+restructured so the `Link` is a full-bleed absolutely-positioned sibling
+(`z-0`) behind the date number, chips, and the per-cell "+" button (`z-10`)
+— empty cell area still falls through to the link, chips/buttons intercept
+their own clicks.
+
+**Quick-add entry points**, each producing prefill values via the pure
+helpers in `lib/calendar/quick-add.ts`:
+
+- Tapping an hour slot in the day/week time grid (`DayColumn` renders one
+  button per hour, positioned behind the `EventBlock`s) — 1h duration
+  starting on the hour.
+- A month cell's "+" affordance (visible on hover/focus — desktop-oriented;
+  mobile reaches quick-add via the day view or the header button) — an
+  all-day default for that date. It doesn't intercept the cell's own
+  day-navigation tap.
+- A persistent "+ New event" button in `CalendarHeader`, the universal
+  fallback on every view/breakpoint — starts at the next 30-minute mark.

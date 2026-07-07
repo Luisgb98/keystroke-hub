@@ -31,7 +31,8 @@ export const events = pgTable(
       .defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
-      .defaultNow(),
+      .defaultNow()
+      .$onUpdate(() => new Date()),
   },
   (table) => [
     index("events_starts_at_ends_at_idx").on(table.startsAt, table.endsAt),

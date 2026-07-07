@@ -39,11 +39,12 @@ export default defineConfig({
       name: "mobile-chrome",
       use: { ...devices["Pixel 7"], storageState: STORAGE_STATE },
       dependencies: ["setup"],
-      // calendar.spec.ts seeds/clears real rows in the dev database and
-      // already covers its own mobile-viewport checks via `test.use`, so
-      // running it again under this project would race against the
-      // chromium project's runs against the same shared DB.
-      testIgnore: /calendar\.spec\.ts$/,
+      // calendar.spec.ts and event-management.spec.ts seed/create/clear real
+      // rows in the dev database and already cover their own mobile-viewport
+      // checks via `test.use`, so running them again under this project
+      // would race against the chromium project's runs against the same
+      // shared DB.
+      testIgnore: /(calendar|event-management)\.spec\.ts$/,
     },
   ],
   webServer: {

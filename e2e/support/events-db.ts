@@ -60,6 +60,17 @@ export async function seedTestEvents(today: Date): Promise<void> {
 
 /** Removes every fixture row this suite may have inserted. */
 export async function clearTestEvents(): Promise<void> {
+  await clearEventsWithPrefix(TITLE_PREFIX);
+}
+
+/**
+ * Removes rows by a title prefix other than the shared `[e2e]` one — for
+ * specs (e.g. `event-management.spec.ts`) that create/delete events through
+ * the UI rather than seeding fixed rows, and need cleanup that can't
+ * accidentally sweep up another spec file's concurrently-running fixtures
+ * (Playwright runs spec files in parallel workers against the same dev DB).
+ */
+export async function clearEventsWithPrefix(prefix: string): Promise<void> {
   const db = getTestDb();
-  await db.delete(events).where(like(events.title, `${TITLE_PREFIX}%`));
+  await db.delete(events).where(like(events.title, `${prefix}%`));
 }

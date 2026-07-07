@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,7 +11,10 @@ import {
   formatRangeLabel,
   shiftDate,
 } from "@/lib/calendar/range";
+import { quickAddFromNow } from "@/lib/calendar/quick-add";
 import type { CalendarView } from "@/lib/calendar/types";
+
+import { EventEditor } from "./event-editor";
 
 interface CalendarHeaderProps {
   view: CalendarView;
@@ -19,6 +23,7 @@ interface CalendarHeaderProps {
 
 export function CalendarHeader({ view, date }: CalendarHeaderProps) {
   const router = useRouter();
+  const [newEventOpen, setNewEventOpen] = useState(false);
 
   function navigate(nextView: CalendarView, nextDate: Date) {
     router.push(`/calendar?view=${nextView}&date=${formatDateParam(nextDate)}`);
@@ -26,9 +31,15 @@ export function CalendarHeader({ view, date }: CalendarHeaderProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      <h2 className="font-heading text-h2 font-semibold">
-        {formatRangeLabel(view, date)}
-      </h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="font-heading text-h2 font-semibold">
+          {formatRangeLabel(view, date)}
+        </h2>
+        <Button onClick={() => setNewEventOpen(true)}>
+          <Plus aria-hidden />
+          New event
+        </Button>
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Button
@@ -63,6 +74,13 @@ export function CalendarHeader({ view, date }: CalendarHeaderProps) {
           </TabsList>
         </Tabs>
       </div>
+
+      <EventEditor
+        mode="create"
+        defaults={quickAddFromNow(new Date())}
+        open={newEventOpen}
+        onOpenChange={setNewEventOpen}
+      />
     </div>
   );
 }
