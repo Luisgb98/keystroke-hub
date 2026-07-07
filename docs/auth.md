@@ -28,6 +28,13 @@ Vercel project settings for deploys):
   in a Server Action (`lib/auth/actions.ts`) against `AUTH_PASSWORD_HASH`
   using `node:crypto` scrypt + `timingSafeEqual` (`lib/auth/password.ts`).
   Failed attempts get a generic error after a ~1 s delay to blunt brute force.
+  The hash is encoded as `scrypt.N.r.p.salt.key` — deliberately `.`-delimited
+  rather than the more conventional `$` (as bcrypt/PHC-style hashes use):
+  Next.js's env loader runs `dotenv-expand` on `.env` values, which treats an
+  unescaped `$` as a `$VAR`/`${VAR}` reference and silently replaces it with
+  an empty string when unmatched — corrupting any `$`-delimited hash on every
+  load, with no error. `.` never appears in base64 output, so it needs no
+  escaping.
 - **Session** — a stateless JWT (HS256 via [jose](https://github.com/panva/jose)),
   stored in an `HttpOnly` / `Secure` (production) / `SameSite=Lax` cookie.
   **30-day rolling expiry**: activity re-issues the token (at most once a

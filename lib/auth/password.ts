@@ -38,6 +38,14 @@ interface ParsedHash {
   key: Buffer;
 }
 
+// `.` rather than the more conventional `$` (as in bcrypt/PHC-style hashes):
+// Next.js's env loader runs dotenv-expand on `.env` values, which treats an
+// unescaped `$` as the start of a `$VAR`/`${VAR}` interpolation and silently
+// replaces unmatched references with an empty string — corrupting the hash
+// on every load. `.` never appears in base64 output, so it's a safe, non-
+// ambiguous delimiter that needs no escaping in `.env` files.
+const DELIMITER = ".";
+
 function encode(params: ParsedHash): string {
   return [
     "scrypt",
@@ -46,11 +54,11 @@ function encode(params: ParsedHash): string {
     params.parallelization,
     params.salt.toString("base64"),
     params.key.toString("base64"),
-  ].join("$");
+  ].join(DELIMITER);
 }
 
 function parse(stored: string): ParsedHash | null {
-  const parts = stored.split("$");
+  const parts = stored.split(DELIMITER);
   if (parts.length !== 6 || parts[0] !== "scrypt") return null;
 
   const cost = Number(parts[1]);
@@ -74,7 +82,7 @@ function parse(stored: string): ParsedHash | null {
   return { cost, blockSize, parallelization, salt, key };
 }
 
-/** Hashes a password into a self-describing `scrypt$N$r$p$salt$key` string. */
+/** Hashes a password into a self-describing `scrypt.N.r.p.salt.key` string. */
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(SALT_LENGTH);
   const key = await scryptAsync(password, salt, KEY_LENGTH, {
