@@ -42,6 +42,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# agent worktrees (local scratch checkouts, never ours to commit)
+.claude/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
