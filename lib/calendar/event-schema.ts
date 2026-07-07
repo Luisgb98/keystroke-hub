@@ -112,3 +112,15 @@ export const eventFormSchema = rawEventSchema.transform((data, ctx) => {
   };
   return result;
 });
+
+/** Shared by `rescheduleEvent`: a drag/resize only ever rewrites the time bounds. */
+export const rescheduleSchema = z
+  .object({
+    id: z.string().min(1),
+    startsAt: z.date(),
+    endsAt: z.date(),
+  })
+  .refine((data) => data.endsAt.getTime() >= data.startsAt.getTime(), {
+    message: "End must be after start",
+    path: ["endsAt"],
+  });

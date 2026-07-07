@@ -14,7 +14,7 @@ import {
   pushEventUpdated,
 } from "@/lib/sync/push";
 
-import { eventFormSchema } from "./event-schema";
+import { eventFormSchema, rescheduleSchema } from "./event-schema";
 
 /**
  * Schedules `fn` via `after()`, swallowing a synchronous throw from `after`
@@ -107,6 +107,44 @@ export async function updateEvent(
   revalidatePath("/calendar");
   schedulePush(() => pushEventUpdated(updated[0].id, updated[0].track));
   return { success: true };
+}
+
+export interface RescheduleEventResult {
+  error?: string;
+}
+
+/**
+ * Narrow mutation for drag-to-reschedule/resize (issue #13): only rewrites
+ * `startsAt`/`endsAt`, unlike `updateEvent` which validates the full
+ * form-shaped editor payload. Same push-after-commit contract as the other
+ * mutations, so Google sync propagation (#12) falls out of reusing this path.
+ */
+export async function rescheduleEvent(
+  id: string,
+  startsAt: Date,
+  endsAt: Date
+): Promise<RescheduleEventResult> {
+  await verifySession();
+
+  const parsed = rescheduleSchema.safeParse({ id, startsAt, endsAt });
+  if (!parsed.success) {
+    return { error: "That reschedule isn't valid." };
+  }
+
+  const db = getDb();
+  const updated = await db
+    .update(events)
+    .set({ startsAt: parsed.data.startsAt, endsAt: parsed.data.endsAt })
+    .where(eq(events.id, parsed.data.id))
+    .returning({ id: events.id, track: events.track });
+
+  if (updated.length === 0) {
+    return { error: "That event no longer exists." };
+  }
+
+  revalidatePath("/calendar");
+  schedulePush(() => pushEventUpdated(updated[0].id, updated[0].track));
+  return {};
 }
 
 export interface DeleteEventResult {

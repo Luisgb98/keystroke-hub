@@ -1,3 +1,5 @@
+"use client";
+
 import { format, isSameDay } from "date-fns";
 
 import { cn } from "@/lib/utils";
@@ -8,6 +10,7 @@ import { AllDayRow } from "./all-day-row";
 import { DayColumn } from "./day-column";
 import { EventChip } from "./event-chip";
 import { TimeGutter } from "./time-gutter";
+import { useEventReschedule } from "./use-event-reschedule";
 
 interface WeekViewProps {
   days: Date[];
@@ -16,15 +19,16 @@ interface WeekViewProps {
 }
 
 export function WeekView({ days, events, now }: WeekViewProps) {
-  const allDayEvents = events.filter((event) => event.allDay);
-  const timedEvents = events.filter((event) => !event.allDay);
+  const { events: liveEvents, reschedule } = useEventReschedule(events);
+  const allDayEvents = liveEvents.filter((event) => event.allDay);
+  const timedEvents = liveEvents.filter((event) => !event.allDay);
 
   return (
     <>
       {/* Phone: stacked agenda-style list — a 7-column grid is unreadable this narrow. */}
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto md:hidden">
         {days.map((day) => {
-          const dayEvents = events
+          const dayEvents = liveEvents
             .filter((event) => eventOverlapsDay(event, day))
             .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
 
@@ -93,6 +97,8 @@ export function WeekView({ days, events, now }: WeekViewProps) {
                 day={day}
                 events={timedEvents}
                 now={now}
+                crossDayDrag
+                onReschedule={reschedule}
               />
             ))}
           </div>

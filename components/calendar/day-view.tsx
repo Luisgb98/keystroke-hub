@@ -1,8 +1,11 @@
+"use client";
+
 import type { CalendarEvent } from "@/lib/calendar/types";
 
 import { AllDayRow } from "./all-day-row";
 import { DayColumn } from "./day-column";
 import { TimeGutter } from "./time-gutter";
+import { useEventReschedule } from "./use-event-reschedule";
 
 interface DayViewProps {
   day: Date;
@@ -11,8 +14,9 @@ interface DayViewProps {
 }
 
 export function DayView({ day, events, now }: DayViewProps) {
-  const allDayEvents = events.filter((event) => event.allDay);
-  const timedEvents = events.filter((event) => !event.allDay);
+  const { events: liveEvents, reschedule } = useEventReschedule(events);
+  const allDayEvents = liveEvents.filter((event) => event.allDay);
+  const timedEvents = liveEvents.filter((event) => !event.allDay);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-border">
@@ -20,7 +24,12 @@ export function DayView({ day, events, now }: DayViewProps) {
       <div className="flex flex-1 overflow-y-auto">
         <TimeGutter />
         <div className="flex-1">
-          <DayColumn day={day} events={timedEvents} now={now} />
+          <DayColumn
+            day={day}
+            events={timedEvents}
+            now={now}
+            onReschedule={reschedule}
+          />
         </div>
       </div>
     </div>

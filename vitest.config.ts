@@ -19,7 +19,11 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],
     include: ["**/*.test.{ts,tsx}"],
-    exclude: ["node_modules", ".next", "e2e"],
+    // ".claude" excludes stray agent worktrees (each a full checkout with its
+    // own node_modules) from ever being picked up by the test glob — without
+    // this, a leftover worktree's duplicate React copy causes "Invalid hook
+    // call" errors when its test files run alongside the real ones.
+    exclude: ["node_modules", ".next", "e2e", ".claude"],
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],

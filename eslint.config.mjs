@@ -19,6 +19,12 @@ const eslintConfig = defineConfig([
     // but not excluded from lint by eslint-config-next's defaults above.
     "playwright-report/**",
     "test-results/**",
+    // Vitest coverage output — gitignored, but not excluded by the defaults.
+    "coverage/**",
+    // Stray agent worktrees (each a full checkout with its own
+    // node_modules) can linger under here between sessions; never ours to
+    // lint (see the matching vitest.config.ts exclude).
+    ".claude/**",
   ]),
   // Must stay last: disables stylistic rules that would conflict with Prettier.
   prettierConfig,

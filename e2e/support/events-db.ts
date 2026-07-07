@@ -1,8 +1,9 @@
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
-import { like } from "drizzle-orm";
+import { eq, like } from "drizzle-orm";
 
 import { events } from "../../lib/db/schema";
+import type { Track } from "../../lib/calendar/types";
 
 /** Prefix isolates e2e fixture rows so cleanup can't touch real/dev data. */
 const TITLE_PREFIX = "[e2e]";
@@ -73,4 +74,40 @@ export async function clearTestEvents(): Promise<void> {
 export async function clearEventsWithPrefix(prefix: string): Promise<void> {
   const db = getTestDb();
   await db.delete(events).where(like(events.title, `${prefix}%`));
+}
+
+/** Inserts a single event with fully deterministic bounds — for tests (e.g. drag-reschedule) that need to assert an exact px-to-time conversion. */
+export async function insertTestEvent(fixture: {
+  title: string;
+  track: Track;
+  startsAt: Date;
+  endsAt: Date;
+  allDay?: boolean;
+}): Promise<void> {
+  const db = getTestDb();
+  await db.insert(events).values({
+    track: fixture.track,
+    title: fixture.title,
+    startsAt: fixture.startsAt,
+    endsAt: fixture.endsAt,
+    allDay: fixture.allDay ?? false,
+  });
+}
+
+/** Reads back an event's persisted bounds by exact title, for post-drag assertions. */
+export async function getTestEventTimes(
+  title: string
+): Promise<{ startsAt: Date; endsAt: Date } | undefined> {
+  const db = getTestDb();
+  const [row] = await db
+    .select({ startsAt: events.startsAt, endsAt: events.endsAt })
+    .from(events)
+    .where(eq(events.title, title));
+  return row;
+}
+
+/** Deletes a single event by exact title — used to simulate a concurrent deletion mid-drag. */
+export async function deleteTestEventByTitle(title: string): Promise<void> {
+  const db = getTestDb();
+  await db.delete(events).where(eq(events.title, title));
 }
