@@ -2,6 +2,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import { formatDateParam } from "@/lib/calendar/range";
+
 const { push } = vi.hoisted(() => ({ push: vi.fn() }));
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
@@ -38,7 +40,10 @@ describe("CalendarHeader", () => {
 
     await user.click(screen.getByRole("button", { name: "Today" }));
 
-    const today = new Date().toISOString().slice(0, 10);
+    // Matches the app's own local-date formatting (lib/calendar/range.ts) —
+    // `toISOString()` is UTC and drifts a day off near local midnight in
+    // timezones ahead of UTC.
+    const today = formatDateParam(new Date());
     expect(push).toHaveBeenCalledWith(`/calendar?view=week&date=${today}`);
   });
 
