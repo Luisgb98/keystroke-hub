@@ -35,6 +35,10 @@ Copy `.env.example` to `.env.local` and fill in the values:
 - **`SESSION_SECRET`** — generate with `openssl rand -base64 32`.
 - **`AUTH_PASSWORD_HASH`** — generate with `pnpm auth:hash`. See
   [`docs/auth.md`](docs/auth.md).
+- **Google Calendar sync** (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+  `GOOGLE_TOKEN_ENCRYPTION_KEY`, `CRON_SECRET`) — optional for local dev
+  (the app runs fine without them; connecting a calendar just won't work
+  until they're set). See [`docs/google-sync.md`](docs/google-sync.md).
 
 ```bash
 pnpm dev
@@ -100,6 +104,15 @@ Postgres on [Neon](https://neon.tech), accessed through
 (`pnpm db:generate` / `pnpm db:migrate` / `pnpm db:studio`). See
 [`docs/database.md`](docs/database.md) for env vars, the full migration
 workflow, and known gaps. `GET /api/health` verifies the connection is live.
+
+## Google Calendar sync
+
+Connects one Google Calendar to each track — work and content stay strictly
+separated — and syncs events both ways, so the app never drifts from the
+real calendars. Conflicting edits resolve by latest-edit-wins with a visible
+note on the event; disconnecting never deletes local events. See
+[`docs/google-sync.md`](docs/google-sync.md) for setup (including the
+one-time Google Cloud Console steps), the sync design, and known follow-ups.
 
 ## Versioning
 
