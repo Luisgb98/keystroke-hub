@@ -44,6 +44,11 @@ browsing/editing data directly.
 The only table created without an explicit migration is drizzle-kit's own
 bookkeeping table, `__drizzle_migrations`, on first `db:migrate` run.
 
+`lib/db/migrations/` is committed with its initial (empty) state already
+generated — `pnpm db:migrate` works out of the box on a fresh clone even
+before any feature adds a table. `lib/db/migrations/**` is excluded from
+Prettier/ESLint: it's drizzle-kit-generated output, not hand-written.
+
 ## Verifying the connection
 
 `GET /api/health` runs `SELECT 1` through the same db client the app uses,
