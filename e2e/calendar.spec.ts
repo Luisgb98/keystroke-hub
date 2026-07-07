@@ -118,8 +118,12 @@ test.describe("calendar", () => {
       month: "long",
       day: "numeric",
     });
-    const todayCell = page.getByRole("link", { name: todayLabel });
-    await expect(todayCell).toBeVisible();
+    const todayLink = page.getByRole("link", { name: todayLabel });
+    await expect(todayLink).toBeVisible();
+    // The link is a full-bleed sibling behind the cell's date-number span
+    // (see docs/calendar.md), not its parent — scope to the shared cell
+    // wrapper to find the span.
+    const todayCell = page.locator(".group").filter({ has: todayLink });
     await expect(todayCell.locator("span").first()).toHaveClass(/bg-primary/);
   });
 
@@ -134,7 +138,14 @@ test.describe("calendar", () => {
       month: "long",
       day: "numeric",
     });
-    await page.getByRole("link", { name: todayLabel }).click();
+    // The link fills the whole cell but sits behind the date-number badge and
+    // any event chips (see docs/calendar.md), so click near the top-left
+    // where only the (pointer-events-none) date badge overlaps it — clicking
+    // the link's own bounding-box center could land on a chip instead when
+    // the day has several events.
+    await page
+      .getByRole("link", { name: todayLabel })
+      .click({ position: { x: 10, y: 10 } });
 
     await expect(page).toHaveURL(`/calendar?view=day&date=${todayParam}`);
   });
