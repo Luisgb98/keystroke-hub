@@ -16,6 +16,21 @@ import {
 
 import { eventFormSchema } from "./event-schema";
 
+/**
+ * Schedules `fn` via `after()`, swallowing a synchronous throw from `after`
+ * itself (rather than the callback) — matches the "push failures never
+ * block or fail the mutation" contract in docs/google-sync.md, extended to
+ * the scheduling call itself in case the request-scope `after` needs isn't
+ * available for some reason.
+ */
+function schedulePush(fn: () => Promise<void>): void {
+  try {
+    after(fn);
+  } catch (error) {
+    console.error("Failed to schedule Google Calendar push:", error);
+  }
+}
+
 export interface EventActionState {
   error?: string;
   fieldErrors?: Record<string, string[]>;
@@ -59,7 +74,7 @@ export async function createEvent(
   revalidatePath("/calendar");
   // Push to Google after the response is sent (see docs/google-sync.md) —
   // never delays or can fail this mutation for the user.
-  after(() => pushEventCreated(inserted.id, inserted.track));
+  schedulePush(() => pushEventCreated(inserted.id, inserted.track));
   return { success: true };
 }
 
@@ -90,7 +105,7 @@ export async function updateEvent(
   }
 
   revalidatePath("/calendar");
-  after(() => pushEventUpdated(updated[0].id, updated[0].track));
+  schedulePush(() => pushEventUpdated(updated[0].id, updated[0].track));
   return { success: true };
 }
 
@@ -121,7 +136,7 @@ export async function deleteEvent(id: string): Promise<DeleteEventResult> {
 
   revalidatePath("/calendar");
   if (link) {
-    after(() =>
+    schedulePush(() =>
       pushEventDeleted(link.id, link.googleEventId, deleted[0].track)
     );
   }

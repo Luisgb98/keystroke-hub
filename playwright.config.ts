@@ -2,8 +2,13 @@ import { defineConfig, devices } from "@playwright/test";
 import { config } from "dotenv";
 
 import {
+  E2E_CRON_SECRET,
+  E2E_GOOGLE_CLIENT_ID,
+  E2E_GOOGLE_CLIENT_SECRET,
+  E2E_GOOGLE_TOKEN_ENCRYPTION_KEY,
   E2E_PASSWORD_HASH,
   E2E_SESSION_SECRET,
+  FAKE_GOOGLE_BASE_URL,
   STORAGE_STATE,
 } from "./e2e/support/credentials";
 
@@ -39,25 +44,44 @@ export default defineConfig({
       name: "mobile-chrome",
       use: { ...devices["Pixel 7"], storageState: STORAGE_STATE },
       dependencies: ["setup"],
-      // calendar.spec.ts and event-management.spec.ts seed/create/clear real
-      // rows in the dev database and already cover their own mobile-viewport
-      // checks via `test.use`, so running them again under this project
-      // would race against the chromium project's runs against the same
-      // shared DB.
-      testIgnore: /(calendar|event-management)\.spec\.ts$/,
+      // calendar.spec.ts, event-management.spec.ts, and calendar-sync.spec.ts
+      // seed/create/clear real rows (calendar-sync.spec.ts's connection rows
+      // are also unique-per-track) in the dev database and already cover
+      // their own mobile-viewport checks via `test.use`, so running them
+      // again under this project would race against the chromium project's
+      // runs against the same shared DB.
+      testIgnore: /(calendar|calendar-sync|event-management)\.spec\.ts$/,
     },
   ],
-  webServer: {
-    command: "pnpm build && pnpm start",
-    url: "http://localhost:3000/login",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-    env: {
-      ...process.env,
-      // Hermetic test credentials (see e2e/support/credentials.ts) — the
-      // real values from .env are deliberately overridden.
-      SESSION_SECRET: E2E_SESSION_SECRET,
-      AUTH_PASSWORD_HASH: E2E_PASSWORD_HASH,
+  webServer: [
+    {
+      // Stands in for Google's OAuth token + Calendar REST endpoints (issue
+      // #12) — real Google OAuth isn't automatable in CI, and the app's
+      // Google calls all happen server-side, so page-level route
+      // interception can't reach them (see e2e/support/fake-google-server.ts).
+      command: "node e2e/support/fake-google-server.ts",
+      url: `${FAKE_GOOGLE_BASE_URL}/__control/health`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
     },
-  },
+    {
+      command: "pnpm build && pnpm start",
+      url: "http://localhost:3000/login",
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+      env: {
+        ...process.env,
+        // Hermetic test credentials (see e2e/support/credentials.ts) — the
+        // real values from .env are deliberately overridden.
+        SESSION_SECRET: E2E_SESSION_SECRET,
+        AUTH_PASSWORD_HASH: E2E_PASSWORD_HASH,
+        GOOGLE_CLIENT_ID: E2E_GOOGLE_CLIENT_ID,
+        GOOGLE_CLIENT_SECRET: E2E_GOOGLE_CLIENT_SECRET,
+        GOOGLE_TOKEN_ENCRYPTION_KEY: E2E_GOOGLE_TOKEN_ENCRYPTION_KEY,
+        GOOGLE_CALENDAR_API_BASE_URL: FAKE_GOOGLE_BASE_URL,
+        GOOGLE_OAUTH_TOKEN_BASE_URL: FAKE_GOOGLE_BASE_URL,
+        CRON_SECRET: E2E_CRON_SECRET,
+      },
+    },
+  ],
 });

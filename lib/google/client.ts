@@ -10,7 +10,8 @@
 // requests, since these calls happen server-side and never touch the
 // browser page Playwright can otherwise hook into.
 const API_BASE =
-  process.env.GOOGLE_CALENDAR_API_BASE_URL ?? "https://www.googleapis.com/calendar/v3";
+  process.env.GOOGLE_CALENDAR_API_BASE_URL ??
+  "https://www.googleapis.com/calendar/v3";
 
 /** Google Calendar's event date, either an all-day `date` or a timed `dateTime` + zone. */
 export interface GoogleEventDateTime {
