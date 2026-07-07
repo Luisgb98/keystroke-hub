@@ -13,6 +13,9 @@ vi.mock("@/lib/calendar/actions", () => ({
   deleteEvent,
 }));
 
+const dismissConflictNote = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/sync/actions", () => ({ dismissConflictNote }));
+
 import { EventEditor } from "./event-editor";
 
 function makeEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
@@ -24,6 +27,7 @@ function makeEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     startsAt: new Date("2026-07-08T09:00:00"),
     endsAt: new Date("2026-07-08T10:00:00"),
     allDay: false,
+    conflictNote: null,
     ...overrides,
   };
 }
@@ -107,5 +111,45 @@ describe("EventEditor — edit mode", () => {
       />
     );
     expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+  });
+
+  it("shows a dismissible conflict note when the event's sync link has one", async () => {
+    dismissConflictNote.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(
+      <EventEditor
+        mode="edit"
+        event={makeEvent({
+          conflictNote: "Overwritten by a Google Calendar edit",
+        })}
+        open
+        onOpenChange={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.getByText("Overwritten by a Google Calendar edit")
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Dismiss" }));
+
+    expect(dismissConflictNote).toHaveBeenCalledWith("evt-1");
+    expect(
+      screen.queryByText("Overwritten by a Google Calendar edit")
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows no conflict note when the link is clean", () => {
+    render(
+      <EventEditor
+        mode="edit"
+        event={makeEvent()}
+        open
+        onOpenChange={vi.fn()}
+      />
+    );
+    expect(
+      screen.queryByRole("button", { name: "Dismiss" })
+    ).not.toBeInTheDocument();
   });
 });

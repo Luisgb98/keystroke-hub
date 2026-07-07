@@ -22,6 +22,7 @@ const event: CalendarEvent = {
   startsAt: new Date("2026-07-08T09:00:00"),
   endsAt: new Date("2026-07-08T10:00:00"),
   allDay: false,
+  conflictNote: null,
 };
 
 describe("DeleteEventDialog", () => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AlertTriangle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import type { CalendarEvent } from "@/lib/calendar/types";
@@ -33,6 +34,15 @@ export function EventChip({ event, className }: EventChipProps) {
         <Icon aria-hidden className="size-3 shrink-0" />
         <span className="sr-only">{TRACK_LABEL[event.track]}: </span>
         <span className="truncate">{event.title}</span>
+        {event.conflictNote ? (
+          <span
+            role="img"
+            aria-label="Sync conflict was resolved on this event"
+            title={event.conflictNote}
+          >
+            <AlertTriangle aria-hidden className="size-3 shrink-0" />
+          </span>
+        ) : null}
       </button>
       <EventEditor
         mode="edit"

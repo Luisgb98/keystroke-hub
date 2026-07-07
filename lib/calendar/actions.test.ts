@@ -12,16 +12,29 @@ vi.mock("next/navigation", () => ({
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
+// `after()` requires a real request scope, which vitest's node environment
+// doesn't provide — the outbound Google push it schedules is exercised by
+// lib/sync/push.test.ts instead, so it's mocked away here entirely.
+vi.mock("next/server", () => ({ after: vi.fn((fn: () => unknown) => fn()) }));
+vi.mock("@/lib/sync/push", () => ({
+  pushEventCreated: vi.fn(),
+  pushEventUpdated: vi.fn(),
+  pushEventDeleted: vi.fn(),
+}));
 
 const dbMock = vi.hoisted(() => {
-  const insertValues = vi.fn().mockResolvedValue(undefined);
+  const insertReturning = vi.fn();
+  const insertValues = vi.fn(() => ({ returning: insertReturning }));
   const updateReturning = vi.fn();
   const deleteReturning = vi.fn();
+  const selectWhere = vi.fn();
 
   return {
+    insertReturning,
     insertValues,
     updateReturning,
     deleteReturning,
+    selectWhere,
     insert: vi.fn(() => ({ values: insertValues })),
     update: vi.fn(() => ({
       set: vi.fn(() => ({
@@ -30,6 +43,9 @@ const dbMock = vi.hoisted(() => {
     })),
     delete: vi.fn(() => ({
       where: vi.fn(() => ({ returning: deleteReturning })),
+    })),
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({ where: selectWhere })),
     })),
   };
 });
@@ -62,8 +78,11 @@ const validTimedForm = {
 
 beforeEach(() => {
   vi.mocked(verifySession).mockResolvedValue({ isAuth: true });
-  dbMock.deleteReturning.mockResolvedValue([{ id: "1" }]);
-  dbMock.updateReturning.mockResolvedValue([{ id: "evt-1" }]);
+  dbMock.insertReturning.mockResolvedValue([{ id: "evt-1", track: "work" }]);
+  dbMock.deleteReturning.mockResolvedValue([{ id: "1", track: "work" }]);
+  dbMock.updateReturning.mockResolvedValue([{ id: "evt-1", track: "work" }]);
+  // deleteEvent's pre-delete sync-link lookup — no link by default.
+  dbMock.selectWhere.mockResolvedValue([]);
 });
 
 afterEach(() => {

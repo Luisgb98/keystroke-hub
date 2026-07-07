@@ -12,4 +12,6 @@ export interface CalendarEvent {
   startsAt: Date;
   endsAt: Date;
   allDay: boolean;
+  /** Set when Google Calendar sync (issue #12) last resolved a conflicting edit on this event — see docs/google-sync.md. */
+  conflictNote: string | null;
 }

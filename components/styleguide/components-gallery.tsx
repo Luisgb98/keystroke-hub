@@ -160,6 +160,7 @@ export function ComponentsGallery() {
             startsAt: new Date(),
             endsAt: new Date(),
             allDay: false,
+            conflictNote: null,
           }}
         />
         <EventChip
@@ -171,6 +172,7 @@ export function ComponentsGallery() {
             startsAt: new Date(),
             endsAt: new Date(),
             allDay: false,
+            conflictNote: null,
           }}
         />
       </div>

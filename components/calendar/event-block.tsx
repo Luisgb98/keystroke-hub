@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { format } from "date-fns";
+import { AlertTriangle } from "lucide-react";
 import type { CSSProperties } from "react";
 
 import { cn } from "@/lib/utils";
@@ -37,6 +38,15 @@ export function EventBlock({ segment, style }: EventBlockProps) {
           <Icon aria-hidden className="size-3 shrink-0" />
           <span className="sr-only">{TRACK_LABEL[event.track]}: </span>
           <span className="truncate">{event.title}</span>
+          {event.conflictNote ? (
+            <span
+              role="img"
+              aria-label="Sync conflict was resolved on this event"
+              title={event.conflictNote}
+            >
+              <AlertTriangle aria-hidden className="size-3 shrink-0" />
+            </span>
+          ) : null}
         </div>
         <p className="truncate font-mono text-[0.65rem] opacity-80">
           {format(start, "HH:mm")}–{format(end, "HH:mm")}

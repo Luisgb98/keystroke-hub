@@ -1,3 +1,5 @@
+import { Settings } from "lucide-react";
+
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { NavLink } from "@/components/shell/nav-link";
 import { navItems } from "@/lib/navigation";
@@ -17,6 +19,12 @@ export function BottomNav() {
           variant="bottom"
         />
       ))}
+      <NavLink
+        href="/settings/calendars"
+        label="Settings"
+        icon={<Settings aria-hidden className="size-5" />}
+        variant="bottom"
+      />
       <SignOutButton variant="bottom" />
     </nav>
   );

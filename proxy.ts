@@ -62,9 +62,14 @@ export const config = {
     /*
      * Gate everything except:
      * - /api/health (public uptime probe — leaks nothing, see issue #8)
+     * - The three Google sync routes (issue #12), each hit by Google/Vercel
+     *   directly with no session cookie and carrying its own auth instead:
+     *   - api/google/oauth/callback — signed `state` JWT
+     *   - api/google/webhook — per-channel `X-Goog-Channel-Token`
+     *   - api/cron/calendar-sync — `CRON_SECRET` bearer token
      * - Next internals (_next/static, _next/image)
      * - static files (anything with an extension, e.g. favicon.ico, icons)
      */
-    "/((?!api/health|_next/static|_next/image|.*\\..*).*)",
+    "/((?!api/health|api/google/oauth/callback|api/google/webhook|api/cron/calendar-sync|_next/static|_next/image|.*\\..*).*)",
   ],
 };

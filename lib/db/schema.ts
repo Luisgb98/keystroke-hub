@@ -7,6 +7,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -45,3 +46,106 @@ export const events = pgTable(
 
 export type Event = typeof events.$inferSelect;
 export type NewEvent = typeof events.$inferInsert;
+
+// --- Google Calendar sync (issue #12) ---
+//
+// See docs/google-sync.md for the full design. Two tables: `calendarConnections`
+// (one per track, at most) and `eventSyncLinks` (one per synced event, kept
+// separate so #10/#11's `events` schema stays sync-agnostic and a disconnect
+// is a clean deletion of connection state only).
+
+export const connectionStatusEnum = pgEnum("connection_status", [
+  "active",
+  "error",
+  "disconnected",
+]);
+
+export const pushStateEnum = pgEnum("push_state", [
+  "synced",
+  "pending_push",
+  "pending_delete",
+  "error",
+]);
+
+export const calendarConnections = pgTable(
+  "calendar_connections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // At most one connection per track — the structural guarantee that
+    // makes crossing tracks impossible (see docs/google-sync.md).
+    track: trackEnum("track").notNull(),
+    googleAccountEmail: text("google_account_email").notNull(),
+    googleCalendarId: text("google_calendar_id").notNull(),
+    // AES-256-GCM ciphertext (lib/google/crypto.ts) — never plaintext at rest.
+    accessTokenEncrypted: text("access_token_encrypted").notNull(),
+    refreshTokenEncrypted: text("refresh_token_encrypted").notNull(),
+    tokenExpiresAt: timestamp("token_expires_at", {
+      withTimezone: true,
+    }).notNull(),
+    syncToken: text("sync_token"),
+    channelId: text("channel_id"),
+    channelResourceId: text("channel_resource_id"),
+    channelExpiresAt: timestamp("channel_expires_at", { withTimezone: true }),
+    // Per-channel secret Google echoes back in `X-Goog-Channel-Token` on
+    // every webhook push — verifies the request actually came from the
+    // channel we created (lib/google/oauth.ts generates it at watch time).
+    channelToken: text("channel_token"),
+    status: connectionStatusEnum("status").notNull().default("active"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [unique("calendar_connections_track_unique").on(table.track)]
+);
+
+export const eventSyncLinks = pgTable(
+  "event_sync_links",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Nullable + "set null" on event delete (not cascade): deleting an event
+    // marks this row `pending_delete` and clears `eventId` *before* the row
+    // is removed, so the Google-side delete survives past the event's own
+    // lifetime for the cron to push. Also nulled on disconnect (with
+    // `connectionId` cleared instead) so a reconnect can re-link losslessly
+    // by remembered `googleEventId` — see docs/google-sync.md open question 4.
+    eventId: uuid("event_id").references(() => events.id, {
+      onDelete: "set null",
+    }),
+    connectionId: uuid("connection_id").references(
+      () => calendarConnections.id,
+      { onDelete: "set null" }
+    ),
+    // Nullable: a freshly-created local event whose very first outbound push
+    // to Google failed has a link row (`push_state: "pending_push"`) before
+    // it has ever been assigned a Google id — the cron retry inserts rather
+    // than patches in that case (see lib/sync/run.ts).
+    googleEventId: text("google_event_id"),
+    googleEtag: text("google_etag"),
+    googleUpdatedAt: timestamp("google_updated_at", { withTimezone: true }),
+    pushState: pushStateEnum("push_state").notNull().default("synced"),
+    conflictNote: text("conflict_note"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    unique("event_sync_links_event_id_unique").on(table.eventId),
+    index("event_sync_links_connection_id_idx").on(table.connectionId),
+    index("event_sync_links_google_event_id_idx").on(table.googleEventId),
+  ]
+);
+
+export type CalendarConnection = typeof calendarConnections.$inferSelect;
+export type NewCalendarConnection = typeof calendarConnections.$inferInsert;
+export type EventSyncLink = typeof eventSyncLinks.$inferSelect;
+export type NewEventSyncLink = typeof eventSyncLinks.$inferInsert;

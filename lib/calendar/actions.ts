@@ -1,14 +1,35 @@
 "use server";
 
 import { eq } from "drizzle-orm";
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { verifySession } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
-import { events } from "@/lib/db/schema";
+import { eventSyncLinks, events } from "@/lib/db/schema";
+import {
+  pushEventCreated,
+  pushEventDeleted,
+  pushEventUpdated,
+} from "@/lib/sync/push";
 
 import { eventFormSchema } from "./event-schema";
+
+/**
+ * Schedules `fn` via `after()`, swallowing a synchronous throw from `after`
+ * itself (rather than the callback) — matches the "push failures never
+ * block or fail the mutation" contract in docs/google-sync.md, extended to
+ * the scheduling call itself in case the request-scope `after` needs isn't
+ * available for some reason.
+ */
+function schedulePush(fn: () => Promise<void>): void {
+  try {
+    after(fn);
+  } catch (error) {
+    console.error("Failed to schedule Google Calendar push:", error);
+  }
+}
 
 export interface EventActionState {
   error?: string;
@@ -46,8 +67,14 @@ export async function createEvent(
   }
 
   const db = getDb();
-  await db.insert(events).values(parsed.data);
+  const [inserted] = await db
+    .insert(events)
+    .values(parsed.data)
+    .returning({ id: events.id, track: events.track });
   revalidatePath("/calendar");
+  // Push to Google after the response is sent (see docs/google-sync.md) —
+  // never delays or can fail this mutation for the user.
+  schedulePush(() => pushEventCreated(inserted.id, inserted.track));
   return { success: true };
 }
 
@@ -71,13 +98,14 @@ export async function updateEvent(
     .update(events)
     .set(parsed.data)
     .where(eq(events.id, id))
-    .returning({ id: events.id });
+    .returning({ id: events.id, track: events.track });
 
   if (updated.length === 0) {
     return { error: "That event no longer exists." };
   }
 
   revalidatePath("/calendar");
+  schedulePush(() => pushEventUpdated(updated[0].id, updated[0].track));
   return { success: true };
 }
 
@@ -89,15 +117,28 @@ export async function deleteEvent(id: string): Promise<DeleteEventResult> {
   await verifySession();
 
   const db = getDb();
+  // Captured before the delete: the link's `eventId` auto-nulls via
+  // `ON DELETE SET NULL` the moment the event row is gone (lib/db/schema.ts),
+  // and `after()` runs strictly after that — see lib/sync/push.ts.
+  const [link] = await db
+    .select()
+    .from(eventSyncLinks)
+    .where(eq(eventSyncLinks.eventId, id));
+
   const deleted = await db
     .delete(events)
     .where(eq(events.id, id))
-    .returning({ id: events.id });
+    .returning({ id: events.id, track: events.track });
 
   if (deleted.length === 0) {
     return { error: "That event no longer exists." };
   }
 
   revalidatePath("/calendar");
+  if (link) {
+    schedulePush(() =>
+      pushEventDeleted(link.id, link.googleEventId, deleted[0].track)
+    );
+  }
   return {};
 }
