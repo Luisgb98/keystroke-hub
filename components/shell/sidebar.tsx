@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { SignOutButton } from "@/components/auth/sign-out-button";
 import { NavLink } from "@/components/shell/nav-link";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { navItems } from "@/lib/navigation";
@@ -28,7 +29,10 @@ export function Sidebar() {
 
       <div className="flex items-center justify-between border-t border-border px-4 py-3">
         <span className="text-caption text-muted-foreground">Theme</span>
-        <ThemeToggle />
+        <div className="flex items-center gap-1">
+          <ThemeToggle />
+          <SignOutButton variant="sidebar" />
+        </div>
       </div>
     </aside>
   );

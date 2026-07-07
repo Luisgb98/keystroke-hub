@@ -5,6 +5,7 @@ import { DualTrackShowcase } from "@/components/styleguide/dual-track-showcase";
 import { SectionNav } from "@/components/styleguide/section-nav";
 import { TokenSwatch } from "@/components/styleguide/token-swatch";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { verifySession } from "@/lib/auth/session";
 import {
   motionTokens,
   radiusTokens,
@@ -20,7 +21,10 @@ export const metadata: Metadata = {
     "Living reference for Keystroke Hub's design tokens and components.",
 };
 
-export default function StyleguidePage() {
+export default async function StyleguidePage() {
+  // DAL check — the proxy gate is only optimistic (see docs/auth.md).
+  await verifySession();
+
   return (
     <div className="flex flex-1 flex-col">
       <header className="flex items-center justify-between px-6 pt-6 sm:px-10">

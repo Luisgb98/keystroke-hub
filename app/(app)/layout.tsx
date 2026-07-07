@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { BottomNav } from "@/components/shell/bottom-nav";
 import { Sidebar } from "@/components/shell/sidebar";
+import { verifySession } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
   title: {
@@ -10,11 +11,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default function AppShellLayout({
+export default async function AppShellLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // DAL check — the proxy gate is only optimistic (see docs/auth.md).
+  await verifySession();
+
   return (
     <div className="flex min-h-full flex-1">
       <Sidebar />
