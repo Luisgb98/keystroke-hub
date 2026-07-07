@@ -34,4 +34,7 @@ Single-user personal app for a full-stack developer who is also a gaming content
 6. Assign **`Luisgb98`** (repo owner) as assignee on every Issue and PR.
 7. Set correct metadata everywhere: type label (`type:feature`, `type:bug`, `type:chore`, …), epic label (`epic:*`), milestone, and link the PR to its originating Issue (`Closes #X`).
 8. All commits follow Conventional Commits (see Non-negotiables).
-9. **Bump the project version once per feature**, semver driven by the commit type: `feat` → minor, `fix` → patch, breaking change → major. The concrete mechanism is defined in the versioning foundation Issue — follow it once it lands.
+9. **Bump the project version once per feature**, semver driven by the commit type: `feat` → minor, `fix` → patch, breaking change → major (see [Versioning](README.md#versioning) in the README for the full convention and the verification command). In short:
+   - Before opening the PR, determine the bump level from `git log develop..HEAD`: any `!` marker or `BREAKING CHANGE:` footer → major, else any `feat:` → minor, else → patch (this covers `fix`-only and `chore`/`docs`/`test`/`refactor`/`style`-only branches too — every branch bumps at least a patch).
+   - Bump with `pnpm version <level> --no-git-tag-version` and commit the result as `chore(release): v<X.Y.Z>` — the final commit on the branch.
+   - Run `pnpm version:check` to confirm the bump is present, is exactly one semver step, and meets the required level before opening the PR.
