@@ -3,6 +3,7 @@
 import { LayoutDashboard, NotebookPen } from "lucide-react";
 import { toast } from "sonner";
 
+import { EventChip } from "@/components/calendar/event-chip";
 import { NavLink } from "@/components/shell/nav-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -147,6 +148,31 @@ export function ComponentsGallery() {
       <div className="flex flex-col gap-2">
         <Skeleton className="h-4 w-48" />
         <Skeleton className="h-4 w-32" />
+      </div>
+
+      <div className="flex max-w-xs flex-col gap-1">
+        <EventChip
+          event={{
+            id: "styleguide-work",
+            track: "work",
+            title: "Sprint planning",
+            description: null,
+            startsAt: new Date(),
+            endsAt: new Date(),
+            allDay: false,
+          }}
+        />
+        <EventChip
+          event={{
+            id: "styleguide-content",
+            track: "content",
+            title: "Record voiceover",
+            description: null,
+            startsAt: new Date(),
+            endsAt: new Date(),
+            allDay: false,
+          }}
+        />
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
