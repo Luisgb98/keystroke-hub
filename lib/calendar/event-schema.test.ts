@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { eventFormSchema } from "./event-schema";
+import { eventFormSchema, rescheduleSchema } from "./event-schema";
 
 function baseInput(overrides: Record<string, unknown> = {}) {
   return {
@@ -165,6 +165,58 @@ describe("eventFormSchema", () => {
 
   it("rejects a malformed time", () => {
     const result = eventFormSchema.safeParse(baseInput({ startTime: "9am" }));
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("rescheduleSchema", () => {
+  it("accepts a valid drag/resize payload", () => {
+    const result = rescheduleSchema.safeParse({
+      id: "evt-1",
+      startsAt: new Date("2026-07-08T09:00:00"),
+      endsAt: new Date("2026-07-08T10:00:00"),
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts equal start/end (zero-width boundary)", () => {
+    const date = new Date("2026-07-08T09:00:00");
+    const result = rescheduleSchema.safeParse({
+      id: "evt-1",
+      startsAt: date,
+      endsAt: date,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects endsAt before startsAt", () => {
+    const result = rescheduleSchema.safeParse({
+      id: "evt-1",
+      startsAt: new Date("2026-07-08T10:00:00"),
+      endsAt: new Date("2026-07-08T09:00:00"),
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path[0] === "endsAt");
+      expect(issue?.message).toBe("End must be after start");
+    }
+  });
+
+  it("rejects a missing id", () => {
+    const result = rescheduleSchema.safeParse({
+      id: "",
+      startsAt: new Date("2026-07-08T09:00:00"),
+      endsAt: new Date("2026-07-08T10:00:00"),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a non-date startsAt", () => {
+    const result = rescheduleSchema.safeParse({
+      id: "evt-1",
+      startsAt: "2026-07-08T09:00:00",
+      endsAt: new Date("2026-07-08T10:00:00"),
+    });
     expect(result.success).toBe(false);
   });
 });

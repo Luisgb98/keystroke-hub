@@ -7,6 +7,7 @@ import { format, isSameDay, isSameMonth } from "date-fns";
 
 import { cn } from "@/lib/utils";
 import { MONTH_CELL_MAX_CHIPS } from "@/lib/calendar/constants";
+import type { TimeShift } from "@/lib/calendar/drag";
 import { quickAddFromDayCell } from "@/lib/calendar/quick-add";
 import { formatDateParam } from "@/lib/calendar/range";
 import { eventOverlapsDay } from "@/lib/calendar/segments";
@@ -14,6 +15,7 @@ import type { CalendarEvent } from "@/lib/calendar/types";
 
 import { EventChip } from "./event-chip";
 import { EventEditor } from "./event-editor";
+import { useEventReschedule } from "./use-event-reschedule";
 
 interface MonthViewProps {
   days: Date[];
@@ -26,6 +28,8 @@ interface MonthViewProps {
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export function MonthView({ days, anchorMonth, events, now }: MonthViewProps) {
+  const { events: liveEvents, reschedule } = useEventReschedule(events);
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-border">
       <div className="grid grid-cols-7 border-b border-border">
@@ -40,7 +44,7 @@ export function MonthView({ days, anchorMonth, events, now }: MonthViewProps) {
       </div>
       <div className="grid flex-1 grid-cols-7 grid-rows-6 overflow-y-auto">
         {days.map((day) => {
-          const dayEvents = events
+          const dayEvents = liveEvents
             .filter((event) => eventOverlapsDay(event, day))
             .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
           const visible = dayEvents.slice(0, MONTH_CELL_MAX_CHIPS);
@@ -56,6 +60,7 @@ export function MonthView({ days, anchorMonth, events, now }: MonthViewProps) {
               overflowCount={overflowCount}
               inAnchorMonth={inAnchorMonth}
               isToday={isToday}
+              onReschedule={reschedule}
             />
           );
         })}
@@ -70,6 +75,7 @@ interface MonthCellProps {
   overflowCount: number;
   inAnchorMonth: boolean;
   isToday: boolean;
+  onReschedule: (event: CalendarEvent, shift: TimeShift) => void;
 }
 
 /**
@@ -85,11 +91,13 @@ function MonthCell({
   overflowCount,
   inAnchorMonth,
   isToday,
+  onReschedule,
 }: MonthCellProps) {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
 
   return (
     <div
+      data-slot="month-cell"
       className={cn(
         "group relative flex min-h-20 flex-col gap-1 border-t border-l border-border p-1.5 first:border-l-0 [&:nth-child(7n+1)]:border-l-0",
         !inAnchorMonth && "bg-muted/30"
@@ -112,7 +120,11 @@ function MonthCell({
       </span>
       <div className="relative z-10 flex min-w-0 flex-col gap-0.5">
         {visible.map((event) => (
-          <EventChip key={event.id} event={event} />
+          <EventChip
+            key={event.id}
+            event={event}
+            onReschedule={(shift) => onReschedule(event, shift)}
+          />
         ))}
         {overflowCount > 0 && (
           <span className="text-caption text-muted-foreground">

@@ -3,7 +3,12 @@
 import { useState } from "react";
 import { format } from "date-fns";
 
-import { DAY_GRID_HEIGHT_REM, HOURS_IN_DAY } from "@/lib/calendar/constants";
+import {
+  DAY_GRID_HEIGHT_REM,
+  HOURS_IN_DAY,
+  MINUTES_IN_DAY,
+} from "@/lib/calendar/constants";
+import type { TimeShift } from "@/lib/calendar/drag";
 import { layoutTimedEvents } from "@/lib/calendar/layout";
 import { quickAddFromSlot } from "@/lib/calendar/quick-add";
 import {
@@ -22,12 +27,19 @@ interface DayColumnProps {
   /** Timed (non-all-day) events for the whole visible range — filtered here to this day. */
   events: CalendarEvent[];
   now: Date;
+  /** Whether this column sits in a multi-column week grid — enables horizontal (day-to-day) drag. */
+  crossDayDrag?: boolean;
+  onReschedule?: (event: CalendarEvent, shift: TimeShift) => void;
 }
 
-const MINUTES_IN_DAY = HOURS_IN_DAY * 60;
-
 /** A single day's vertical time grid: hour gridlines, positioned timed events, and the now-line. */
-export function DayColumn({ day, events, now }: DayColumnProps) {
+export function DayColumn({
+  day,
+  events,
+  now,
+  crossDayDrag = false,
+  onReschedule,
+}: DayColumnProps) {
   const [quickAddHour, setQuickAddHour] = useState<number | null>(null);
 
   const segments = events
@@ -44,6 +56,7 @@ export function DayColumn({ day, events, now }: DayColumnProps) {
 
   return (
     <div
+      data-slot="day-column"
       className="relative border-l border-border first:border-l-0"
       style={{ height: `${DAY_GRID_HEIGHT_REM}rem` }}
     >
@@ -81,6 +94,13 @@ export function DayColumn({ day, events, now }: DayColumnProps) {
           <EventBlock
             key={segment.event.id}
             segment={segment}
+            day={day}
+            crossDayDrag={crossDayDrag}
+            onReschedule={
+              onReschedule
+                ? (shift) => onReschedule(segment.event, shift)
+                : undefined
+            }
             style={{
               top: `${(start / MINUTES_IN_DAY) * 100}%`,
               height: `${Math.max((end - start) / MINUTES_IN_DAY, 0.02) * 100}%`,

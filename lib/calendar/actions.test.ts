@@ -57,7 +57,13 @@ vi.mock("@/lib/db", () => ({
 import { revalidatePath } from "next/cache";
 
 import { verifySession } from "@/lib/auth/session";
-import { createEvent, deleteEvent, updateEvent } from "./actions";
+import { pushEventUpdated } from "@/lib/sync/push";
+import {
+  createEvent,
+  deleteEvent,
+  rescheduleEvent,
+  updateEvent,
+} from "./actions";
 
 function form(entries: Record<string, string>): FormData {
   const data = new FormData();
@@ -163,6 +169,51 @@ describe("updateEvent", () => {
     dbMock.updateReturning.mockResolvedValueOnce([]);
     const state = await updateEvent("missing", undefined, form(validTimedForm));
     expect(state).toEqual({ error: "That event no longer exists." });
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+});
+
+describe("rescheduleEvent", () => {
+  const start = new Date("2026-07-08T09:00:00");
+  const end = new Date("2026-07-08T10:00:00");
+
+  it("verifies the session before touching the database", async () => {
+    await rescheduleEvent("evt-1", start, end);
+    expect(verifySession).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects an unauthenticated call before writing", async () => {
+    vi.mocked(verifySession).mockRejectedValueOnce(
+      new Error("NEXT_REDIRECT:/login")
+    );
+    await expect(rescheduleEvent("evt-1", start, end)).rejects.toThrow(
+      "NEXT_REDIRECT:/login"
+    );
+    expect(dbMock.update).not.toHaveBeenCalled();
+  });
+
+  it("updates only the time bounds and revalidates the calendar", async () => {
+    const result = await rescheduleEvent("evt-1", start, end);
+    expect(result).toEqual({});
+    expect(dbMock.update).toHaveBeenCalledTimes(1);
+    expect(revalidatePath).toHaveBeenCalledWith("/calendar");
+  });
+
+  it("schedules a Google push for the updated event", async () => {
+    await rescheduleEvent("evt-1", start, end);
+    expect(pushEventUpdated).toHaveBeenCalledWith("evt-1", "work");
+  });
+
+  it("returns an error without writing when endsAt is before startsAt", async () => {
+    const result = await rescheduleEvent("evt-1", end, start);
+    expect(result).toEqual({ error: "That reschedule isn't valid." });
+    expect(dbMock.update).not.toHaveBeenCalled();
+  });
+
+  it("returns an error (not a throw) when rescheduling a nonexistent event", async () => {
+    dbMock.updateReturning.mockResolvedValueOnce([]);
+    const result = await rescheduleEvent("missing", start, end);
+    expect(result).toEqual({ error: "That event no longer exists." });
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 });
