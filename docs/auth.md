@@ -63,6 +63,9 @@ Vercel project settings for deploys):
 - **Rate limiting**: there is none beyond the constant-time compare and the
   1 s failure delay — proportionate for a single-user app. If the URL ever
   attracts attention, add Vercel WAF / rate rules in front.
+- **`AUTH_FAILURE_DELAY_MS`** (optional): overrides the failure delay in
+  milliseconds, mainly so unit/e2e tests don't wait out the real 1 s. Leave
+  unset in production.
 
 ## Testing
 
