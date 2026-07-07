@@ -1,10 +1,18 @@
 import { defineConfig, devices } from "@playwright/test";
+import { config } from "dotenv";
 
 import {
   E2E_PASSWORD_HASH,
   E2E_SESSION_SECRET,
   STORAGE_STATE,
 } from "./e2e/support/credentials";
+
+// The Playwright test runner is a plain Node process — unlike `next dev`/
+// `next start`, it doesn't load `.env*` files on its own. Loading it here
+// makes `process.env.DATABASE_URL` available both to spec files (e.g. the
+// health and calendar DB-skip checks) and to the webServer env below.
+config({ path: ".env.local" });
+config({ path: ".env" });
 
 export default defineConfig({
   testDir: "./e2e",
@@ -31,6 +39,11 @@ export default defineConfig({
       name: "mobile-chrome",
       use: { ...devices["Pixel 7"], storageState: STORAGE_STATE },
       dependencies: ["setup"],
+      // calendar.spec.ts seeds/clears real rows in the dev database and
+      // already covers its own mobile-viewport checks via `test.use`, so
+      // running it again under this project would race against the
+      // chromium project's runs against the same shared DB.
+      testIgnore: /calendar\.spec\.ts$/,
     },
   ],
   webServer: {
