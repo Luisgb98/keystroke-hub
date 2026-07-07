@@ -69,6 +69,14 @@ Testing is mandatory for every feature — see `AGENTS.md`.
     local dev server, stop it first — Playwright's `webServer` needs the
     port and only reuses an existing server outside of `CI`.
 
+## Authentication
+
+The whole app sits behind a lightweight single-user gate: one password
+(stored as a scrypt hash in an env var), a signed session cookie, no user
+accounts, no database. Set `SESSION_SECRET` and `AUTH_PASSWORD_HASH` (see
+`.env.example`; generate the hash with `pnpm auth:hash`). Full details in
+[`docs/auth.md`](docs/auth.md).
+
 ## Database
 
 Postgres on [Neon](https://neon.tech), accessed through

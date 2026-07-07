@@ -6,6 +6,12 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      // Vitest isn't a react-server environment, so the package's default
+      // export would throw; resolve it to its no-op build instead.
+      "server-only": path.resolve(
+        __dirname,
+        "node_modules/server-only/empty.js"
+      ),
       "@": path.resolve(__dirname, "."),
     },
   },
