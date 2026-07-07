@@ -8,6 +8,10 @@ content creator. It keeps two worlds side by side without mixing them:
 
 Both tracks share one calendar UI but stay strictly separated everywhere else.
 
+This is a personal project built for one user (me) — it isn't looking for
+contributions, but the code is public so feel free to read, fork, or borrow
+from it.
+
 ## Tech stack
 
 - [Next.js](https://nextjs.org) (App Router) + React
@@ -21,6 +25,18 @@ This project uses **pnpm only** — do not use npm or yarn.
 
 ```bash
 pnpm install
+```
+
+Copy `.env.example` to `.env.local` and fill in the values:
+
+- **`DATABASE_URL`** / **`DATABASE_URL_UNPOOLED`** — Neon Postgres connection
+  strings (pooled and direct). Copy them from the Neon console for your
+  development branch. See [`docs/database.md`](docs/database.md).
+- **`SESSION_SECRET`** — generate with `openssl rand -base64 32`.
+- **`AUTH_PASSWORD_HASH`** — generate with `pnpm auth:hash`. See
+  [`docs/auth.md`](docs/auth.md).
+
+```bash
 pnpm dev
 ```
 
@@ -124,7 +140,6 @@ PR can be merged. Reproduce any of them locally with the matching `pnpm`
 script from the [Code quality](#code-quality) and [Testing](#testing) tables
 above.
 
-## Learn more
+## License
 
-- [Next.js Documentation](https://nextjs.org/docs)
-- [shadcn/ui Documentation](https://ui.shadcn.com/docs)
+[MIT](LICENSE)
