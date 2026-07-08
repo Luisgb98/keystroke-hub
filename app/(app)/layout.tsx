@@ -22,7 +22,7 @@ export default async function AppShellLayout({
   return (
     <div className="flex min-h-full flex-1">
       <Sidebar />
-      <main className="flex min-h-full flex-1 flex-col pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
+      <main className="flex min-h-full min-w-0 flex-1 flex-col pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
         {children}
       </main>
       <BottomNav />
