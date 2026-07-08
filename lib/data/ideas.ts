@@ -65,3 +65,13 @@ export async function getDistinctIdeaTags(): Promise<string[]> {
   );
   return result.rows.map((row) => row.tag);
 }
+
+/**
+ * Every idea, feeding #16's board — grouping/sorting happens client-side in
+ * `groupIdeasByStatus` (`lib/content/board.ts`), which also has to run
+ * without a database dependency for the board's optimistic moves.
+ */
+export async function getIdeasForBoard(): Promise<Idea[]> {
+  const db = getDb();
+  return db.select().from(ideas);
+}

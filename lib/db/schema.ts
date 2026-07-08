@@ -165,12 +165,14 @@ export const ideaFormatEnum = pgEnum("idea_format", [
 // The full pipeline vocabulary is defined here (not just the initial stage)
 // so issue #16's board consumes this single source of truth rather than
 // inventing its own — see docs/content-ideas.md. Adding a stage later is a
-// cheap `ALTER TYPE ... ADD VALUE` migration.
+// cheap `ALTER TYPE ... ADD VALUE` migration. `edited` was added by #16,
+// between `recorded` and `published`, to cover the board's pipeline.
 export const ideaStatusEnum = pgEnum("idea_status", [
   "spark",
   "outlined",
   "scripted",
   "recorded",
+  "edited",
   "published",
   "parked",
 ]);
@@ -189,6 +191,15 @@ export const ideas = pgTable(
     // Nullable, no UI yet: forward-compat for the projects tracker (#24),
     // which doesn't exist. Avoids a data migration once it lands.
     projectId: uuid("project_id"),
+    // When the idea last entered its current `status` — powers the board's
+    // (#16) time-in-stage chip and oldest-first column sort. Set by
+    // `updateIdeaStatus` only when the status actually changes (re-selecting
+    // the same status doesn't reset the clock). Backfilled from `updatedAt`
+    // at migration time, since `updateIdeaStatus` was the only post-capture
+    // write path before this column existed (see docs/content-ideas.md).
+    stageEnteredAt: timestamp("stage_entered_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -201,6 +212,7 @@ export const ideas = pgTable(
     index("ideas_status_idx").on(table.status),
     index("ideas_created_at_idx").on(table.createdAt),
     index("ideas_tags_idx").using("gin", table.tags),
+    index("ideas_stage_entered_at_idx").on(table.stageEnteredAt),
   ]
 );
 

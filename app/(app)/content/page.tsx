@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Clapperboard, Lightbulb } from "lucide-react";
+import { Clapperboard, Columns3, Lightbulb } from "lucide-react";
 
 import { PlaceholderPanel } from "@/components/shell/placeholder-panel";
 import { Card, CardContent } from "@/components/ui/card";
@@ -30,6 +30,23 @@ export default function ContentPage() {
               <span className="font-heading text-h3 font-semibold">Ideas</span>
               <span className="text-small text-muted-foreground">
                 Capture and organize video and stream ideas
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
+
+      <Link href="/content/board" className="block">
+        <Card className="border-track-content-border transition-colors hover:bg-track-content/40">
+          <CardContent className="flex items-center gap-3">
+            <Columns3
+              aria-hidden
+              className="size-6 shrink-0 text-track-content-foreground"
+            />
+            <div className="flex flex-col">
+              <span className="font-heading text-h3 font-semibold">Board</span>
+              <span className="text-small text-muted-foreground">
+                Track every idea through the pipeline, stage by stage
               </span>
             </div>
           </CardContent>

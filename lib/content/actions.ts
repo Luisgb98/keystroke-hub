@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -53,10 +53,15 @@ export interface UpdateIdeaStatusResult {
 }
 
 /**
- * Narrow mutation for the inline status control on `IdeaCard` — the only
- * field editable after capture until issue #16's board exists (see
- * docs/content-ideas.md open question 2). Mirrors `rescheduleEvent`'s
+ * Shared by `IdeaCard`'s inline status `<select>` and #16's board move menu —
+ * both surfaces call this one mutation, so behavior (including the stage
+ * clock below) stays consistent between them. Mirrors `rescheduleEvent`'s
  * narrow-mutation shape in `lib/calendar/actions.ts`.
+ *
+ * `stageEnteredAt` resets to `now()` only when the status actually changes —
+ * re-submitting the current status (e.g. re-selecting it, or a stale
+ * optimistic retry) must not reset the board's time-in-stage clock (see
+ * docs/content-ideas.md).
  */
 export async function updateIdeaStatus(
   id: string,
@@ -72,7 +77,10 @@ export async function updateIdeaStatus(
   const db = getDb();
   const updated = await db
     .update(ideas)
-    .set({ status: parsed.data.status })
+    .set({
+      status: parsed.data.status,
+      stageEnteredAt: sql`case when ${ideas.status} is distinct from ${parsed.data.status} then now() else ${ideas.stageEnteredAt} end`,
+    })
     .where(eq(ideas.id, parsed.data.id))
     .returning({ id: ideas.id });
 
@@ -81,6 +89,7 @@ export async function updateIdeaStatus(
   }
 
   revalidatePath("/content/ideas");
+  revalidatePath("/content/board");
   return {};
 }
 
