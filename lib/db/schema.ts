@@ -149,3 +149,60 @@ export type CalendarConnection = typeof calendarConnections.$inferSelect;
 export type NewCalendarConnection = typeof calendarConnections.$inferInsert;
 export type EventSyncLink = typeof eventSyncLinks.$inferSelect;
 export type NewEventSyncLink = typeof eventSyncLinks.$inferInsert;
+
+// --- Idea capture & organization (issue #15) ---
+//
+// See docs/content-ideas.md. One table, deliberately independent of `events`
+// — an idea only ever *becomes* content, it doesn't share the calendar's
+// track discriminator (ideas live entirely in the content world).
+
+export const ideaFormatEnum = pgEnum("idea_format", [
+  "video",
+  "stream",
+  "either",
+]);
+
+// The full pipeline vocabulary is defined here (not just the initial stage)
+// so issue #16's board consumes this single source of truth rather than
+// inventing its own — see docs/content-ideas.md. Adding a stage later is a
+// cheap `ALTER TYPE ... ADD VALUE` migration.
+export const ideaStatusEnum = pgEnum("idea_status", [
+  "spark",
+  "outlined",
+  "scripted",
+  "recorded",
+  "published",
+  "parked",
+]);
+
+export const ideas = pgTable(
+  "ideas",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    title: text("title").notNull(),
+    notes: text("notes"),
+    format: ideaFormatEnum("format").notNull().default("either"),
+    status: ideaStatusEnum("status").notNull().default("spark"),
+    // Free-form, single-user tags — filter options are derived from tags in
+    // use rather than a normalized tag table (see docs/content-ideas.md).
+    tags: text("tags").array().notNull().default([]),
+    // Nullable, no UI yet: forward-compat for the projects tracker (#24),
+    // which doesn't exist. Avoids a data migration once it lands.
+    projectId: uuid("project_id"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("ideas_status_idx").on(table.status),
+    index("ideas_created_at_idx").on(table.createdAt),
+    index("ideas_tags_idx").using("gin", table.tags),
+  ]
+);
+
+export type Idea = typeof ideas.$inferSelect;
+export type NewIdea = typeof ideas.$inferInsert;

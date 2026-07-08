@@ -1,0 +1,105 @@
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const updateIdeaStatus = vi.hoisted(() => vi.fn());
+const deleteIdea = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/content/actions", () => ({ updateIdeaStatus, deleteIdea }));
+
+const toastSuccess = vi.hoisted(() => vi.fn());
+const toastError = vi.hoisted(() => vi.fn());
+vi.mock("sonner", () => ({
+  toast: { success: toastSuccess, error: toastError },
+}));
+
+import type { Idea } from "@/lib/db/schema";
+import { IdeaCard } from "./idea-card";
+
+function makeIdea(overrides: Partial<Idea> = {}): Idea {
+  return {
+    id: "idea-1",
+    title: "Speedrun any% commentary",
+    notes: null,
+    format: "either",
+    status: "spark",
+    tags: [],
+    projectId: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  };
+}
+
+describe("IdeaCard", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renders the title, format, and tags", () => {
+    render(
+      <IdeaCard
+        idea={makeIdea({ format: "video", tags: ["speedrun", "glitch"] })}
+      />
+    );
+
+    expect(screen.getByText("Speedrun any% commentary")).toBeInTheDocument();
+    expect(screen.getByText("Video")).toBeInTheDocument();
+    expect(screen.getByText("speedrun")).toBeInTheDocument();
+    expect(screen.getByText("glitch")).toBeInTheDocument();
+  });
+
+  it("renders notes when present, and omits the block when absent", () => {
+    const { rerender } = render(
+      <IdeaCard idea={makeIdea({ notes: "Cover the wrong warp" })} />
+    );
+    expect(screen.getByText("Cover the wrong warp")).toBeInTheDocument();
+
+    rerender(<IdeaCard idea={makeIdea({ notes: null })} />);
+    expect(screen.queryByText("Cover the wrong warp")).not.toBeInTheDocument();
+  });
+
+  it("shows the idea's current status in the status control", () => {
+    render(<IdeaCard idea={makeIdea({ status: "outlined" })} />);
+    expect(screen.getByLabelText("Status")).toHaveValue("outlined");
+  });
+
+  it("changes status and calls updateIdeaStatus", async () => {
+    updateIdeaStatus.mockResolvedValue({});
+    const user = userEvent.setup();
+    render(<IdeaCard idea={makeIdea({ id: "idea-42", status: "spark" })} />);
+
+    await user.selectOptions(screen.getByLabelText("Status"), "outlined");
+
+    await waitFor(() =>
+      expect(updateIdeaStatus).toHaveBeenCalledWith("idea-42", "outlined")
+    );
+  });
+
+  it("toasts an error without reverting the select when the status update fails", async () => {
+    updateIdeaStatus.mockResolvedValue({
+      error: "That idea no longer exists.",
+    });
+    const user = userEvent.setup();
+    render(<IdeaCard idea={makeIdea()} />);
+
+    await user.selectOptions(screen.getByLabelText("Status"), "parked");
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith("That idea no longer exists.")
+    );
+  });
+
+  it("opens a delete confirmation and calls deleteIdea on confirm", async () => {
+    deleteIdea.mockResolvedValue({});
+    const user = userEvent.setup();
+    render(<IdeaCard idea={makeIdea({ id: "idea-7", title: "Old idea" })} />);
+
+    await user.click(screen.getByRole("button", { name: 'Delete "Old idea"' }));
+    const confirm = screen.getByRole("alertdialog");
+    expect(confirm).toBeVisible();
+
+    await user.click(within(confirm).getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(deleteIdea).toHaveBeenCalledWith("idea-7"));
+  });
+});
