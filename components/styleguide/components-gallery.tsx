@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { AgendaItemRow } from "@/components/agenda/agenda-item";
 import { EventChip } from "@/components/calendar/event-chip";
+import { ScriptReadingView } from "@/components/content/script/script-reading-view";
 import { NavLink } from "@/components/shell/nav-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -210,6 +211,14 @@ export function ComponentsGallery() {
             timeLabel: "All day",
             inProgress: false,
           }}
+        />
+      </div>
+
+      <div className="max-w-lg rounded-xl border border-border p-4">
+        <ScriptReadingView
+          content={
+            "# Cold open\n\nHook the viewer in the first five seconds.\n\n## Beat 1\n\n- Show the glitch\n- Ask the question\n\n> Don't explain the trick yet — that's the payoff.\n\nUse `speedrun.com` for splits, or a fenced block for setup:\n\n```bash\nffmpeg -i raw.mp4 -c copy clip.mp4\n```"
+          }
         />
       </div>
 

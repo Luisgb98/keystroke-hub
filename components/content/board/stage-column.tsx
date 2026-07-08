@@ -13,6 +13,7 @@ interface StageColumnProps {
   status: IdeaStatus;
   ideas: Idea[];
   onMove: (idea: Idea, status: IdeaStatus) => void;
+  ideaIdsWithScripts?: Set<string>;
 }
 
 /**
@@ -21,7 +22,12 @@ interface StageColumnProps {
  * of looking broken. `parked` renders visually muted — dead ideas shouldn't
  * read as pipeline load (see docs/content-ideas.md).
  */
-export function StageColumn({ status, ideas, onMove }: StageColumnProps) {
+export function StageColumn({
+  status,
+  ideas,
+  onMove,
+  ideaIdsWithScripts = new Set(),
+}: StageColumnProps) {
   const isParked = status === PARKED_IDEA_STATUS;
 
   return (
@@ -55,7 +61,12 @@ export function StageColumn({ status, ideas, onMove }: StageColumnProps) {
           </p>
         ) : (
           ideas.map((idea) => (
-            <BoardCard key={idea.id} idea={idea} onMove={onMove} />
+            <BoardCard
+              key={idea.id}
+              idea={idea}
+              onMove={onMove}
+              hasScript={ideaIdsWithScripts.has(idea.id)}
+            />
           ))
         )}
       </div>

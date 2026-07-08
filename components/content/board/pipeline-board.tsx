@@ -12,6 +12,7 @@ import { StageColumn } from "./stage-column";
 
 interface PipelineBoardProps {
   ideas: Idea[];
+  ideaIdsWithScripts?: Set<string>;
 }
 
 interface MoveAction {
@@ -28,7 +29,10 @@ interface MoveAction {
  * built-in rollback), and a toast surfaces the error (see
  * docs/content-ideas.md).
  */
-export function PipelineBoard({ ideas }: PipelineBoardProps) {
+export function PipelineBoard({
+  ideas,
+  ideaIdsWithScripts = new Set(),
+}: PipelineBoardProps) {
   const [optimisticIdeas, applyMove] = useOptimistic<Idea[], MoveAction>(
     ideas,
     (current, { id, status }) =>
@@ -61,6 +65,7 @@ export function PipelineBoard({ ideas }: PipelineBoardProps) {
           status={status}
           ideas={grouped[status]}
           onMove={handleMove}
+          ideaIdsWithScripts={ideaIdsWithScripts}
         />
       ))}
     </div>

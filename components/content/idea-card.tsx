@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { Trash2 } from "lucide-react";
+import { ScrollText, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { updateIdeaStatus } from "@/lib/content/actions";
@@ -18,6 +19,8 @@ import { IDEA_FORMAT_ICON } from "./idea-format-styles";
 
 interface IdeaCardProps {
   idea: Idea;
+  /** Whether a non-empty script is already saved for this idea (see docs/scripts.md). */
+  hasScript?: boolean;
 }
 
 /**
@@ -25,7 +28,7 @@ interface IdeaCardProps {
  * open question 2) — a plain `<select>` change commits immediately, no
  * confirmation needed since it's cheap to change back.
  */
-export function IdeaCard({ idea }: IdeaCardProps) {
+export function IdeaCard({ idea, hasScript = false }: IdeaCardProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const Icon = IDEA_FORMAT_ICON[idea.format];
@@ -47,15 +50,31 @@ export function IdeaCard({ idea }: IdeaCardProps) {
             <Icon aria-hidden className="size-4 shrink-0" />
             <span>{IDEA_FORMAT_LABEL[idea.format]}</span>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label={`Delete "${idea.title}"`}
-            onClick={() => setDeleteOpen(true)}
-          >
-            <Trash2 aria-hidden className="size-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={`${hasScript ? "Open" : "Write"} script for "${idea.title}"`}
+              render={<Link href={`/content/ideas/${idea.id}/script`} />}
+            >
+              <ScrollText
+                aria-hidden
+                className={
+                  hasScript ? "size-4 text-track-content-foreground" : "size-4"
+                }
+              />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={`Delete "${idea.title}"`}
+              onClick={() => setDeleteOpen(true)}
+            >
+              <Trash2 aria-hidden className="size-4" />
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <h3 className="font-heading text-h3 font-semibold">{idea.title}</h3>
@@ -103,6 +122,7 @@ export function IdeaCard({ idea }: IdeaCardProps) {
         idea={idea}
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
+        hasScript={hasScript}
       />
     </>
   );

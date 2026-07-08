@@ -13,6 +13,7 @@ import {
   getIdeas,
   type IdeaFilters as IdeaFilterInput,
 } from "@/lib/data/ideas";
+import { getIdeaIdsWithScripts } from "@/lib/data/scripts";
 import type { Idea } from "@/lib/db/schema";
 
 export const metadata: Metadata = {
@@ -42,10 +43,12 @@ export default async function IdeasPage({ searchParams }: IdeasPageProps) {
   // has no DATABASE_URL, and this route is linked from primary navigation.
   let ideas: Idea[] = [];
   let availableTags: string[] = [];
+  let ideaIdsWithScripts = new Set<string>();
   try {
-    [ideas, availableTags] = await Promise.all([
+    [ideas, availableTags, ideaIdsWithScripts] = await Promise.all([
       getIdeas(filters),
       getDistinctIdeaTags(),
+      getIdeaIdsWithScripts(),
     ]);
   } catch (error) {
     console.error("Failed to load ideas:", error);
@@ -80,7 +83,11 @@ export default async function IdeasPage({ searchParams }: IdeasPageProps) {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {ideas.map((idea) => (
-            <IdeaCard key={idea.id} idea={idea} />
+            <IdeaCard
+              key={idea.id}
+              idea={idea}
+              hasScript={ideaIdsWithScripts.has(idea.id)}
+            />
           ))}
         </div>
       )}
