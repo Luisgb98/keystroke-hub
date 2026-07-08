@@ -1,5 +1,6 @@
 import "server-only";
-import { and, asc, eq, gte, lt } from "drizzle-orm";
+import { and, asc, eq, gte, lt, or } from "drizzle-orm";
+import { startOfDay } from "date-fns";
 
 import { getDb } from "@/lib/db";
 import { eventSyncLinks, events } from "@/lib/db/schema";
@@ -26,6 +27,48 @@ export async function getEventsInRange(
     .from(events)
     .leftJoin(eventSyncLinks, eq(eventSyncLinks.eventId, events.id))
     .where(and(lt(events.startsAt, to), gte(events.endsAt, from)))
+    .orderBy(asc(events.startsAt));
+
+  return rows.map(({ event: row, conflictNote }) => ({
+    id: row.id,
+    track: row.track,
+    title: row.title,
+    description: row.description,
+    startsAt: row.startsAt,
+    endsAt: row.endsAt,
+    allDay: row.allDay,
+    conflictNote: conflictNote ?? null,
+  }));
+}
+
+/**
+ * Events starting before `horizonEnd` that haven't ended yet — the source
+ * data for the upcoming-agenda widget (issue #14). "Hasn't ended" differs by
+ * kind: a timed event needs `endsAt >= now`, but an all-day event stores
+ * `startsAt`/`endsAt` as day boundaries (docs/calendar.md), so using `now`
+ * there would drop today's all-day events the moment the clock passes
+ * midnight; `endsAt >= startOfDay(now)` is the equivalent check for them.
+ * In-progress events are intentionally included — see `lib/calendar/agenda.ts`.
+ */
+export async function getUpcomingEvents(
+  now: Date,
+  horizonEnd: Date
+): Promise<CalendarEvent[]> {
+  const db = getDb();
+  const todayStart = startOfDay(now);
+  const rows = await db
+    .select({ event: events, conflictNote: eventSyncLinks.conflictNote })
+    .from(events)
+    .leftJoin(eventSyncLinks, eq(eventSyncLinks.eventId, events.id))
+    .where(
+      and(
+        lt(events.startsAt, horizonEnd),
+        or(
+          and(eq(events.allDay, false), gte(events.endsAt, now)),
+          and(eq(events.allDay, true), gte(events.endsAt, todayStart))
+        )
+      )
+    )
     .orderBy(asc(events.startsAt));
 
   return rows.map(({ event: row, conflictNote }) => ({

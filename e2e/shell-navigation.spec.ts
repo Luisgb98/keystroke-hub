@@ -9,7 +9,14 @@ test.describe("app shell navigation", () => {
     await page.goto("/");
 
     for (const item of navItems) {
-      const link = page.getByRole("link", { name: item.label }).first();
+      // Scoped to the primary nav landmark (not the whole page) — a host
+      // page's own content (e.g. the dashboard's "View calendar →" link)
+      // can otherwise substring-match a nav label like "Calendar" and,
+      // depending on DOM order, outrank the real nav link under `.first()`.
+      const link = page
+        .getByRole("navigation", { name: "Primary" })
+        .getByRole("link", { name: item.label })
+        .first();
       await link.click();
 
       await expect(page).toHaveURL(
@@ -18,9 +25,7 @@ test.describe("app shell navigation", () => {
       await expect(
         page.getByRole("heading", { level: 1, name: item.label })
       ).toBeVisible();
-      await expect(
-        page.getByRole("link", { name: item.label }).first()
-      ).toHaveAttribute("aria-current", "page");
+      await expect(link).toHaveAttribute("aria-current", "page");
     }
   });
 
@@ -29,7 +34,11 @@ test.describe("app shell navigation", () => {
   }) => {
     await page.goto("/");
 
-    const calendarLink = page.getByRole("link", { name: "Calendar" }).first();
+    // Scoped to the primary nav landmark — see the comment above.
+    const calendarLink = page
+      .getByRole("navigation", { name: "Primary" })
+      .getByRole("link", { name: "Calendar" })
+      .first();
     await calendarLink.focus();
     await expect(calendarLink).toBeFocused();
 

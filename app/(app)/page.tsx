@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import { LayoutDashboard } from "lucide-react";
 
-import { PlaceholderPanel } from "@/components/shell/placeholder-panel";
+import { UpcomingAgenda } from "@/components/agenda/upcoming-agenda";
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -16,7 +15,7 @@ export default function DashboardPage() {
           Your day at a glance, across both tracks.
         </p>
       </div>
-      <PlaceholderPanel icon={LayoutDashboard} />
+      <UpcomingAgenda className="max-w-md" />
     </div>
   );
 }

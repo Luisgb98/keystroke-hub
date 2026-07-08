@@ -190,3 +190,39 @@ while dragging, drag across the all-day row, and drag target-cell
 highlighting in month view. None are required by #13's acceptance criteria;
 the touch long-press behavior in particular is worth a manual pass on a
 real device before relying on it.
+
+## Upcoming-items agenda widget (#14)
+
+`<UpcomingAgenda />` (`components/agenda/upcoming-agenda.tsx`) is a
+self-fetching, embeddable "what's next" card spanning **today + tomorrow**
+across both tracks, mounted on the home page (`app/(app)/page.tsx`) in place
+of its earlier placeholder. It takes only `className`/`maxItems` — a host
+page doesn't provide data, just drops it in.
+
+- **Horizon**: fixed at today + tomorrow (`AGENDA_HORIZON_DAYS` in
+  `lib/calendar/agenda.ts`), capped at `DEFAULT_AGENDA_MAX_ITEMS` (8) rows
+  total across both days. This isn't a prop — it's the widget's identity, not
+  a per-embed setting.
+- **`getUpcomingEvents(now, horizonEnd)`** (`lib/data/events.ts`) fetches
+  events starting before the horizon that haven't ended: `endsAt >= now` for
+  timed events, `endsAt >= startOfDay(now)` for all-day ones (same reasoning
+  as `getEventsInRange`'s inclusive `endsAt` boundary above) — in-progress
+  events are intentionally included so a meeting you're currently in still
+  shows up.
+- **`buildAgenda(events, now, maxItems)`** (`lib/calendar/agenda.ts`) is the
+  pure grouping logic, unit-tested without a database: buckets events into
+  "Today"/"Tomorrow", pins all-day items before timed ones within a day,
+  labels the currently-in-progress item "Now", and tightens the "hasn't
+  ended" boundary to strictly exclude an event ending exactly at `now` (it
+  just finished). A multi-day all-day event appears once per day bucket it
+  covers, mirroring the calendar's own segment behavior rather than
+  collapsing to one row.
+- **`AgendaItemRow`** (`components/agenda/agenda-item.tsx`) reuses the same
+  visual language as `EventChip`/`EventBlock` (track icon + surface classes
+  - label, conflict-note indicator) and opens the same `EventEditor` edit
+    dialog on tap — no new mutation surface.
+- **Resilience**: same contract as the calendar page — a `getUpcomingEvents`
+  failure is caught and renders the empty state rather than breaking the
+  host page.
+- **Empty state**: when both days have nothing, a quiet "Nothing coming up"
+  panel — never a bare gap.
