@@ -36,6 +36,7 @@ export function Sidebar() {
             variant="ghost"
             size="icon"
             aria-label="Settings"
+            nativeButton={false}
             render={<Link href="/settings/calendars" />}
           >
             <Settings aria-hidden />
