@@ -3,6 +3,7 @@
 import { LayoutDashboard, NotebookPen } from "lucide-react";
 import { toast } from "sonner";
 
+import { AgendaItemRow } from "@/components/agenda/agenda-item";
 import { EventChip } from "@/components/calendar/event-chip";
 import { NavLink } from "@/components/shell/nav-link";
 import { Badge } from "@/components/ui/badge";
@@ -173,6 +174,41 @@ export function ComponentsGallery() {
             endsAt: new Date(),
             allDay: false,
             conflictNote: null,
+          }}
+        />
+      </div>
+
+      <div className="flex max-w-xs flex-col gap-1">
+        <AgendaItemRow
+          item={{
+            event: {
+              id: "styleguide-agenda-work",
+              track: "work",
+              title: "Sprint planning",
+              description: null,
+              startsAt: new Date(),
+              endsAt: new Date(),
+              allDay: false,
+              conflictNote: null,
+            },
+            timeLabel: "Now",
+            inProgress: true,
+          }}
+        />
+        <AgendaItemRow
+          item={{
+            event: {
+              id: "styleguide-agenda-content",
+              track: "content",
+              title: "Record voiceover",
+              description: null,
+              startsAt: new Date(),
+              endsAt: new Date(),
+              allDay: true,
+              conflictNote: null,
+            },
+            timeLabel: "All day",
+            inProgress: false,
           }}
         />
       </div>
