@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  IDEA_STATUS_EMPTY_STATE_COPY,
   IDEA_STATUS_LABEL,
   IDEA_STATUSES,
   INITIAL_IDEA_STATUS,
+  PARKED_IDEA_STATUS,
   isIdeaStatus,
 } from "./idea-status";
 
@@ -14,6 +16,7 @@ describe("idea-status", () => {
       "outlined",
       "scripted",
       "recorded",
+      "edited",
       "published",
       "parked",
     ]);
@@ -24,9 +27,20 @@ describe("idea-status", () => {
     expect(IDEA_STATUSES).toContain(INITIAL_IDEA_STATUS);
   });
 
+  it("renders the parked stage last, for #16's muted board column", () => {
+    expect(PARKED_IDEA_STATUS).toBe("parked");
+    expect(IDEA_STATUSES[IDEA_STATUSES.length - 1]).toBe(PARKED_IDEA_STATUS);
+  });
+
   it("has a label for every status", () => {
     for (const status of IDEA_STATUSES) {
       expect(IDEA_STATUS_LABEL[status]).toBeTruthy();
+    }
+  });
+
+  it("has board empty-state copy for every status", () => {
+    for (const status of IDEA_STATUSES) {
+      expect(IDEA_STATUS_EMPTY_STATE_COPY[status]).toBeTruthy();
     }
   });
 

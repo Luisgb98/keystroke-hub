@@ -15,18 +15,21 @@ vi.mock("next/cache", () => ({
 
 const dbMock = vi.hoisted(() => {
   const insertValues = vi.fn(() => Promise.resolve());
+  const updateSet = vi.fn();
   const updateReturning = vi.fn();
   const deleteReturning = vi.fn();
 
   return {
     insertValues,
+    updateSet,
     updateReturning,
     deleteReturning,
     insert: vi.fn(() => ({ values: insertValues })),
     update: vi.fn(() => ({
-      set: vi.fn(() => ({
-        where: vi.fn(() => ({ returning: updateReturning })),
-      })),
+      set: vi.fn((values) => {
+        updateSet(values);
+        return { where: vi.fn(() => ({ returning: updateReturning })) };
+      }),
     })),
     delete: vi.fn(() => ({
       where: vi.fn(() => ({ returning: deleteReturning })),
@@ -150,11 +153,20 @@ describe("updateIdeaStatus", () => {
     expect(dbMock.update).not.toHaveBeenCalled();
   });
 
-  it("updates the status and revalidates the list", async () => {
+  it("updates the status and revalidates both the list and the board", async () => {
     const result = await updateIdeaStatus("idea-1", "outlined");
     expect(result).toEqual({});
     expect(dbMock.update).toHaveBeenCalledTimes(1);
     expect(revalidatePath).toHaveBeenCalledWith("/content/ideas");
+    expect(revalidatePath).toHaveBeenCalledWith("/content/board");
+  });
+
+  it("sets stageEnteredAt via a conditional SQL expression, not a plain value", async () => {
+    await updateIdeaStatus("idea-1", "outlined");
+    const [setArgs] = dbMock.updateSet.mock.calls[0];
+    expect(setArgs.status).toBe("outlined");
+    expect(setArgs.stageEnteredAt).toBeTruthy();
+    expect(typeof setArgs.stageEnteredAt).toBe("object");
   });
 
   it("returns an error without writing for an invalid status", async () => {

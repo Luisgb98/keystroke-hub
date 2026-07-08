@@ -24,6 +24,7 @@ function makeIdea(overrides: Partial<Idea> = {}): Idea {
     status: "spark",
     tags: [],
     projectId: null,
+    stageEnteredAt: new Date(),
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,

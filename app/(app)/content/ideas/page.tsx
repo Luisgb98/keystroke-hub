@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { Columns3 } from "lucide-react";
 
 import { IdeaCapture } from "@/components/content/idea-capture";
 import { IdeaCard } from "@/components/content/idea-card";
@@ -56,7 +58,16 @@ export default async function IdeasPage({ searchParams }: IdeasPageProps) {
   return (
     <div className="flex flex-1 flex-col gap-4 px-4 py-6 sm:px-10 sm:py-8">
       <div className="flex flex-col gap-1">
-        <h1 className="font-heading text-h1 font-semibold">Ideas</h1>
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="font-heading text-h1 font-semibold">Ideas</h1>
+          <Link
+            href="/content/board"
+            className="flex items-center gap-1.5 text-small font-medium text-track-content-foreground hover:underline"
+          >
+            <Columns3 aria-hidden className="size-4" />
+            Board
+          </Link>
+        </div>
         <p className="text-small text-muted-foreground">
           Video and stream ideas, captured the moment they hit.
         </p>
