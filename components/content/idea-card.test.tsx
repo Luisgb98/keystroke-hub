@@ -36,6 +36,26 @@ describe("IdeaCard", () => {
     vi.clearAllMocks();
   });
 
+  it("links the script action to the idea's script page", () => {
+    render(<IdeaCard idea={makeIdea({ id: "idea-9", title: "Boss rush" })} />);
+    const link = screen.getByRole("link", {
+      name: 'Write script for "Boss rush"',
+    });
+    expect(link).toHaveAttribute("href", "/content/ideas/idea-9/script");
+  });
+
+  it("labels the script action as 'Open' once a script exists", () => {
+    render(
+      <IdeaCard
+        idea={makeIdea({ id: "idea-9", title: "Boss rush" })}
+        hasScript
+      />
+    );
+    expect(
+      screen.getByRole("link", { name: 'Open script for "Boss rush"' })
+    ).toBeInTheDocument();
+  });
+
   it("renders the title, format, and tags", () => {
     render(
       <IdeaCard
@@ -102,5 +122,16 @@ describe("IdeaCard", () => {
     await user.click(within(confirm).getByRole("button", { name: "Delete" }));
 
     await waitFor(() => expect(deleteIdea).toHaveBeenCalledWith("idea-7"));
+  });
+
+  it("warns that the script is deleted too when the idea has one", async () => {
+    const user = userEvent.setup();
+    render(<IdeaCard idea={makeIdea({ title: "Old idea" })} hasScript />);
+
+    await user.click(screen.getByRole("button", { name: 'Delete "Old idea"' }));
+
+    expect(
+      screen.getByText(/Its script will be deleted too\./)
+    ).toBeInTheDocument();
   });
 });

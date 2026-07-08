@@ -4,6 +4,7 @@ import { Lightbulb } from "lucide-react";
 
 import { PipelineBoard } from "@/components/content/board/pipeline-board";
 import { getIdeasForBoard } from "@/lib/data/ideas";
+import { getIdeaIdsWithScripts } from "@/lib/data/scripts";
 import type { Idea } from "@/lib/db/schema";
 
 export const metadata: Metadata = {
@@ -15,8 +16,12 @@ export default async function BoardPage() {
   // e2e job has no DATABASE_URL, and this route is linked from primary
   // navigation, so it must render (with an empty board) rather than throw.
   let ideas: Idea[] = [];
+  let ideaIdsWithScripts = new Set<string>();
   try {
-    ideas = await getIdeasForBoard();
+    [ideas, ideaIdsWithScripts] = await Promise.all([
+      getIdeasForBoard(),
+      getIdeaIdsWithScripts(),
+    ]);
   } catch (error) {
     console.error("Failed to load the board:", error);
   }
@@ -39,7 +44,7 @@ export default async function BoardPage() {
         </p>
       </div>
 
-      <PipelineBoard ideas={ideas} />
+      <PipelineBoard ideas={ideas} ideaIdsWithScripts={ideaIdsWithScripts} />
     </div>
   );
 }

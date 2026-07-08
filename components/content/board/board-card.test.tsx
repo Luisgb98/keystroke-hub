@@ -49,4 +49,23 @@ describe("BoardCard", () => {
 
     expect(onMove).toHaveBeenCalledWith(idea, "recorded");
   });
+
+  it("links the script action to the idea's script page", () => {
+    const idea = makeIdea({ id: "idea-9", title: "Boss rush" });
+    render(<BoardCard idea={idea} onMove={vi.fn()} />);
+
+    const link = screen.getByRole("link", {
+      name: 'Write script for "Boss rush"',
+    });
+    expect(link).toHaveAttribute("href", "/content/ideas/idea-9/script");
+  });
+
+  it("labels the script action as 'Open' once a script exists", () => {
+    const idea = makeIdea({ id: "idea-9", title: "Boss rush" });
+    render(<BoardCard idea={idea} onMove={vi.fn()} hasScript />);
+
+    expect(
+      screen.getByRole("link", { name: 'Open script for "Boss rush"' })
+    ).toBeInTheDocument();
+  });
 });

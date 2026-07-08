@@ -218,3 +218,31 @@ export const ideas = pgTable(
 
 export type Idea = typeof ideas.$inferSelect;
 export type NewIdea = typeof ideas.$inferInsert;
+
+// --- Markdown script editor (issue #17) ---
+//
+// See docs/scripts.md. `unique(idea_id)` is what enforces "a script attaches
+// to exactly one idea" at the schema level, and is the upsert's conflict
+// target — the first save creates the row, every save after that updates it.
+
+export const scripts = pgTable(
+  "scripts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ideaId: uuid("idea_id")
+      .notNull()
+      .references(() => ideas.id, { onDelete: "cascade" }),
+    content: text("content").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [unique("scripts_idea_id_unique").on(table.ideaId)]
+);
+
+export type Script = typeof scripts.$inferSelect;
+export type NewScript = typeof scripts.$inferInsert;
