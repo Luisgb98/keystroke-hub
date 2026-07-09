@@ -22,6 +22,8 @@ interface DeleteIdeaDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Whether a non-empty script is saved for this idea — its script is deleted too, via `on delete cascade` (see docs/scripts.md). */
   hasScript?: boolean;
+  /** Whether this idea is linked to any calendar events — those links cascade-delete too (see docs/content-links.md). */
+  hasScheduledEvents?: boolean;
 }
 
 /** Hard delete with confirmation — no soft-archive (see docs/content-ideas.md). */
@@ -30,6 +32,7 @@ export function DeleteIdeaDialog({
   open,
   onOpenChange,
   hasScript = false,
+  hasScheduledEvents = false,
 }: DeleteIdeaDialogProps) {
   const [pending, startTransition] = useTransition();
 
@@ -55,6 +58,9 @@ export function DeleteIdeaDialog({
             &ldquo;{idea.title}&rdquo; will be permanently deleted. This
             can&apos;t be undone.
             {hasScript ? " Its script will be deleted too." : ""}
+            {hasScheduledEvents
+              ? " Its calendar links will be removed too."
+              : ""}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

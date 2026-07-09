@@ -10,17 +10,21 @@ import { updateIdeaStatus } from "@/lib/content/actions";
 import { IDEA_FORMAT_LABEL } from "@/lib/content/idea-format";
 import { IDEA_STATUSES, IDEA_STATUS_LABEL } from "@/lib/content/idea-status";
 import type { Idea } from "@/lib/db/schema";
+import type { ScheduledEventSummary } from "@/lib/data/idea-event-links";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 import { DeleteIdeaDialog } from "./delete-idea-dialog";
 import { IDEA_FORMAT_ICON } from "./idea-format-styles";
+import { IdeaScheduledEvents } from "./idea-scheduled-events";
 
 interface IdeaCardProps {
   idea: Idea;
   /** Whether a non-empty script is already saved for this idea (see docs/scripts.md). */
   hasScript?: boolean;
+  /** Content-track events this idea is linked to, chronological (see docs/content-links.md). */
+  scheduledEvents?: ScheduledEventSummary[];
 }
 
 /**
@@ -28,7 +32,11 @@ interface IdeaCardProps {
  * open question 2) — a plain `<select>` change commits immediately, no
  * confirmation needed since it's cheap to change back.
  */
-export function IdeaCard({ idea, hasScript = false }: IdeaCardProps) {
+export function IdeaCard({
+  idea,
+  hasScript = false,
+  scheduledEvents = [],
+}: IdeaCardProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const Icon = IDEA_FORMAT_ICON[idea.format];
@@ -94,6 +102,11 @@ export function IdeaCard({ idea, hasScript = false }: IdeaCardProps) {
             </div>
           ) : null}
 
+          <IdeaScheduledEvents
+            ideaId={idea.id}
+            scheduledEvents={scheduledEvents}
+          />
+
           <div className="flex items-center justify-between gap-2">
             <label className="sr-only" htmlFor={`idea-status-${idea.id}`}>
               Status
@@ -122,6 +135,7 @@ export function IdeaCard({ idea, hasScript = false }: IdeaCardProps) {
         idea={idea}
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
+        hasScheduledEvents={scheduledEvents.length > 0}
         hasScript={hasScript}
       />
     </>

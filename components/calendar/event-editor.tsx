@@ -14,6 +14,7 @@ import type { QuickAddDefaults } from "@/lib/calendar/quick-add";
 import type { CalendarEvent, Track } from "@/lib/calendar/types";
 import { dismissConflictNote } from "@/lib/sync/actions";
 import { cn } from "@/lib/utils";
+import { EventLinkedIdeas } from "@/components/content/event-linked-ideas";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -196,6 +197,13 @@ export function EventEditor({
                 </p>
               ) : null}
             </div>
+
+            {mode === "edit" && event && values.track === "content" ? (
+              <EventLinkedIdeas
+                eventId={event.id}
+                linkedIdeas={event.linkedIdeas}
+              />
+            ) : null}
 
             <div className="flex flex-col gap-2">
               <Label htmlFor={titleId}>Title</Label>

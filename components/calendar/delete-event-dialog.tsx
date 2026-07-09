@@ -52,6 +52,9 @@ export function DeleteEventDialog({
           <AlertDialogDescription>
             &ldquo;{event.title}&rdquo; will be permanently deleted. This
             can&apos;t be undone.
+            {event.linkedIdeas.length > 0
+              ? " Its idea links will be removed too."
+              : ""}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
