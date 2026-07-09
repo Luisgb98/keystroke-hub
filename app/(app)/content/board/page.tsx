@@ -3,6 +3,10 @@ import Link from "next/link";
 import { Lightbulb } from "lucide-react";
 
 import { PipelineBoard } from "@/components/content/board/pipeline-board";
+import {
+  getChecklistProgressForIdeas,
+  type ChecklistProgress,
+} from "@/lib/data/idea-checklists";
 import { getIdeasForBoard } from "@/lib/data/ideas";
 import { getIdeaIdsWithScripts } from "@/lib/data/scripts";
 import type { Idea } from "@/lib/db/schema";
@@ -17,11 +21,15 @@ export default async function BoardPage() {
   // navigation, so it must render (with an empty board) rather than throw.
   let ideas: Idea[] = [];
   let ideaIdsWithScripts = new Set<string>();
+  let checklistProgress = new Map<string, ChecklistProgress>();
   try {
     [ideas, ideaIdsWithScripts] = await Promise.all([
       getIdeasForBoard(),
       getIdeaIdsWithScripts(),
     ]);
+    checklistProgress = await getChecklistProgressForIdeas(
+      ideas.map((idea) => idea.id)
+    );
   } catch (error) {
     console.error("Failed to load the board:", error);
   }
@@ -44,7 +52,11 @@ export default async function BoardPage() {
         </p>
       </div>
 
-      <PipelineBoard ideas={ideas} ideaIdsWithScripts={ideaIdsWithScripts} />
+      <PipelineBoard
+        ideas={ideas}
+        ideaIdsWithScripts={ideaIdsWithScripts}
+        checklistProgress={checklistProgress}
+      />
     </div>
   );
 }

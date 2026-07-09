@@ -117,9 +117,23 @@ describe("pending connection", () => {
 
   it("rejects a tampered token", async () => {
     const token = await signPendingConnection(pending);
-    await expect(
-      verifyPendingConnection(token.slice(0, -2) + "AA")
-    ).resolves.toBeNull();
+    // A compact JWE is 5 base64url segments joined by ".". Tampering the
+    // *final* character(s) of the token (the tail of the auth tag segment)
+    // is unreliable: when a segment's byte length isn't a multiple of 3,
+    // its last base64url character only carries a couple of significant
+    // bits — the rest is padding a permissive decoder ignores — so two
+    // different characters there can decode to the identical byte and the
+    // "tampered" token silently verifies as valid. Flipping a character in
+    // the *middle* of the ciphertext segment instead is guaranteed to alter
+    // a real ciphertext byte, which GCM's auth tag will always reject.
+    const parts = token.split(".");
+    const ciphertext = parts[3];
+    const index = Math.floor(ciphertext.length / 2);
+    const original = ciphertext[index];
+    const flipped = original === "A" ? "B" : "A";
+    parts[3] =
+      ciphertext.slice(0, index) + flipped + ciphertext.slice(index + 1);
+    await expect(verifyPendingConnection(parts.join("."))).resolves.toBeNull();
   });
 
   it("rejects garbage input", async () => {

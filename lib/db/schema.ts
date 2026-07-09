@@ -390,3 +390,38 @@ export type StreamChecklistTemplateItem =
   typeof streamChecklistTemplateItems.$inferSelect;
 export type NewStreamChecklistTemplateItem =
   typeof streamChecklistTemplateItems.$inferInsert;
+
+// --- Video publishing checklist (issue #20) ---
+//
+// See docs/content-ideas.md. Unlike the stream checklist, there is no
+// template table: the four defaults (title, thumbnail, description, tags)
+// are a code constant (`lib/content/publish-checklist.ts`), since a
+// single-user app has no need for template management at this scope.
+// `updateIdeaStatus` snapshots them onto an idea the first time it enters a
+// late pipeline stage (`recorded`/`edited`/`published`) — "no rows yet" is
+// the seeding gate, so later per-video edits (add/remove/toggle) are never
+// retroactively touched by anything else.
+
+export const ideaChecklistItems = pgTable(
+  "idea_checklist_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ideaId: uuid("idea_id")
+      .notNull()
+      .references(() => ideas.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    done: boolean("done").notNull().default(false),
+    position: integer("position").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [index("idea_checklist_items_idea_id_idx").on(table.ideaId)]
+);
+
+export type IdeaChecklistItem = typeof ideaChecklistItems.$inferSelect;
+export type NewIdeaChecklistItem = typeof ideaChecklistItems.$inferInsert;

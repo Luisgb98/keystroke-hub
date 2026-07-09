@@ -68,4 +68,30 @@ describe("BoardCard", () => {
       screen.getByRole("link", { name: 'Open script for "Boss rush"' })
     ).toBeInTheDocument();
   });
+
+  it("renders no checklist chip for an idea with no checklist rows", () => {
+    render(<BoardCard idea={makeIdea()} onMove={vi.fn()} />);
+    expect(screen.queryByText(/^\d+\/\d+$/)).not.toBeInTheDocument();
+  });
+
+  it("renders the checklist chip and opens the checklist on click", async () => {
+    const onOpenChecklist = vi.fn();
+    const user = userEvent.setup();
+    const idea = makeIdea({ title: "Boss rush" });
+    render(
+      <BoardCard
+        idea={idea}
+        onMove={vi.fn()}
+        checklistProgress={{ done: 2, total: 4 }}
+        onOpenChecklist={onOpenChecklist}
+      />
+    );
+
+    const chip = screen.getByRole("button", {
+      name: 'Open publish checklist for "Boss rush" (2 of 4 done)',
+    });
+    await user.click(chip);
+
+    expect(onOpenChecklist).toHaveBeenCalledWith(idea);
+  });
 });

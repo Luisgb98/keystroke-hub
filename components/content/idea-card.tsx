@@ -46,6 +46,15 @@ export function IdeaCard({
       const result = await updateIdeaStatus(idea.id, status);
       if (result.error) {
         toast.error(result.error);
+        return;
+      }
+      // No chip/dialog on this surface (the board card owns that — see
+      // docs/content-ideas.md), so the nudge here is a plain message.
+      if (status === "published" && (result.uncheckedCount ?? 0) > 0) {
+        const count = result.uncheckedCount ?? 0;
+        toast(
+          `Published with ${count} unchecked checklist item${count === 1 ? "" : "s"}`
+        );
       }
     });
   }
