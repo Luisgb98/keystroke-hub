@@ -7,7 +7,12 @@ import { z } from "zod";
 
 import { verifySession } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
-import { eventSyncLinks, events, ideaEventLinks } from "@/lib/db/schema";
+import {
+  eventSyncLinks,
+  events,
+  ideaEventLinks,
+  streams,
+} from "@/lib/db/schema";
 import {
   pushEventCreated,
   pushEventDeleted,
@@ -172,13 +177,20 @@ export async function deleteEvent(id: string): Promise<DeleteEventResult> {
   await verifySession();
 
   const db = getDb();
-  // Captured before the delete: the link's `eventId` auto-nulls via
-  // `ON DELETE SET NULL` the moment the event row is gone (lib/db/schema.ts),
-  // and `after()` runs strictly after that — see lib/sync/push.ts.
+  // Both captured before the delete: the sync link's `eventId` and the
+  // stream's `eventId`/`eventTrack` auto-null via `ON DELETE SET NULL` the
+  // moment the event row is gone (lib/db/schema.ts) — `after()` runs
+  // strictly after that (see lib/sync/push.ts), and the stream lookup is
+  // what lets this revalidate the stream planner (issue #19), which has no
+  // other way to learn its linked event just vanished.
   const [link] = await db
     .select()
     .from(eventSyncLinks)
     .where(eq(eventSyncLinks.eventId, id));
+  const [stream] = await db
+    .select({ id: streams.id })
+    .from(streams)
+    .where(eq(streams.eventId, id));
 
   const deleted = await db
     .delete(events)
@@ -190,6 +202,10 @@ export async function deleteEvent(id: string): Promise<DeleteEventResult> {
   }
 
   revalidatePath("/calendar");
+  if (stream) {
+    revalidatePath("/content/streams");
+    revalidatePath(`/content/streams/${stream.id}`);
+  }
   if (link) {
     schedulePush(() =>
       pushEventDeleted(link.id, link.googleEventId, deleted[0].track)

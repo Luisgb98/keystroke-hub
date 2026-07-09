@@ -46,14 +46,14 @@ export default defineConfig({
       dependencies: ["setup"],
       // calendar.spec.ts, event-management.spec.ts, calendar-sync.spec.ts,
       // drag-reschedule.spec.ts, agenda.spec.ts, board.spec.ts, scripts.spec.ts,
-      // and content-links.spec.ts seed/create/clear real rows
+      // content-links.spec.ts, and streams.spec.ts seed/create/clear real rows
       // (calendar-sync.spec.ts's connection rows are also unique-per-track)
       // in the dev database and already cover their own mobile-viewport
       // checks via `test.use`, so running them again under this project
       // would race against the chromium project's runs against the same
       // shared DB.
       testIgnore:
-        /(calendar|calendar-sync|event-management|drag-reschedule|agenda|board|scripts|content-links)\.spec\.ts$/,
+        /(calendar|calendar-sync|event-management|drag-reschedule|agenda|board|scripts|content-links|streams)\.spec\.ts$/,
     },
   ],
   webServer: [
