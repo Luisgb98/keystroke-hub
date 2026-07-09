@@ -5,6 +5,7 @@ import { startOfDay } from "date-fns";
 import { getDb } from "@/lib/db";
 import { eventSyncLinks, events } from "@/lib/db/schema";
 import type { CalendarEvent } from "@/lib/calendar/types";
+import { getLinkedIdeaSummariesForEvents } from "@/lib/data/idea-event-links";
 
 /**
  * Events overlapping `[from, to)` — anything whose span touches the range,
@@ -29,6 +30,10 @@ export async function getEventsInRange(
     .where(and(lt(events.startsAt, to), gte(events.endsAt, from)))
     .orderBy(asc(events.startsAt));
 
+  const linkedIdeasByEvent = await getLinkedIdeaSummariesForEvents(
+    rows.map(({ event: row }) => row.id)
+  );
+
   return rows.map(({ event: row, conflictNote }) => ({
     id: row.id,
     track: row.track,
@@ -38,6 +43,7 @@ export async function getEventsInRange(
     endsAt: row.endsAt,
     allDay: row.allDay,
     conflictNote: conflictNote ?? null,
+    linkedIdeas: linkedIdeasByEvent.get(row.id) ?? [],
   }));
 }
 
@@ -71,6 +77,10 @@ export async function getUpcomingEvents(
     )
     .orderBy(asc(events.startsAt));
 
+  const linkedIdeasByEvent = await getLinkedIdeaSummariesForEvents(
+    rows.map(({ event: row }) => row.id)
+  );
+
   return rows.map(({ event: row, conflictNote }) => ({
     id: row.id,
     track: row.track,
@@ -80,5 +90,6 @@ export async function getUpcomingEvents(
     endsAt: row.endsAt,
     allDay: row.allDay,
     conflictNote: conflictNote ?? null,
+    linkedIdeas: linkedIdeasByEvent.get(row.id) ?? [],
   }));
 }

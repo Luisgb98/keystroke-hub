@@ -43,6 +43,13 @@
       "when": 1783548006959,
       "tag": "0005_add_scripts_table",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783604326550,
+      "tag": "0006_bitter_iron_lad",
+      "breakpoints": true
     }
   ]
 }
