@@ -2,9 +2,11 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  foreignKey,
   index,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -41,6 +43,10 @@ export const events = pgTable(
       "events_ends_at_after_starts_at",
       sql`${table.endsAt} >= ${table.startsAt}`
     ),
+    // Harmless alongside the PK — exists so `idea_event_links` (issue #18)
+    // can carry a composite FK `(event_id, event_track) -> (id, track)`,
+    // which is what makes a work-track link impossible at the DB level.
+    unique("events_id_track_unique").on(table.id, table.track),
   ]
 );
 
@@ -246,3 +252,41 @@ export const scripts = pgTable(
 
 export type Script = typeof scripts.$inferSelect;
 export type NewScript = typeof scripts.$inferInsert;
+
+// --- Idea <-> calendar event links (issue #18) ---
+//
+// See docs/content-links.md. Many-to-many join table, content-track-only.
+// The rule is enforced twice: `linkIdeaToEvent` (lib/content/link-actions.ts)
+// rejects a non-content event before ever inserting, and — belt-and-braces —
+// `eventTrack` is CHECK-constrained to `'content'` and FK'd against the
+// composite `events_id_track_unique` above, so no code path can create (or
+// leave behind, via a track flip) a work-track link.
+
+export const ideaEventLinks = pgTable(
+  "idea_event_links",
+  {
+    ideaId: uuid("idea_id")
+      .notNull()
+      .references(() => ideas.id, { onDelete: "cascade" }),
+    eventId: uuid("event_id").notNull(),
+    eventTrack: trackEnum("event_track").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.ideaId, table.eventId] }),
+    foreignKey({
+      columns: [table.eventId, table.eventTrack],
+      foreignColumns: [events.id, events.track],
+      name: "idea_event_links_event_id_event_track_fk",
+    }).onDelete("cascade"),
+    check(
+      "idea_event_links_event_track_content",
+      sql`${table.eventTrack} = 'content'`
+    ),
+  ]
+);
+
+export type IdeaEventLink = typeof ideaEventLinks.$inferSelect;
+export type NewIdeaEventLink = typeof ideaEventLinks.$inferInsert;
