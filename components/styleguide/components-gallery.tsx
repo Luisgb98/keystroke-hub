@@ -163,6 +163,7 @@ export function ComponentsGallery() {
             endsAt: new Date(),
             allDay: false,
             conflictNote: null,
+            linkedIdeas: [],
           }}
         />
         <EventChip
@@ -175,6 +176,7 @@ export function ComponentsGallery() {
             endsAt: new Date(),
             allDay: false,
             conflictNote: null,
+            linkedIdeas: [],
           }}
         />
       </div>
@@ -191,6 +193,7 @@ export function ComponentsGallery() {
               endsAt: new Date(),
               allDay: false,
               conflictNote: null,
+              linkedIdeas: [],
             },
             timeLabel: "Now",
             inProgress: true,
@@ -207,6 +210,7 @@ export function ComponentsGallery() {
               endsAt: new Date(),
               allDay: true,
               conflictNote: null,
+              linkedIdeas: [],
             },
             timeLabel: "All day",
             inProgress: false,
