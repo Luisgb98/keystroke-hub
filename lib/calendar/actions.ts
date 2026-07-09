@@ -7,7 +7,7 @@ import { z } from "zod";
 
 import { verifySession } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
-import { eventSyncLinks, events } from "@/lib/db/schema";
+import { eventSyncLinks, events, ideaEventLinks } from "@/lib/db/schema";
 import {
   pushEventCreated,
   pushEventDeleted,
@@ -94,6 +94,23 @@ export async function updateEvent(
   }
 
   const db = getDb();
+
+  // Flipping a linked content event to `work` would otherwise fail on the
+  // composite FK `idea_event_links` carries against `events (id, track)`
+  // (see docs/content-links.md issue #18) — caught here first for a
+  // friendly, UI-facing message instead of a raw constraint-violation error.
+  if (parsed.data.track === "work") {
+    const [existingLink] = await db
+      .select({ ideaId: ideaEventLinks.ideaId })
+      .from(ideaEventLinks)
+      .where(eq(ideaEventLinks.eventId, id));
+    if (existingLink) {
+      return {
+        error: "Unlink content first — this event still has linked ideas.",
+      };
+    }
+  }
+
   const updated = await db
     .update(events)
     .set(parsed.data)

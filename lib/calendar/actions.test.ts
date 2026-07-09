@@ -171,6 +171,32 @@ describe("updateEvent", () => {
     expect(state).toEqual({ error: "That event no longer exists." });
     expect(revalidatePath).not.toHaveBeenCalled();
   });
+
+  it("blocks flipping a linked content event to work with a friendly error", async () => {
+    dbMock.selectWhere.mockResolvedValueOnce([{ ideaId: "idea-1" }]);
+    const state = await updateEvent("evt-1", undefined, form(validTimedForm));
+    expect(state).toEqual({
+      error: "Unlink content first — this event still has linked ideas.",
+    });
+    expect(dbMock.update).not.toHaveBeenCalled();
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("allows updating to work when the event has no links", async () => {
+    const state = await updateEvent("evt-1", undefined, form(validTimedForm));
+    expect(state).toEqual({ success: true });
+    expect(dbMock.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips the link guard entirely when the track isn't work", async () => {
+    await updateEvent(
+      "evt-1",
+      undefined,
+      form({ ...validTimedForm, track: "content" })
+    );
+    expect(dbMock.select).not.toHaveBeenCalled();
+    expect(dbMock.update).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("rescheduleEvent", () => {
