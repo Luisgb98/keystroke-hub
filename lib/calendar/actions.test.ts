@@ -271,4 +271,26 @@ describe("deleteEvent", () => {
     await expect(deleteEvent("evt-1")).rejects.toThrow("NEXT_REDIRECT:/login");
     expect(dbMock.delete).not.toHaveBeenCalled();
   });
+
+  it("also revalidates the stream planner when a stream was linked to this event", async () => {
+    // Two pre-delete lookups, in order: the sync link (none here), then the
+    // stream lookup that this test cares about.
+    dbMock.selectWhere
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: "stream-1" }]);
+    dbMock.deleteReturning.mockResolvedValueOnce([{ id: "evt-1" }]);
+
+    await deleteEvent("evt-1");
+
+    expect(revalidatePath).toHaveBeenCalledWith("/content/streams");
+    expect(revalidatePath).toHaveBeenCalledWith("/content/streams/stream-1");
+  });
+
+  it("does not revalidate the stream planner when no stream was linked", async () => {
+    dbMock.deleteReturning.mockResolvedValueOnce([{ id: "evt-1" }]);
+
+    await deleteEvent("evt-1");
+
+    expect(revalidatePath).not.toHaveBeenCalledWith("/content/streams");
+  });
 });

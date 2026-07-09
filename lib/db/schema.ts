@@ -4,6 +4,7 @@ import {
   check,
   foreignKey,
   index,
+  integer,
   pgEnum,
   pgTable,
   primaryKey,
@@ -290,3 +291,102 @@ export const ideaEventLinks = pgTable(
 
 export type IdeaEventLink = typeof ideaEventLinks.$inferSelect;
 export type NewIdeaEventLink = typeof ideaEventLinks.$inferInsert;
+
+// --- Stream session planner (issue #19) ---
+//
+// See docs/content-streams.md. A stream's "when" is its linked content-track
+// calendar event — the row itself stores no date. `eventId`/`eventTrack` are
+// nullable (an unscheduled stream has neither) with the same belt-and-braces
+// composite-FK + CHECK pattern as `idea_event_links` above, except the CHECK
+// also allows NULL (unscheduled). `onDelete: "set null"` on the composite FK
+// means deleting the linked event unschedules the stream rather than
+// destroying its checklist/notes; `unique(event_id)` keeps "one stream per
+// event" true at the DB level.
+
+export const streams = pgTable(
+  "streams",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    title: text("title").notNull(),
+    notes: text("notes"),
+    retroNotes: text("retro_notes"),
+    eventId: uuid("event_id"),
+    eventTrack: trackEnum("event_track"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    unique("streams_event_id_unique").on(table.eventId),
+    foreignKey({
+      columns: [table.eventId, table.eventTrack],
+      foreignColumns: [events.id, events.track],
+      name: "streams_event_id_event_track_fk",
+    }).onDelete("set null"),
+    check(
+      "streams_event_track_content",
+      sql`${table.eventTrack} is null or ${table.eventTrack} = 'content'`
+    ),
+  ]
+);
+
+export type Stream = typeof streams.$inferSelect;
+export type NewStream = typeof streams.$inferInsert;
+
+/**
+ * Copy-on-create checklist rows: creating a stream snapshots
+ * `streamChecklistTemplateItems` into these, so later template edits never
+ * retroactively change an existing stream's checklist.
+ */
+export const streamChecklistItems = pgTable(
+  "stream_checklist_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    streamId: uuid("stream_id")
+      .notNull()
+      .references(() => streams.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    done: boolean("done").notNull().default(false),
+    position: integer("position").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [index("stream_checklist_items_stream_id_idx").on(table.streamId)]
+);
+
+export type StreamChecklistItem = typeof streamChecklistItems.$inferSelect;
+export type NewStreamChecklistItem = typeof streamChecklistItems.$inferInsert;
+
+/** Single-user app: one global default checklist, no template "sets" (see docs/content-streams.md). */
+export const streamChecklistTemplateItems = pgTable(
+  "stream_checklist_template_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    label: text("label").notNull(),
+    position: integer("position").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("stream_checklist_template_items_position_idx").on(table.position),
+  ]
+);
+
+export type StreamChecklistTemplateItem =
+  typeof streamChecklistTemplateItems.$inferSelect;
+export type NewStreamChecklistTemplateItem =
+  typeof streamChecklistTemplateItems.$inferInsert;

@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Clapperboard, Columns3, Lightbulb } from "lucide-react";
+import { Columns3, Lightbulb, Radio } from "lucide-react";
 
-import { PlaceholderPanel } from "@/components/shell/placeholder-panel";
 import { Card, CardContent } from "@/components/ui/card";
 
 export const metadata: Metadata = {
@@ -53,7 +52,24 @@ export default function ContentPage() {
         </Card>
       </Link>
 
-      <PlaceholderPanel icon={Clapperboard} />
+      <Link href="/content/streams" className="block">
+        <Card className="border-track-content-border transition-colors hover:bg-track-content/40">
+          <CardContent className="flex items-center gap-3">
+            <Radio
+              aria-hidden
+              className="size-6 shrink-0 text-track-content-foreground"
+            />
+            <div className="flex flex-col">
+              <span className="font-heading text-h3 font-semibold">
+                Streams
+              </span>
+              <span className="text-small text-muted-foreground">
+                Plan live sessions — topic, checklist, and post-stream notes
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
     </div>
   );
 }
