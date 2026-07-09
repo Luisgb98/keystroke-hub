@@ -14,6 +14,8 @@ interface StageColumnProps {
   ideas: Idea[];
   onMove: (idea: Idea, status: IdeaStatus) => void;
   ideaIdsWithScripts?: Set<string>;
+  checklistProgress?: Map<string, { done: number; total: number }>;
+  onOpenChecklist?: (idea: Idea) => void;
 }
 
 /**
@@ -27,6 +29,8 @@ export function StageColumn({
   ideas,
   onMove,
   ideaIdsWithScripts = new Set(),
+  checklistProgress,
+  onOpenChecklist,
 }: StageColumnProps) {
   const isParked = status === PARKED_IDEA_STATUS;
 
@@ -66,6 +70,8 @@ export function StageColumn({
               idea={idea}
               onMove={onMove}
               hasScript={ideaIdsWithScripts.has(idea.id)}
+              checklistProgress={checklistProgress?.get(idea.id)}
+              onOpenChecklist={onOpenChecklist}
             />
           ))
         )}

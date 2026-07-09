@@ -1,8 +1,10 @@
 # Idea capture & organization
 
-Issue #15 (capture, list, filters) and issue #16 (the pipeline board). A
-fast, low-friction way to capture video/stream ideas, and a board that shows
-every idea's pipeline stage at a glance.
+Issue #15 (capture, list, filters), issue #16 (the pipeline board), and
+issue #20 (the publish checklist). A fast, low-friction way to capture
+video/stream ideas, a board that shows every idea's pipeline stage at a
+glance, and a per-video checklist so nothing ships without title, thumbnail,
+description, and tags being confirmed done.
 
 ## Data model
 
@@ -149,6 +151,63 @@ glance. Cross-linked with the ideas list via header links on both routes.
 - **No manual ordering, no status-history table**: both deliberately out of
   scope for v1 — see the plan comment on issue #16 for the reasoning.
 
+## Publish checklist (issue #20)
+
+A per-video checklist so nothing ships without title, thumbnail,
+description, and tags being confirmed — visible on the board, editable per
+video, and a non-blocking nudge if it's incomplete at publish time.
+
+- **Data**: one table, `idea_checklist_items` (`lib/db/schema.ts`) —
+  `id`, `idea_id` (FK → `ideas`, `ON DELETE CASCADE`), `label`, `done`
+  (default `false`), `position`, `created_at`/`updated_at`. Indexed on
+  `idea_id`. Unlike the stream checklist (#19), there's **no template
+  table** — the four defaults (`Title`, `Thumbnail`, `Description`, `Tags`)
+  are a code constant, `DEFAULT_PUBLISH_CHECKLIST_ITEMS`
+  (`lib/content/publish-checklist.ts`), since a single-user app has no need
+  for template management at this scope.
+- **Seeding**: `updateIdeaStatus` (`lib/content/actions.ts`) seeds the four
+  defaults the first time an idea's status update lands on a "late" stage
+  (`recorded`/`edited`/`published`, per `isLateStage`/`LATE_IDEA_STATUSES`)
+  — "no rows yet" is the gate, not a `checklist_seeded_at` marker, so a user
+  who deletes every item and later re-enters a late stage gets them back
+  (accepted tradeoff — see issue #20's plan comment). This runs **after**
+  the status update is confirmed to have hit a real row (not batched with
+  it): seeding is a nice-to-have on top of the status change, and
+  `seedPublishChecklistIfMissing` swallows its own errors (logged, not
+  thrown) rather than fail the whole request if the idea vanishes between
+  the update and the seed (e.g. deleted from another session in the same
+  instant) — a narrow race, but one that surfaced in e2e runs since the
+  board's optimistic move resolves before the server request necessarily
+  has, and a test's `afterEach` cleanup can delete the idea while seeding is
+  still in flight. Moving directly from an early stage to `published`
+  (skipping recorded/edited) still seeds and immediately nudges.
+- **Editing**: `lib/content/checklist-actions.ts` — `toggleIdeaChecklistItem`
+  / `addIdeaChecklistItem` (120-200 char label cap via `checklistLabelSchema`,
+  `lib/content/checklist-schema.ts`) / `removeIdeaChecklistItem`, plus a
+  client-facing `getIdeaChecklistItems` wrapper around the `server-only`
+  `lib/data/idea-checklists.ts` query (same shape as `stream-actions.ts`'s
+  `searchAttachableEvents`). No in-place rename — remove + re-add covers it.
+- **Board surface**: `ChecklistChip` (`components/content/board/checklist-chip.tsx`)
+  renders a `done/total` chip on `BoardCard` for ideas with checklist rows
+  (nothing for early-stage ideas with none yet), styled with the
+  content-track accent once complete. Tapping it opens
+  `PublishChecklistDialog` — a `Dialog` wrapping the same tap-to-toggle/
+  inline-add/remove idiom as `StreamChecklist`, fetching items on open via
+  a Server Action. `PipelineBoard` owns which idea's dialog is open (not
+  the chip itself) so the publish nudge toast's "Open checklist" action can
+  open the same dialog a chip tap would. `getChecklistProgressForIdeas`
+  (`lib/data/idea-checklists.ts`) is one grouped query for every idea's
+  `{done, total}` — no per-card N+1, same pattern as the stream checklist's
+  `getChecklistProgressForStreams`.
+- **Publish nudge**: `updateIdeaStatus` returns `uncheckedCount` whenever the
+  new status is `published`. The board (`PipelineBoard`) shows a `sonner`
+  toast with an "Open checklist" action; the ideas list (`IdeaCard`, which
+  has no chip/dialog — the checklist is board-only, per issue #20's open
+  question 3) shows a plain nudge with no action. Either way **the move
+  always succeeds** — the toast is purely a nudge, never a blocker, per the
+  acceptance criteria. Zero checklist items is treated as vacuously
+  complete: `uncheckedCount` is `0`, so no nudge fires.
+
 ## Resilience to a missing database
 
 Same contract as `/calendar` (`docs/database.md`): `getIdeas`/
@@ -159,15 +218,21 @@ from primary navigation.
 
 ## Testing
 
-Unit (Vitest + RTL): `idea-schema`, `idea-status`, `lib/content/board`'s
-grouping/sorting, `lib/data/ideas`'s filter → SQL mapping, `actions` (DB
-mocked, including the stage-clock guard), the `idea-capture`/`idea-card`/
-`idea-filters`/`idea-empty-state` components, and the board's
-`pipeline-board`/`stage-column`/`board-card`/`move-menu` components.
+Unit (Vitest + RTL): `idea-schema`, `idea-status`, `publish-checklist`
+(defaults, `isLateStage` boundaries), `lib/content/board`'s
+grouping/sorting, `lib/data/ideas`'s filter → SQL mapping,
+`lib/data/idea-checklists`'s progress aggregation, `actions` (DB mocked,
+including the stage-clock guard, checklist seeding on first late-stage
+entry, no-reseed on a second one, the seeding-error-doesn't-fail-the-request
+path, and `uncheckedCount` on publish), `checklist-actions`, the
+`idea-capture`/`idea-card`/`idea-filters`/`idea-empty-state` components, and
+the board's `pipeline-board`/`stage-column`/`board-card`/`move-menu`/
+`checklist-chip`/`publish-checklist-dialog` components.
 
-e2e (`e2e/ideas.spec.ts` and `e2e/board.spec.ts`, real DB via
-`e2e/support/ideas-db.ts` with `[e2e-*]`-prefixed rows and per-suite cleanup,
-skipped where `DATABASE_URL` is unset):
+e2e (`e2e/ideas.spec.ts`, `e2e/board.spec.ts`, and
+`e2e/publish-checklist.spec.ts`, real DB via `e2e/support/ideas-db.ts` with
+`[e2e-*]`-prefixed rows and per-suite cleanup, skipped where `DATABASE_URL`
+is unset):
 
 - **Ideas list**: title-only and full capture, status change surviving a
   reload, delete-with-confirmation, search/format/status/tag filtering
@@ -180,6 +245,12 @@ skipped where `DATABASE_URL` is unset):
   excluded from the `mobile-chrome` Playwright project (`playwright.config.ts`)
   since it seeds/clears real rows and already covers its own mobile
   viewport via `test.use` — the same precedent as the calendar suites.
+- **Publish checklist**: moving an idea into `recorded` seeds the four
+  defaults; toggling/adding/removing items updates the board chip count;
+  publishing with unchecked items shows the non-blocking nudge toast and
+  still moves the card (skipping stages included); completing every item
+  avoids the nudge; a mobile-viewport chip-tap → toggle flow.
+  `publish-checklist.spec.ts` is likewise excluded from `mobile-chrome`.
 
 The true "no ideas exist at all" empty state isn't covered by e2e (no way to
 guarantee a shared dev database is genuinely empty) — it's covered by the

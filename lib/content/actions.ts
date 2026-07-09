@@ -6,9 +6,13 @@ import { z } from "zod";
 
 import { verifySession } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
-import { ideas } from "@/lib/db/schema";
+import { ideaChecklistItems, ideas } from "@/lib/db/schema";
 
 import { ideaCaptureSchema, ideaStatusSchema } from "./idea-schema";
+import {
+  DEFAULT_PUBLISH_CHECKLIST_ITEMS,
+  isLateStage,
+} from "./publish-checklist";
 
 export interface IdeaActionState {
   error?: string;
@@ -50,6 +54,42 @@ export async function createIdea(
 
 export interface UpdateIdeaStatusResult {
   error?: string;
+  /** Only set when the new status is `published` — powers the non-blocking publish nudge (see docs/content-ideas.md). */
+  uncheckedCount?: number;
+}
+
+/**
+ * Seeds the publish checklist's four defaults onto an idea, but only if it
+ * has no checklist rows yet — "no rows" is the gate, not a `checklist_seeded_at`
+ * marker, so a user who deletes every item and re-enters a late stage gets
+ * them back (accepted tradeoff for a single-user app — see issue #20's plan).
+ * Deliberately tolerant of the idea having vanished between the caller's own
+ * status update and this call (e.g. deleted from another session in the
+ * same instant) — that's an update that already succeeded on its own terms,
+ * so a checklist that never gets seeded is a fine degrade, not worth failing
+ * the whole request over.
+ */
+async function seedPublishChecklistIfMissing(
+  db: ReturnType<typeof getDb>,
+  ideaId: string
+): Promise<void> {
+  try {
+    const existingItems = await db
+      .select({ id: ideaChecklistItems.id })
+      .from(ideaChecklistItems)
+      .where(eq(ideaChecklistItems.ideaId, ideaId));
+    if (existingItems.length > 0) return;
+
+    const seedValues = DEFAULT_PUBLISH_CHECKLIST_ITEMS.map(
+      (label, position) => ({ ideaId, label, position })
+    );
+    await db.insert(ideaChecklistItems).values(seedValues);
+  } catch (error) {
+    console.error(
+      `Failed to seed the publish checklist for idea ${ideaId}:`,
+      error
+    );
+  }
 }
 
 /**
@@ -62,6 +102,12 @@ export interface UpdateIdeaStatusResult {
  * re-submitting the current status (e.g. re-selecting it, or a stale
  * optimistic retry) must not reset the board's time-in-stage clock (see
  * docs/content-ideas.md).
+ *
+ * Entering a late pipeline stage (`recorded`/`edited`/`published`) also
+ * seeds the publish checklist's four defaults, but only the first time (see
+ * `seedPublishChecklistIfMissing`) — run only once the status update itself
+ * is confirmed to have hit a real row, so a deleted-idea request fails fast
+ * without ever touching the checklist table.
  */
 export async function updateIdeaStatus(
   id: string,
@@ -90,7 +136,23 @@ export async function updateIdeaStatus(
 
   revalidatePath("/content/ideas");
   revalidatePath("/content/board");
-  return {};
+
+  if (isLateStage(parsed.data.status)) {
+    await seedPublishChecklistIfMissing(db, parsed.data.id);
+  }
+
+  if (parsed.data.status !== "published") {
+    return {};
+  }
+
+  const checklistItems = await db
+    .select({ done: ideaChecklistItems.done })
+    .from(ideaChecklistItems)
+    .where(eq(ideaChecklistItems.ideaId, parsed.data.id));
+
+  return {
+    uncheckedCount: checklistItems.filter((item) => !item.done).length,
+  };
 }
 
 export interface DeleteIdeaResult {

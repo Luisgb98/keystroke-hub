@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { IDEA_FORMAT_ICON } from "@/components/content/idea-format-styles";
 
+import { ChecklistChip } from "./checklist-chip";
 import { MoveMenu } from "./move-menu";
 
 interface BoardCardProps {
@@ -18,6 +19,9 @@ interface BoardCardProps {
   onMove: (idea: Idea, status: IdeaStatus) => void;
   /** Whether a non-empty script is already saved for this idea (see docs/scripts.md). */
   hasScript?: boolean;
+  /** Publish checklist progress — absent/zero-total ideas render no chip (see docs/content-ideas.md). */
+  checklistProgress?: { done: number; total: number };
+  onOpenChecklist?: (idea: Idea) => void;
 }
 
 /**
@@ -26,7 +30,13 @@ interface BoardCardProps {
  * board is a status-at-a-glance surface, not a replacement for the ideas
  * list (see docs/content-ideas.md).
  */
-export function BoardCard({ idea, onMove, hasScript = false }: BoardCardProps) {
+export function BoardCard({
+  idea,
+  onMove,
+  hasScript = false,
+  checklistProgress,
+  onOpenChecklist,
+}: BoardCardProps) {
   const Icon = IDEA_FORMAT_ICON[idea.format];
 
   return (
@@ -52,6 +62,14 @@ export function BoardCard({ idea, onMove, hasScript = false }: BoardCardProps) {
         <h3 className="line-clamp-2 font-heading text-small font-semibold">
           {idea.title}
         </h3>
+        {checklistProgress && checklistProgress.total > 0 ? (
+          <ChecklistChip
+            ideaTitle={idea.title}
+            done={checklistProgress.done}
+            total={checklistProgress.total}
+            onOpen={() => onOpenChecklist?.(idea)}
+          />
+        ) : null}
         <div className="flex items-center gap-1.5">
           <Button
             type="button"

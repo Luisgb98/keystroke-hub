@@ -14,16 +14,35 @@ vi.mock("next/cache", () => ({
 }));
 
 const dbMock = vi.hoisted(() => {
+  // A `select().from().where()` chain is awaitable directly — mirrors
+  // `stream-actions.test.ts`'s `makeSelectChain` precedent, minus
+  // `.orderBy()` (unused by `updateIdeaStatus`'s checklist queries).
+  const selectQueue: unknown[][] = [];
+  function nextSelect(): Promise<unknown[]> {
+    return Promise.resolve(selectQueue.shift() ?? []);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function makeSelectChain(): any {
+    const chain = {
+      where: vi.fn(() => chain),
+      then: (resolve: (v: unknown[]) => void, reject?: (e: unknown) => void) =>
+        nextSelect().then(resolve, reject),
+    };
+    return chain;
+  }
+
   const insertValues = vi.fn(() => Promise.resolve());
   const updateSet = vi.fn();
   const updateReturning = vi.fn();
   const deleteReturning = vi.fn();
 
   return {
+    selectQueue,
     insertValues,
     updateSet,
     updateReturning,
     deleteReturning,
+    select: vi.fn(() => ({ from: vi.fn(() => makeSelectChain()) })),
     insert: vi.fn(() => ({ values: insertValues })),
     update: vi.fn(() => ({
       set: vi.fn((values) => {
@@ -180,6 +199,104 @@ describe("updateIdeaStatus", () => {
     const result = await updateIdeaStatus("missing", "outlined");
     expect(result).toEqual({ error: "That idea no longer exists." });
     expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("does not touch the checklist table for an early-stage transition", async () => {
+    await updateIdeaStatus("idea-1", "scripted");
+    expect(dbMock.select).not.toHaveBeenCalled();
+    expect(dbMock.insert).not.toHaveBeenCalled();
+  });
+
+  it("seeds the four default checklist items on first entry into a late stage", async () => {
+    dbMock.selectQueue.push([]); // no existing checklist rows
+
+    const result = await updateIdeaStatus("idea-1", "recorded");
+
+    expect(result).toEqual({});
+    expect(dbMock.insertValues).toHaveBeenCalledWith([
+      { ideaId: "idea-1", label: "Title", position: 0 },
+      { ideaId: "idea-1", label: "Thumbnail", position: 1 },
+      { ideaId: "idea-1", label: "Description", position: 2 },
+      { ideaId: "idea-1", label: "Tags", position: 3 },
+    ]);
+  });
+
+  it("does not reseed when the idea already has checklist rows", async () => {
+    dbMock.selectQueue.push([{ id: "item-1" }]);
+
+    const result = await updateIdeaStatus("idea-1", "edited");
+
+    expect(result).toEqual({});
+    expect(dbMock.insert).not.toHaveBeenCalled();
+  });
+
+  it("returns an error without touching the checklist table when the idea no longer exists on a late-stage move", async () => {
+    dbMock.updateReturning.mockResolvedValueOnce([]);
+
+    const result = await updateIdeaStatus("missing", "recorded");
+
+    expect(result).toEqual({ error: "That idea no longer exists." });
+    expect(revalidatePath).not.toHaveBeenCalled();
+    expect(dbMock.select).not.toHaveBeenCalled();
+  });
+
+  it("does not fail the request when seeding the checklist errors (e.g. the idea vanished mid-flight)", async () => {
+    dbMock.select.mockImplementationOnce(() => {
+      throw new Error("connection reset");
+    });
+
+    const result = await updateIdeaStatus("idea-1", "recorded");
+
+    expect(result).toEqual({});
+    expect(revalidatePath).toHaveBeenCalledWith("/content/board");
+  });
+
+  it("returns the unchecked count when moving an already-seeded idea to published", async () => {
+    dbMock.selectQueue.push([{ id: "item-1" }]); // already seeded
+    dbMock.selectQueue.push([
+      { done: false },
+      { done: true },
+      { done: false },
+      { done: false },
+    ]);
+
+    const result = await updateIdeaStatus("idea-1", "published");
+
+    expect(result).toEqual({ uncheckedCount: 3 });
+  });
+
+  it("seeds and returns the full unchecked count when skipping directly to published", async () => {
+    dbMock.selectQueue.push([]); // no existing checklist rows -> seeds
+    dbMock.selectQueue.push([
+      { done: false },
+      { done: false },
+      { done: false },
+      { done: false },
+    ]);
+
+    const result = await updateIdeaStatus("idea-1", "published");
+
+    expect(result).toEqual({ uncheckedCount: 4 });
+    expect(dbMock.insertValues).toHaveBeenCalledWith([
+      { ideaId: "idea-1", label: "Title", position: 0 },
+      { ideaId: "idea-1", label: "Thumbnail", position: 1 },
+      { ideaId: "idea-1", label: "Description", position: 2 },
+      { ideaId: "idea-1", label: "Tags", position: 3 },
+    ]);
+  });
+
+  it("returns an unchecked count of 0 when every item is already checked", async () => {
+    dbMock.selectQueue.push([{ id: "item-1" }]); // already seeded
+    dbMock.selectQueue.push([
+      { done: true },
+      { done: true },
+      { done: true },
+      { done: true },
+    ]);
+
+    const result = await updateIdeaStatus("idea-1", "published");
+
+    expect(result).toEqual({ uncheckedCount: 0 });
   });
 });
 

@@ -6,10 +6,11 @@ const updateIdeaStatus = vi.hoisted(() => vi.fn());
 const deleteIdea = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/content/actions", () => ({ updateIdeaStatus, deleteIdea }));
 
+const toastFn = vi.hoisted(() => vi.fn());
 const toastSuccess = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
 vi.mock("sonner", () => ({
-  toast: { success: toastSuccess, error: toastError },
+  toast: Object.assign(toastFn, { success: toastSuccess, error: toastError }),
 }));
 
 import type { Idea } from "@/lib/db/schema";
@@ -108,6 +109,36 @@ describe("IdeaCard", () => {
     await waitFor(() =>
       expect(toastError).toHaveBeenCalledWith("That idea no longer exists.")
     );
+  });
+
+  it("nudges with a plain toast when publishing leaves items unchecked", async () => {
+    updateIdeaStatus.mockResolvedValue({ uncheckedCount: 2 });
+    const user = userEvent.setup();
+    render(<IdeaCard idea={makeIdea({ status: "edited" })} />);
+
+    await user.selectOptions(screen.getByLabelText("Status"), "published");
+
+    await waitFor(() =>
+      expect(toastFn).toHaveBeenCalledWith(
+        "Published with 2 unchecked checklist items"
+      )
+    );
+  });
+
+  it("does not nudge when publishing with everything checked", async () => {
+    updateIdeaStatus.mockResolvedValue({ uncheckedCount: 0 });
+    const user = userEvent.setup();
+    render(<IdeaCard idea={makeIdea({ status: "edited" })} />);
+
+    await user.selectOptions(screen.getByLabelText("Status"), "published");
+
+    await waitFor(() =>
+      expect(updateIdeaStatus).toHaveBeenCalledWith(
+        expect.any(String),
+        "published"
+      )
+    );
+    expect(toastFn).not.toHaveBeenCalled();
   });
 
   it("opens a delete confirmation and calls deleteIdea on confirm", async () => {
