@@ -2,12 +2,14 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  date,
   foreignKey,
   index,
   integer,
   pgEnum,
   pgTable,
   primaryKey,
+  smallint,
   text,
   timestamp,
   unique,
@@ -425,3 +427,84 @@ export const ideaChecklistItems = pgTable(
 
 export type IdeaChecklistItem = typeof ideaChecklistItems.$inferSelect;
 export type NewIdeaChecklistItem = typeof ideaChecklistItems.$inferInsert;
+
+// --- Daily log with end-of-day retro & standup prep (issue #21) ---
+//
+// See docs/journal.md. `daily_logs` is created lazily on first write for a
+// given day (no eager row per calendar day). `daily_log_items` holds both
+// planned and done entries; rollover is a history-preserving copy (the
+// source row flips to `rolled_over` and points at the copy via
+// `rolled_over_to_id`) rather than a move, so a day's log never silently
+// loses an entry.
+
+export const dailyLogItemStatusEnum = pgEnum("daily_log_item_status", [
+  "planned",
+  "done",
+  "rolled_over",
+]);
+
+export const dailyLogs = pgTable(
+  "daily_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Plain `date` (civil day, no time component) — the work journal's unit
+    // of account. Stored/read as a `yyyy-MM-dd` string throughout (see
+    // lib/journal/dates.ts), matching the app's other date-param handling.
+    logDate: date("log_date", { mode: "string" }).notNull(),
+    retro: text("retro"),
+    mood: smallint("mood"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    unique("daily_logs_log_date_unique").on(table.logDate),
+    check(
+      "daily_logs_mood_range",
+      sql`${table.mood} is null or (${table.mood} >= 1 and ${table.mood} <= 5)`
+    ),
+  ]
+);
+
+export type DailyLog = typeof dailyLogs.$inferSelect;
+export type NewDailyLog = typeof dailyLogs.$inferInsert;
+
+export const dailyLogItems = pgTable(
+  "daily_log_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    logId: uuid("log_id")
+      .notNull()
+      .references(() => dailyLogs.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    status: dailyLogItemStatusEnum("status").notNull().default("planned"),
+    // Set only when this item was rolled over — points at its copy on the
+    // target day's log. `onDelete: "set null"` so deleting the copy doesn't
+    // take the (already-`rolled_over`) source down with it.
+    rolledOverToId: uuid("rolled_over_to_id"),
+    position: integer("position").notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("daily_log_items_log_id_idx").on(table.logId),
+    foreignKey({
+      columns: [table.rolledOverToId],
+      foreignColumns: [table.id],
+      name: "daily_log_items_rolled_over_to_id_fk",
+    }).onDelete("set null"),
+  ]
+);
+
+export type DailyLogItem = typeof dailyLogItems.$inferSelect;
+export type NewDailyLogItem = typeof dailyLogItems.$inferInsert;
