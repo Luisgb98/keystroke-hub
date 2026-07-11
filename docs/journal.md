@@ -243,3 +243,141 @@ Mobile-first, single column, ordered for reading aloud top-to-bottom:
   `clearTestWeeklyReviews`. A mobile-viewport case lives in `mobile.spec.ts`,
   excluded from the `mobile-chrome` Playwright project like the other
   DB-writing suites.
+
+# Weekly self-assessment (non-punitive)
+
+Issue #23. A light weekly self-check-in — a self-rating plus three short
+reflection prompts — so the developer can spot trends over time without a
+KPI system judging them. Self-measurement helps only if it stays gentle: the
+goal is awareness, not grades.
+
+## Non-punitive framing rules
+
+These rules constrain every UI and copy decision in this feature, and should
+constrain any future extension of it:
+
+- **No thresholds, no red/green judgment, no streak counters.** The rating's
+  selected state uses a single neutral accent color, never a color ramp.
+- **No percentages styled as achievement.** Signals are phrased as plain
+  observation sentences ("You logged 3 of 5 weekdays."), never a progress bar
+  or a score.
+- **Unassessed weeks are gaps, not failures.** The trend view renders them
+  as quiet, muted rows — no missing-streak framing.
+- **Signals are derived, never stored.** Storing a computed "grade" would
+  freeze it; deriving at read time keeps the framing free to evolve later.
+
+## Data model
+
+No new table — extends the existing `weekly_reviews` row (issue #22) rather
+than adding a second week-keyed table, since the machinery for lazy
+create/upsert-by-week already exists there:
+
+| Column        | Type                            | Notes                                                           |
+| ------------- | ------------------------------- | --------------------------------------------------------------- |
+| `rating`      | `smallint`, nullable, CHECK 1–5 | Same nullable-smallint-with-CHECK pattern as `daily_logs.mood`. |
+| `went_well`   | `text`, nullable                | Reflection prompt.                                              |
+| `drained_me`  | `text`, nullable                | Reflection prompt.                                              |
+| `change_next` | `text`, nullable                | Reflection prompt.                                              |
+
+All nullable: any subset of the assessment can be filled in independently,
+and the row is still lazily created on first write via the existing
+`getOrCreateWeeklyReview` (no change to that function).
+
+## Signal derivation
+
+`lib/journal/signals.ts` computes `WeekSignals` as a pure function over the
+same `WeekDayInput[]` + partial `WeekSummary` (`doneByDay`, `carriedOver`)
+that `buildWeekSummary` already has in scope — no new queries. It's called
+from inside `buildWeekSummary` itself and attached as `WeekSummary.signals`,
+so the week page and the assessment card share one fetch.
+
+- `weekdaysLogged` — count of the week's first 5 days (Mon–Fri) with a log
+  row or any items.
+- `doneCount` — total items with status `done` across the week (sum of
+  `doneByDay[*].done.length`).
+- `carriedOverCount` — reuses `WeekSummary.carriedOver.length` (the
+  rollover-chain-collapsed "still open" count from issue #22) rather than
+  recomputing chain logic.
+- `trackedCount` — `doneCount + carriedOverCount`, the denominator for the
+  "X of Y items got done" sentence.
+
+`weekSignalSentences(signals)` renders these as 1–3 muted-foreground prose
+lines, with a single friendly line for a week with nothing logged at all
+(avoiding a wall of zeros).
+
+Note on precision: `daily_log_items` has no field distinguishing "planned
+then completed" from "added directly as done" (`addItem`'s ad-hoc-done
+path), so `doneCount` cannot separate the two. The signal is worded around
+this ("items logged this week got done") rather than claiming a stricter
+"planned vs. done" ratio it can't actually measure.
+
+## Queries and mutations
+
+- **`lib/journal/log-schema.ts`**: `weeklyRatingSchema` (int 1–5, nullable —
+  mirrors `moodSchema`), `assessmentNoteFieldSchema` (the three prompt keys),
+  `assessmentNoteSchema` (trimmed text, capped at 2000 characters).
+- **`lib/journal/actions.ts`**: `saveWeeklyRating(weekStart, rating | null)`
+  and `saveAssessmentNote(weekStart, field, value)` — both `verifySession()`
+  → validate → `getOrCreateWeeklyReview` → update → `revalidateJournalPaths()`
+  (now also revalidating `/journal/week/trend`).
+- **`lib/data/weekly-reviews.ts`**: `getRecentWeeklyReviews(throughWeekStart, limit)`
+  — the most recent reviewed weeks at or before a given week, for the trend
+  view. Returns only weeks that have a row; the trend route fills gaps.
+- **`lib/journal/trend.ts`**: `recentWeekStarts(throughWeekStart)` (the fixed
+  12-week-start range, oldest first) and the pure `buildAssessmentTrend`
+  (matches reviews to that range, unassessed weeks becoming explicit
+  `{ rating: null, changeNext: null }` gaps).
+
+## UI
+
+- **`week-rating-picker.tsx`**: 5 tappable segments with word anchors —
+  "Rough … Bumpy … Steady … Strong … Great" — deliberately different
+  vocabulary from the daily mood picker's energy scale (`MoodPicker`'s
+  "Drained … Energized"), since this is the week's overall texture, not an
+  average of moods. Structured like `MoodPicker`: tap to save, tap the
+  selected step again to clear, keyboard accessible via native `<button>`s.
+- **`weekly-assessment-card.tsx`**: the rating picker plus three
+  autosave textareas (mirrors `RetroCard`'s ~800ms debounce and "Saved"
+  indicator), all optional. Mounted on `/journal/week` after
+  `WeekSummaryView`, keyed by `weekStart` so drafts reset on week navigation.
+- **`weekly-signals.tsx`**: server-rendered, muted-foreground prose from
+  `weekSignalSentences`.
+- **`/journal/week/trend`**: `assessment-trend.tsx` renders one row per week
+  (oldest first), each a link back to `/journal/week?week=...`: the week
+  label (JetBrains Mono, matching `WeekHeader`'s convention), a 5-dot rating
+  strip (filled dots = rating, single neutral accent, no color ramp), and
+  the week's "change next week" note (the actionable thread between weeks).
+  An unassessed week shows all-muted dots and a quiet "Not assessed" line
+  instead of being omitted. Reachable via a "Trend" button next to the week
+  page's "Journal" back-link.
+- **Markdown export**: `formatWeekSummaryMarkdown` (the "Copy as Markdown"
+  button) deliberately does **not** include the assessment. That export is
+  standup/reporting material for other people; the assessment is
+  self-reflection, and mixing the two invites self-censorship in what's
+  written.
+- Same DB-unreachable resilience contract as the other journal routes: both
+  the week page's assessment section and the trend route render their shell
+  (or an empty-state trend) rather than crashing if the database is
+  unreachable.
+
+## Test strategy
+
+- **Unit (Vitest)**: `lib/journal/signals.test.ts` (empty week, partial
+  week, no-tracked-items week, all-carried-over week — no division by zero),
+  `lib/journal/trend.test.ts` (`recentWeekStarts` boundaries,
+  `buildAssessmentTrend` gap-filling), `lib/journal/log-schema.test.ts`
+  additions for rating bounds and prompt length caps,
+  `lib/journal/actions.test.ts`'s `saveWeeklyRating`/`saveAssessmentNote`
+  cases (create-vs-update, clearing, invalid input), and component tests for
+  `WeekRatingPicker` (mirrors `MoodPicker.test.tsx`), `WeeklyAssessmentCard`
+  (fake timers, mirrors `RetroCard.test.tsx`), `WeeklySignals`, and
+  `AssessmentTrend` (gap rendering, row links).
+- **e2e (Playwright)**: `e2e/weekly-assessment.spec.ts`, gated on
+  `DATABASE_URL` like `weekly-summary.spec.ts`, against its own far-future
+  date window: fill rating + prompts and reload to confirm persistence, edit
+  an existing assessment in place (no duplicate row), confirm a different
+  week's assessment state doesn't bleed across navigation, and the trend
+  page listing an assessed week alongside unassessed gap neighbors. Cleanup
+  reuses `clearTestWeeklyReviews`. A mobile-viewport case lives in
+  `mobile.spec.ts`, excluded from the `mobile-chrome` project like the other
+  DB-writing suites.

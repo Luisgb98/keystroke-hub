@@ -20,6 +20,17 @@ const SUMMARY: WeekSummary = {
   carriedOver: [],
   highlights: "Big week",
   isEmpty: false,
+  rating: null,
+  wentWell: "",
+  drainedMe: "",
+  changeNext: "",
+  signals: {
+    weekdaysLogged: 1,
+    weekdayCount: 5,
+    doneCount: 1,
+    trackedCount: 1,
+    carriedOverCount: 0,
+  },
 };
 
 describe("CopySummaryButton", () => {

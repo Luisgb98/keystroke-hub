@@ -107,3 +107,45 @@ test.describe("weekly summary mobile viewport", () => {
     await expect(page.getByText("Saved")).toBeVisible({ timeout: 5000 });
   });
 });
+
+// Its own far-future window, distinct from every other suite's (see
+// weekly-assessment.spec.ts's comment on the same choice).
+test.describe("weekly assessment mobile viewport", () => {
+  const skip = !process.env.DATABASE_URL;
+  test.skip(
+    skip,
+    "DATABASE_URL is not set — skipping the weekly assessment mobile DB-backed check."
+  );
+
+  const PREFIX = "[e2e-weekly-assessment-mobile]";
+  const target = new Date();
+  target.setDate(target.getDate() + 260);
+  const weekStart = weekStartParam(formatDateParam(target));
+
+  test.afterEach(async () => {
+    await clearTestWeeklyReviews(
+      shiftWeekParam(weekStart, -1),
+      shiftWeekParam(weekStart, 1)
+    );
+  });
+
+  test("the assessment card has no horizontal overflow and the rating is tappable", async ({
+    page,
+  }) => {
+    await page.goto(`/journal/week?week=${weekStart}`);
+    const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+
+    await page.getByRole("radio", { name: "Steady" }).click();
+    await expect(page.getByRole("radio", { name: "Steady" })).toHaveAttribute(
+      "aria-checked",
+      "true"
+    );
+
+    await page.getByLabel("What went well?").fill(`${PREFIX} Kept pace`);
+    await expect(page.getByText("Saved")).toBeVisible({ timeout: 5000 });
+  });
+});

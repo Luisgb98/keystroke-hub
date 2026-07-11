@@ -15,6 +15,7 @@ export const weekStartSchema = z
 const MAX_TITLE_LENGTH = 200;
 const MAX_RETRO_LENGTH = 4000;
 const MAX_HIGHLIGHTS_LENGTH = 4000;
+const MAX_ASSESSMENT_NOTE_LENGTH = 2000;
 
 /** Shared by `addItem` / `editItemTitle`. */
 export const itemTitleSchema = z
@@ -47,5 +48,30 @@ export const highlightsSchema = z.object({
     .max(
       MAX_HIGHLIGHTS_LENGTH,
       `Keep it under ${MAX_HIGHLIGHTS_LENGTH} characters`
+    ),
+});
+
+/** Shared by `saveWeeklyRating`. `null` clears a previously-set rating — mirrors `moodSchema`. */
+export const weeklyRatingSchema = z.object({
+  weekStart: weekStartSchema,
+  rating: z.number().int().min(1).max(5).nullable(),
+});
+
+/** The three reflection prompts, keyed the same way as the DB columns. Shared by `saveAssessmentNote`. */
+export const assessmentNoteFieldSchema = z.enum([
+  "wentWell",
+  "drainedMe",
+  "changeNext",
+]);
+
+export const assessmentNoteSchema = z.object({
+  weekStart: weekStartSchema,
+  field: assessmentNoteFieldSchema,
+  value: z
+    .string()
+    .trim()
+    .max(
+      MAX_ASSESSMENT_NOTE_LENGTH,
+      `Keep it under ${MAX_ASSESSMENT_NOTE_LENGTH} characters`
     ),
 });

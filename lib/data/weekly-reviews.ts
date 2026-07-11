@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
 import {
@@ -104,4 +104,23 @@ export async function getWeekSummary(weekStart: string): Promise<WeekSummary> {
     getWeeklyReview(weekStart),
   ]);
   return buildWeekSummary(weekStart, days, review);
+}
+
+/**
+ * The most recent `limit` reviewed weeks at or before `throughWeekStart`, for
+ * the assessment trend view. Only returns weeks that actually have a
+ * `weekly_reviews` row — unassessed weeks in the trend's fixed date range are
+ * gaps the caller fills in, not rows this query needs to know about.
+ */
+export async function getRecentWeeklyReviews(
+  throughWeekStart: string,
+  limit: number
+): Promise<WeeklyReview[]> {
+  const db = getDb();
+  return db
+    .select()
+    .from(weeklyReviews)
+    .where(lte(weeklyReviews.weekStart, throughWeekStart))
+    .orderBy(desc(weeklyReviews.weekStart))
+    .limit(limit);
 }

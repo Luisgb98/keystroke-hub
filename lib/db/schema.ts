@@ -515,6 +515,12 @@ export type NewDailyLogItem = typeof dailyLogItems.$inferInsert;
 // daily_logs/daily_log_items; this table exists only for the one piece of
 // writable state the week view adds. Created lazily on first highlights
 // write, same pattern as daily_logs (see docs/journal.md).
+//
+// Issue #23 (weekly self-assessment) extends this same row rather than
+// adding a second week-keyed table — `rating`/`wentWell`/`drainedMe`/
+// `changeNext` are the non-punitive self-check-in fields, all nullable so
+// any subset can be filled in independently of highlights. `rating` mirrors
+// `daily_logs.mood`'s nullable-smallint-with-CHECK pattern exactly.
 
 export const weeklyReviews = pgTable(
   "weekly_reviews",
@@ -524,6 +530,10 @@ export const weeklyReviews = pgTable(
     // write, not by a DB constraint (single-user app, one write path).
     weekStart: date("week_start", { mode: "string" }).notNull(),
     highlights: text("highlights"),
+    rating: smallint("rating"),
+    wentWell: text("went_well"),
+    drainedMe: text("drained_me"),
+    changeNext: text("change_next"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -532,7 +542,13 @@ export const weeklyReviews = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (table) => [unique("weekly_reviews_week_start_unique").on(table.weekStart)]
+  (table) => [
+    unique("weekly_reviews_week_start_unique").on(table.weekStart),
+    check(
+      "weekly_reviews_rating_range",
+      sql`${table.rating} is null or (${table.rating} >= 1 and ${table.rating} <= 5)`
+    ),
+  ]
 );
 
 export type WeeklyReview = typeof weeklyReviews.$inferSelect;

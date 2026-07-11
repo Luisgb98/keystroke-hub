@@ -7,6 +7,7 @@ import {
   buildWeekSummary,
   formatWeekSummaryMarkdown,
   type WeekDayInput,
+  type WeekReviewInput,
 } from "./week-summary";
 
 let idCounter = 0;
@@ -54,6 +55,17 @@ function emptyWeek(): WeekDayInput[] {
   return DAYS.map((date) => ({ date, log: null, items: [] }));
 }
 
+function review(overrides: Partial<WeekReviewInput> = {}): WeekReviewInput {
+  return {
+    highlights: null,
+    rating: null,
+    wentWell: null,
+    drainedMe: null,
+    changeNext: null,
+    ...overrides,
+  };
+}
+
 describe("buildWeekSummary", () => {
   it("groups done items by day, sorted by position", () => {
     const days = emptyWeek();
@@ -81,9 +93,11 @@ describe("buildWeekSummary", () => {
   });
 
   it("is not empty when only highlights are set", () => {
-    const summary = buildWeekSummary(WEEK_START, emptyWeek(), {
-      highlights: "Shipped the release",
-    });
+    const summary = buildWeekSummary(
+      WEEK_START,
+      emptyWeek(),
+      review({ highlights: "Shipped the release" })
+    );
     expect(summary.isEmpty).toBe(false);
     expect(summary.highlights).toBe("Shipped the release");
   });
@@ -221,9 +235,11 @@ describe("formatWeekSummaryMarkdown", () => {
     const stuck = item({ title: "Stuck task", status: "planned" });
     days[1] = { date: DAYS[1], log: null, items: [stuck] };
 
-    const summary = buildWeekSummary(WEEK_START, days, {
-      highlights: "Big week for the release.",
-    });
+    const summary = buildWeekSummary(
+      WEEK_START,
+      days,
+      review({ highlights: "Big week for the release." })
+    );
     const markdown = formatWeekSummaryMarkdown(summary);
 
     expect(markdown).toContain("Big week for the release.");
