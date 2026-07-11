@@ -69,6 +69,11 @@ vi.mock("@/lib/data/daily-logs", () => ({
   getDayLog: getDayLogMock,
 }));
 
+const getOrCreateWeeklyReviewMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/data/weekly-reviews", () => ({
+  getOrCreateWeeklyReview: getOrCreateWeeklyReviewMock,
+}));
+
 import { revalidatePath } from "next/cache";
 
 import { verifySession } from "@/lib/auth/session";
@@ -78,17 +83,20 @@ import {
   editItemTitle,
   rolloverAllUnfinished,
   rolloverItem,
+  saveHighlights,
   saveMood,
   saveRetro,
   toggleItem,
 } from "./actions";
 
 const LOG = { id: "log-1", logDate: "2026-07-08" };
+const REVIEW = { id: "review-1", weekStart: "2026-07-06" };
 
 beforeEach(() => {
   vi.mocked(verifySession).mockResolvedValue({ isAuth: true });
   getOrCreateLogMock.mockResolvedValue(LOG);
   nextItemPositionMock.mockResolvedValue(0);
+  getOrCreateWeeklyReviewMock.mockResolvedValue(REVIEW);
   dbMock.updateReturning.mockResolvedValue([{ id: "item-1" }]);
 });
 
@@ -314,6 +322,42 @@ describe("saveMood", () => {
 
   it("rejects a mood outside 1-5", async () => {
     const result = await saveMood("2026-07-08", 9);
+    expect(result.error).toBeTruthy();
+    expect(dbMock.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("saveHighlights", () => {
+  it("verifies the session, saves highlights, and revalidates the week route", async () => {
+    const result = await saveHighlights("2026-07-06", "Shipped the release");
+    expect(result).toEqual({});
+    expect(verifySession).toHaveBeenCalledTimes(1);
+    expect(getOrCreateWeeklyReviewMock).toHaveBeenCalledWith("2026-07-06");
+    expect(dbMock.updateSet).toHaveBeenCalledWith({
+      highlights: "Shipped the release",
+    });
+    expect(revalidatePath).toHaveBeenCalledWith("/journal/week");
+  });
+
+  it("normalizes a non-Monday weekStart to its Monday before saving", async () => {
+    await saveHighlights("2026-07-08", "Great week");
+    expect(getOrCreateWeeklyReviewMock).toHaveBeenCalledWith("2026-07-06");
+  });
+
+  it("clears highlights with an empty string", async () => {
+    await saveHighlights("2026-07-06", "   ");
+    expect(dbMock.updateSet).toHaveBeenCalledWith({ highlights: null });
+  });
+
+  it("rejects an invalid week", async () => {
+    const result = await saveHighlights("nope", "Great week");
+    expect(result.error).toBeTruthy();
+    expect(dbMock.update).not.toHaveBeenCalled();
+    expect(getOrCreateWeeklyReviewMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects highlights over the length cap without writing", async () => {
+    const result = await saveHighlights("2026-07-06", "x".repeat(4001));
     expect(result.error).toBeTruthy();
     expect(dbMock.update).not.toHaveBeenCalled();
   });

@@ -4,6 +4,9 @@ Issue #21. A per-day log of what's planned, what got done, and how the day
 went, so tomorrow's standup prep is one glance instead of memory
 archaeology.
 
+Issue #22 (weekly summary view) builds directly on this and is documented in
+its own section below.
+
 ## Data model
 
 Two new tables in `lib/db/schema.ts`:
@@ -120,3 +123,123 @@ Mobile-first, single column, ordered for an under-a-minute fill-in flow:
   excluded from the `mobile-chrome` Playwright project (like the other
   DB-writing suites) to avoid racing the `chromium` project against the same
   dev database.
+
+# Weekly summary view
+
+Issue #22. A read-first `/journal/week` route that aggregates one
+Monday–Sunday week of daily logs into a Friday-ready narrative — done items
+grouped by day, retros, and still-unfinished carried-over items — plus one
+small piece of writable state (highlights) for pulling out the week's key
+items before a review meeting.
+
+## Data model
+
+One new table in `lib/db/schema.ts`; everything else in the weekly view is a
+read-side aggregation over `daily_logs`/`daily_log_items` (see above) —
+nothing about those tables changes.
+
+| Table            | Columns (essence)                                 | Notes                                                      |
+| ---------------- | ------------------------------------------------- | ---------------------------------------------------------- |
+| `weekly_reviews` | `id`, `week_start` (`date`, unique), `highlights` | one row per week, created lazily on first highlights write |
+
+`week_start` is always a Monday — the daily log's own Monday-start convention
+(`WEEK_STARTS_ON = 1`, mirrored from `lib/calendar/range.ts` the same way
+`lib/journal/dates.ts` mirrors it). This is enforced by normalizing in
+`weekStartSchema` (`lib/journal/log-schema.ts`) before every write, not by a
+database constraint — a single-user app has exactly one write path
+(`saveHighlights`) to guard.
+
+## Rollover chain collapsing ("carried over")
+
+Rollover is a history-preserving copy chain (`rolled_over_to_id`, see above).
+Naively listing every `rolled_over` item in a week would show a multi-day
+rollover (Mon → Tue → Wed) three times. `buildWeekSummary`
+(`lib/journal/week-summary.ts`) collapses each chain to a single entry:
+
+1. A chain's **root** is the earliest copy visible within the fetched week —
+   no in-week item points to it. (It may itself be a copy of something
+   rolled over before the fetched window; in that case it's still treated as
+   first-appearing on the day it's seen, since nothing earlier is visible.)
+2. Walk forward via `rolled_over_to_id` as far as the target is still within
+   the fetched week.
+3. If the chain's final state is `done`, it contributes nothing to "carried
+   over" — the done copy already appears under its own day. Anything else —
+   still `planned`, `rolled_over` with a target outside the fetched week
+   (the chain exits the week, e.g. rolled Friday → Saturday → next Monday),
+   or `rolled_over` with a deleted (null) target — counts as carried over,
+   attributed to the root's day.
+
+This is pure-function logic, unit-tested without a database (multi-day
+chains, chains entering/exiting the week boundary, deleted-target
+null-safety).
+
+## Queries and mutations
+
+- **`lib/data/weekly-reviews.ts`** (`server-only`): `getWeekLogs(weekStart)`
+  (one range query for the week's logs, one for their items), `getWeeklyReview(weekStart)`
+  (read, may be `null`), `getOrCreateWeeklyReview(weekStart)` (lazy write
+  path, same `onConflictDoNothing` + re-fetch race handling as
+  `getOrCreateLog`), and `getWeekSummary(weekStart)` (composes via the pure
+  `buildWeekSummary`).
+- **`lib/journal/actions.ts`**: `saveHighlights(weekStart, highlights)` —
+  `verifySession()` → validate via `highlightsSchema` → lazy
+  get-or-create → update; `revalidateJournalPaths()` additionally revalidates
+  `/journal/week`, since any item/retro/rollover mutation can change the
+  week's summary.
+- **`lib/journal/log-schema.ts`**: `weekStartSchema` (valid date,
+  Monday-normalized), `highlightsSchema` (same length cap as `retroSchema`).
+- **`lib/journal/week-dates.ts`**: `yyyy-MM-dd` week-start parse/format/shift
+  (`weekStartParam`, `parseWeekParam`, `shiftWeekParam`,
+  `isCurrentWeekParam`, `weekDayParams`, `formatWeekLabel`) — mirrors
+  `lib/journal/dates.ts`'s day equivalents.
+- **`lib/journal/week-summary.ts`**: pure `buildWeekSummary(weekStart, days, review)`
+  (grouping, retro collection, rollover chain collapsing) and pure
+  `formatWeekSummaryMarkdown(summary)` (the "Copy as Markdown" formatter).
+- **`lib/journal/mood.ts`**: `moodLabel(value)` — text-only mirror of
+  `MoodPicker`'s 5-step scale, kept separate so non-UI code (the Markdown
+  formatter) doesn't pull a `"use client"` component into its import graph.
+
+## UI
+
+Mobile-first, single column, ordered for reading aloud top-to-bottom:
+
+- **`/journal/week`** (`?week=yyyy-MM-dd`, default the current week; any date
+  inside a week normalizes to its Monday, invalid/missing falls back to the
+  current week): `WeekHeader` (week label, prev/next, "This week" shortcut —
+  mirrors `DayHeader`), a "Copy as Markdown" button
+  (`CopySummaryButton`, `navigator.clipboard.writeText` + a `sonner` toast),
+  `HighlightsCard` (debounced autosave, ~800ms — mirrors `RetroCard`, keyed
+  by `weekStart` so drafts reset on week navigation), then `WeekSummaryView`:
+  done items grouped by day (Mon–Fri always shown, even with a muted
+  "Nothing logged." line; Sat/Sun shown only when they have data — a fully
+  empty week gets a friendly empty state linking to today's log), retros
+  (with their mood label alongside, since the data is already fetched), and
+  carried-over items (each linking back to the day it first appeared).
+  Each day group links back to `/journal?date=...`.
+- The main `/journal` page gets a "Week" button next to "Standup", linking to
+  `/journal/week`.
+- Same DB-unreachable resilience contract as the other journal routes: the
+  shell (heading, empty state) renders rather than crashing if the database
+  is unreachable.
+
+## Test strategy
+
+- **Unit (Vitest)**: `lib/journal/week-dates.test.ts` (Monday normalization,
+  shift, label formatting across month/year boundaries, invalid-param
+  fallback), `lib/journal/week-summary.test.ts` (grouping, empty
+  days/weeks, retro+mood collection, the full rollover-chain-collapse matrix,
+  and `formatWeekSummaryMarkdown`), `lib/journal/actions.test.ts`'s
+  `saveHighlights` cases, and component tests for `WeekHeader`,
+  `HighlightsCard` (fake timers for the autosave debounce),
+  `CopySummaryButton` (mocked `navigator.clipboard`), and `WeekSummaryView`.
+- **e2e (Playwright)**: `e2e/weekly-summary.spec.ts` covers day grouping and
+  retros, previous/next week navigation and deep-linking, highlights autosave
+  surviving a reload, a rolled-over item appearing exactly once under
+  "Carried over", the copy-to-clipboard flow, and the invalid-week-param
+  fallback — against a dedicated far-future date window distinct from
+  `journal.spec.ts`'s own, plus a small real-date suite confirming the
+  current week is reachable from `/journal`. Cleanup uses
+  `e2e/support/daily-logs-db.ts`'s existing helpers plus a new
+  `clearTestWeeklyReviews`. A mobile-viewport case lives in `mobile.spec.ts`,
+  excluded from the `mobile-chrome` Playwright project like the other
+  DB-writing suites.
