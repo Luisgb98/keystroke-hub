@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ClipboardList } from "lucide-react";
+import { CalendarRange, ClipboardList } from "lucide-react";
 
 import { DayHeader } from "@/components/journal/day-header";
 import { ItemList } from "@/components/journal/item-list";
@@ -44,15 +44,26 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
     <div className="flex flex-1 flex-col gap-6 px-4 py-6 sm:mx-auto sm:w-full sm:max-w-2xl sm:px-10 sm:py-8">
       <div className="flex items-center justify-between gap-2">
         <h1 className="font-heading text-h1 font-semibold">Journal</h1>
-        <Button
-          variant="outline"
-          size="sm"
-          nativeButton={false}
-          render={<Link href="/journal/standup" />}
-        >
-          <ClipboardList aria-hidden />
-          Standup
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            nativeButton={false}
+            render={<Link href="/journal/week" />}
+          >
+            <CalendarRange aria-hidden />
+            Week
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            nativeButton={false}
+            render={<Link href="/journal/standup" />}
+          >
+            <ClipboardList aria-hidden />
+            Standup
+          </Button>
+        </div>
       </div>
 
       {/* Keyed by logDate: each subcomponent owns its own local state

@@ -508,3 +508,32 @@ export const dailyLogItems = pgTable(
 
 export type DailyLogItem = typeof dailyLogItems.$inferSelect;
 export type NewDailyLogItem = typeof dailyLogItems.$inferInsert;
+
+// --- Weekly summary view (issue #22) ---
+//
+// Everything else in the weekly view is a read-side aggregation over
+// daily_logs/daily_log_items; this table exists only for the one piece of
+// writable state the week view adds. Created lazily on first highlights
+// write, same pattern as daily_logs (see docs/journal.md).
+
+export const weeklyReviews = pgTable(
+  "weekly_reviews",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Always a Monday — enforced by normalizing in weekStartSchema before
+    // write, not by a DB constraint (single-user app, one write path).
+    weekStart: date("week_start", { mode: "string" }).notNull(),
+    highlights: text("highlights"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [unique("weekly_reviews_week_start_unique").on(table.weekStart)]
+);
+
+export type WeeklyReview = typeof weeklyReviews.$inferSelect;
+export type NewWeeklyReview = typeof weeklyReviews.$inferInsert;

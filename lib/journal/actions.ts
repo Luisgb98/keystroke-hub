@@ -6,15 +6,22 @@ import { revalidatePath } from "next/cache";
 
 import { verifySession } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
-import { dailyLogItems, dailyLogs, type DailyLogItem } from "@/lib/db/schema";
+import {
+  dailyLogItems,
+  dailyLogs,
+  weeklyReviews,
+  type DailyLogItem,
+} from "@/lib/db/schema";
 import {
   getDayLog,
   getOrCreateLog,
   nextItemPosition,
 } from "@/lib/data/daily-logs";
+import { getOrCreateWeeklyReview } from "@/lib/data/weekly-reviews";
 
 import { shiftDateParam } from "./dates";
 import {
+  highlightsSchema,
   itemTitleSchema,
   logDateSchema,
   moodSchema,
@@ -28,6 +35,7 @@ export interface JournalActionResult {
 function revalidateJournalPaths(): void {
   revalidatePath("/journal");
   revalidatePath("/journal/standup");
+  revalidatePath("/journal/week");
 }
 
 /** Appends a planned or ad-hoc-done item to the day's log, lazily creating the log row on first write (see docs/journal.md). */
@@ -240,6 +248,36 @@ export async function saveMood(
     .update(dailyLogs)
     .set({ mood: parsed.data.mood })
     .where(eq(dailyLogs.id, log.id));
+
+  revalidateJournalPaths();
+  return {};
+}
+
+/** The weekly summary's one piece of writable state — free text pulled out as the week's key items. */
+export async function saveHighlights(
+  weekStart: string,
+  highlights: string
+): Promise<JournalActionResult> {
+  await verifySession();
+
+  const parsed = highlightsSchema.safeParse({ weekStart, highlights });
+  if (!parsed.success) {
+    return {
+      error:
+        parsed.error.issues[0]?.message ??
+        "Those highlights couldn't be saved.",
+    };
+  }
+
+  const review = await getOrCreateWeeklyReview(parsed.data.weekStart);
+  const value =
+    parsed.data.highlights.length > 0 ? parsed.data.highlights : null;
+
+  const db = getDb();
+  await db
+    .update(weeklyReviews)
+    .set({ highlights: value })
+    .where(eq(weeklyReviews.id, review.id));
 
   revalidateJournalPaths();
   return {};

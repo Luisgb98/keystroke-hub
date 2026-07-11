@@ -2,7 +2,7 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { and, gte, like, lte } from "drizzle-orm";
 
-import { dailyLogItems, dailyLogs } from "../../lib/db/schema";
+import { dailyLogItems, dailyLogs, weeklyReviews } from "../../lib/db/schema";
 
 function getTestDb() {
   const connectionString = process.env.DATABASE_URL;
@@ -40,4 +40,24 @@ export async function clearTestDailyLogItemsByTitle(
 ): Promise<void> {
   const db = getTestDb();
   await db.delete(dailyLogItems).where(like(dailyLogItems.title, `${prefix}%`));
+}
+
+/**
+ * Removes every weekly review within an inclusive `yyyy-MM-dd` week-start
+ * range — safe only for the dedicated far-future test window, mirroring
+ * `clearTestDailyLogs`.
+ */
+export async function clearTestWeeklyReviews(
+  fromWeekStart: string,
+  toWeekStart: string
+): Promise<void> {
+  const db = getTestDb();
+  await db
+    .delete(weeklyReviews)
+    .where(
+      and(
+        gte(weeklyReviews.weekStart, fromWeekStart),
+        lte(weeklyReviews.weekStart, toWeekStart)
+      )
+    );
 }
