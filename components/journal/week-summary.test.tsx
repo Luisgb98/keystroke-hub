@@ -22,6 +22,17 @@ function emptySummary(overrides: Partial<WeekSummary> = {}): WeekSummary {
     carriedOver: [],
     highlights: "",
     isEmpty: true,
+    rating: null,
+    wentWell: "",
+    drainedMe: "",
+    changeNext: "",
+    signals: {
+      weekdaysLogged: 0,
+      weekdayCount: 5,
+      doneCount: 0,
+      trackedCount: 0,
+      carriedOverCount: 0,
+    },
     ...overrides,
   };
 }

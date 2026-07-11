@@ -2,6 +2,7 @@ import type { DailyLog, DailyLogItem } from "@/lib/db/schema";
 
 import { formatDayLabel, formatShortDayLabel } from "./dates";
 import { moodLabel } from "./mood";
+import { buildWeekSignals, type WeekSignals } from "./signals";
 import { formatWeekLabel } from "./week-dates";
 
 export interface WeekDayInput {
@@ -34,6 +35,16 @@ export interface WeekSummary {
   carriedOver: CarriedOverItem[];
   highlights: string;
   isEmpty: boolean;
+  // The weekly self-assessment (issue #23) — same lazily-created
+  // `weekly_reviews` row as `highlights`, deliberately excluded from
+  // `formatWeekSummaryMarkdown` below (see docs/journal.md): the export is
+  // standup/reporting material for other people, the assessment is
+  // self-reflection, and mixing them invites self-censorship.
+  rating: number | null;
+  wentWell: string;
+  drainedMe: string;
+  changeNext: string;
+  signals: WeekSignals;
 }
 
 function byPosition(a: DailyLogItem, b: DailyLogItem): number {
@@ -89,11 +100,19 @@ function collapseRolloverChains(days: WeekDayInput[]): CarriedOverItem[] {
   return carriedOver;
 }
 
+export interface WeekReviewInput {
+  highlights: string | null;
+  rating: number | null;
+  wentWell: string | null;
+  drainedMe: string | null;
+  changeNext: string | null;
+}
+
 /** Pure composition of a week's daily logs into the summary shape (see docs/journal.md). */
 export function buildWeekSummary(
   weekStart: string,
   days: WeekDayInput[],
-  review: { highlights: string | null } | null
+  review: WeekReviewInput | null
 ): WeekSummary {
   const doneByDay: WeekDaySummary[] = days.map((day) => ({
     date: day.date,
@@ -113,6 +132,10 @@ export function buildWeekSummary(
 
   const carriedOver = collapseRolloverChains(days);
   const highlights = review?.highlights ?? "";
+  const rating = review?.rating ?? null;
+  const wentWell = review?.wentWell ?? "";
+  const drainedMe = review?.drainedMe ?? "";
+  const changeNext = review?.changeNext ?? "";
 
   const isEmpty =
     doneByDay.every((day) => day.done.length === 0) &&
@@ -120,7 +143,21 @@ export function buildWeekSummary(
     carriedOver.length === 0 &&
     highlights.trim().length === 0;
 
-  return { weekStart, doneByDay, retros, carriedOver, highlights, isEmpty };
+  const signals = buildWeekSignals(days, { doneByDay, carriedOver });
+
+  return {
+    weekStart,
+    doneByDay,
+    retros,
+    carriedOver,
+    highlights,
+    isEmpty,
+    rating,
+    wentWell,
+    drainedMe,
+    changeNext,
+    signals,
+  };
 }
 
 function formatDoneSection(summary: WeekSummary): string {

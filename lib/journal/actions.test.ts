@@ -83,9 +83,11 @@ import {
   editItemTitle,
   rolloverAllUnfinished,
   rolloverItem,
+  saveAssessmentNote,
   saveHighlights,
   saveMood,
   saveRetro,
+  saveWeeklyRating,
   toggleItem,
 } from "./actions";
 
@@ -358,6 +360,86 @@ describe("saveHighlights", () => {
 
   it("rejects highlights over the length cap without writing", async () => {
     const result = await saveHighlights("2026-07-06", "x".repeat(4001));
+    expect(result.error).toBeTruthy();
+    expect(dbMock.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("saveWeeklyRating", () => {
+  it("verifies the session, saves a valid rating, and revalidates", async () => {
+    const result = await saveWeeklyRating("2026-07-06", 4);
+    expect(result).toEqual({});
+    expect(verifySession).toHaveBeenCalledTimes(1);
+    expect(getOrCreateWeeklyReviewMock).toHaveBeenCalledWith("2026-07-06");
+    expect(dbMock.updateSet).toHaveBeenCalledWith({ rating: 4 });
+    expect(revalidatePath).toHaveBeenCalledWith("/journal/week");
+    expect(revalidatePath).toHaveBeenCalledWith("/journal/week/trend");
+  });
+
+  it("clears the rating with null", async () => {
+    await saveWeeklyRating("2026-07-06", null);
+    expect(dbMock.updateSet).toHaveBeenCalledWith({ rating: null });
+  });
+
+  it("normalizes a non-Monday weekStart to its Monday before saving", async () => {
+    await saveWeeklyRating("2026-07-08", 3);
+    expect(getOrCreateWeeklyReviewMock).toHaveBeenCalledWith("2026-07-06");
+  });
+
+  it("rejects a rating outside 1-5 without writing", async () => {
+    const result = await saveWeeklyRating("2026-07-06", 9);
+    expect(result.error).toBeTruthy();
+    expect(dbMock.update).not.toHaveBeenCalled();
+    expect(getOrCreateWeeklyReviewMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("saveAssessmentNote", () => {
+  it("verifies the session, saves the given prompt field, and revalidates", async () => {
+    const result = await saveAssessmentNote(
+      "2026-07-06",
+      "wentWell",
+      "Shipped the release"
+    );
+    expect(result).toEqual({});
+    expect(verifySession).toHaveBeenCalledTimes(1);
+    expect(getOrCreateWeeklyReviewMock).toHaveBeenCalledWith("2026-07-06");
+    expect(dbMock.updateSet).toHaveBeenCalledWith({
+      wentWell: "Shipped the release",
+    });
+    expect(revalidatePath).toHaveBeenCalledWith("/journal/week");
+  });
+
+  it("saves each of the three prompt fields under their own column", async () => {
+    await saveAssessmentNote("2026-07-06", "drainedMe", "Too many meetings");
+    expect(dbMock.updateSet).toHaveBeenCalledWith({
+      drainedMe: "Too many meetings",
+    });
+
+    await saveAssessmentNote("2026-07-06", "changeNext", "Fewer meetings");
+    expect(dbMock.updateSet).toHaveBeenCalledWith({
+      changeNext: "Fewer meetings",
+    });
+  });
+
+  it("clears a note with an empty string", async () => {
+    await saveAssessmentNote("2026-07-06", "wentWell", "   ");
+    expect(dbMock.updateSet).toHaveBeenCalledWith({ wentWell: null });
+  });
+
+  it("rejects an invalid week without writing", async () => {
+    const result = await saveAssessmentNote("nope", "wentWell", "text");
+    expect(result.error).toBeTruthy();
+    expect(dbMock.update).not.toHaveBeenCalled();
+    expect(getOrCreateWeeklyReviewMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a note over the length cap without writing", async () => {
+    const result = await saveAssessmentNote(
+      "2026-07-06",
+      "drainedMe",
+      "x".repeat(2001)
+    );
     expect(result.error).toBeTruthy();
     expect(dbMock.update).not.toHaveBeenCalled();
   });

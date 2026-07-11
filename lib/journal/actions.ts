@@ -21,11 +21,13 @@ import { getOrCreateWeeklyReview } from "@/lib/data/weekly-reviews";
 
 import { shiftDateParam } from "./dates";
 import {
+  assessmentNoteSchema,
   highlightsSchema,
   itemTitleSchema,
   logDateSchema,
   moodSchema,
   retroSchema,
+  weeklyRatingSchema,
 } from "./log-schema";
 
 export interface JournalActionResult {
@@ -36,6 +38,7 @@ function revalidateJournalPaths(): void {
   revalidatePath("/journal");
   revalidatePath("/journal/standup");
   revalidatePath("/journal/week");
+  revalidatePath("/journal/week/trend");
 }
 
 /** Appends a planned or ad-hoc-done item to the day's log, lazily creating the log row on first write (see docs/journal.md). */
@@ -277,6 +280,56 @@ export async function saveHighlights(
   await db
     .update(weeklyReviews)
     .set({ highlights: value })
+    .where(eq(weeklyReviews.id, review.id));
+
+  revalidateJournalPaths();
+  return {};
+}
+
+/** The week's non-punitive self-rating. `rating: null` clears a previously-set rating — mirrors `saveMood`. */
+export async function saveWeeklyRating(
+  weekStart: string,
+  rating: number | null
+): Promise<JournalActionResult> {
+  await verifySession();
+
+  const parsed = weeklyRatingSchema.safeParse({ weekStart, rating });
+  if (!parsed.success) return { error: "That rating isn't valid." };
+
+  const review = await getOrCreateWeeklyReview(parsed.data.weekStart);
+
+  const db = getDb();
+  await db
+    .update(weeklyReviews)
+    .set({ rating: parsed.data.rating })
+    .where(eq(weeklyReviews.id, review.id));
+
+  revalidateJournalPaths();
+  return {};
+}
+
+/** One of the three reflection prompts (went well / drained me / change next week) — free text, autosaved like `saveHighlights`. */
+export async function saveAssessmentNote(
+  weekStart: string,
+  field: "wentWell" | "drainedMe" | "changeNext",
+  value: string
+): Promise<JournalActionResult> {
+  await verifySession();
+
+  const parsed = assessmentNoteSchema.safeParse({ weekStart, field, value });
+  if (!parsed.success) {
+    return {
+      error: parsed.error.issues[0]?.message ?? "That note couldn't be saved.",
+    };
+  }
+
+  const review = await getOrCreateWeeklyReview(parsed.data.weekStart);
+  const nextValue = parsed.data.value.length > 0 ? parsed.data.value : null;
+
+  const db = getDb();
+  await db
+    .update(weeklyReviews)
+    .set({ [parsed.data.field]: nextValue })
     .where(eq(weeklyReviews.id, review.id));
 
   revalidateJournalPaths();
