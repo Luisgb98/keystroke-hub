@@ -9,6 +9,13 @@ const { usePathname } = vi.hoisted(() => ({ usePathname: vi.fn() }));
 
 vi.mock("next/navigation", () => ({ usePathname }));
 
+// The search button needs a `CommandPaletteProvider` ancestor — out of scope
+// for this nav-focused suite, which covers `PaletteSearchButton` itself in
+// `palette-trigger.test.tsx`.
+vi.mock("@/components/command-palette/palette-trigger", () => ({
+  PaletteSearchButton: () => null,
+}));
+
 describe("BottomNav", () => {
   it("renders every nav item with an accessible name", () => {
     usePathname.mockReturnValue("/");

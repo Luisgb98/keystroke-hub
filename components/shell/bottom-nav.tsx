@@ -1,6 +1,7 @@
 import { Settings } from "lucide-react";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { PaletteSearchButton } from "@/components/command-palette/palette-trigger";
 import { NavLink } from "@/components/shell/nav-link";
 import { navItems } from "@/lib/navigation";
 
@@ -19,6 +20,7 @@ export function BottomNav() {
           variant="bottom"
         />
       ))}
+      <PaletteSearchButton />
       <NavLink
         href="/settings/calendars"
         label="Settings"
