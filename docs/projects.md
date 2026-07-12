@@ -71,10 +71,11 @@ they use only neutral tokens (`border-border`, `bg-muted`), never
 - **Detail (`/projects/[id]`)**: `ProjectDetailHeader` (status quick-switch +
   an overflow menu for archive/unarchive), `ProjectDetailsForm`
   (name/description), `ProjectNotes` (autosaving markdown with a Write/Preview
-  toggle — a smaller-scale sibling of `ScriptEditor`), and `ProjectLinkedIdeas`
-  (the first concrete "linked items" section; #25/#26 add sibling sections
-  later without reworking this one). Archived projects stay fully viewable but
-  read-only-ish: every mutation besides "unarchive" is disabled.
+  toggle — a smaller-scale sibling of `ScriptEditor`), `ProjectLinkedIdeas`
+  (the first concrete "linked items" section), and `ProjectImprovements`
+  (#25's read-only sibling section — see docs/improvements.md; #26 adds its
+  own sibling later without reworking either). Archived projects stay fully
+  viewable but read-only-ish: every mutation besides "unarchive" is disabled.
 - **Idea side**: `IdeaCard` shows a small read-only project chip (`Briefcase`
   icon + name, linking to the project) when an idea is linked. The primary
   write path is attaching from the project page via `IdeaAttachPicker`

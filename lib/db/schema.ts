@@ -607,3 +607,56 @@ export const projects = pgTable(
 
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
+
+// --- Improvements & proposals backlog (issue #25) ---
+//
+// See docs/improvements.md. A running list of process/tooling ideas so
+// retro and improvement meetings start with a ready agenda. The pipeline
+// vocabulary (`proposed -> discussed -> accepted/rejected -> done`) is
+// documented and shapes the UI, but not hard-enforced at the DB or action
+// layer — single-user app, corrections should be cheap (same precedent as
+// `projects`/`ideas` status changes).
+//
+// `projectId` is an optional nullable FK, same shape and `onDelete: "set
+// null"` as `ideas.projectId` — an improvement belongs to at most one
+// project. Unlike `ideas`, it's settable directly at capture time (see
+// docs/improvements.md), not only via a separate attach flow.
+
+export const improvementStatusEnum = pgEnum("improvement_status", [
+  "proposed",
+  "discussed",
+  "accepted",
+  "rejected",
+  "done",
+]);
+
+export const improvements = pgTable(
+  "improvements",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    title: text("title").notNull(),
+    rationale: text("rationale"),
+    status: improvementStatusEnum("status").notNull().default("proposed"),
+    // What was decided, recorded alongside the accepted/rejected status
+    // change (see `recordImprovementOutcome`). Kept even if the item is
+    // later moved back to `proposed` — visible history, not cleared.
+    outcome: text("outcome"),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("improvements_status_idx").on(table.status),
+    index("improvements_project_id_idx").on(table.projectId),
+  ]
+);
+
+export type Improvement = typeof improvements.$inferSelect;
+export type NewImprovement = typeof improvements.$inferInsert;
