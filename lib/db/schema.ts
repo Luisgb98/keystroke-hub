@@ -660,3 +660,91 @@ export const improvements = pgTable(
 
 export type Improvement = typeof improvements.$inferSelect;
 export type NewImprovement = typeof improvements.$inferInsert;
+
+// --- Meeting notes (issue #26) ---
+//
+// See docs/meetings.md. Captures what a meeting covered and how it went.
+// Closes the loop docs/improvements.md left open ("a future meeting link
+// (#26) will carry the 'which meeting' context properly").
+
+export const meetingTypeEnum = pgEnum("meeting_type", [
+  "standup",
+  "planning",
+  "retro",
+  "one_on_one",
+  "review",
+  "other",
+]);
+
+export const meetingNotes = pgTable(
+  "meeting_notes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Calendar day, not an instant — same `date` mode as
+    // `dailyLogs.logDate`/`weeklyReviews.weekStart`.
+    date: date("date", { mode: "string" }).notNull(),
+    title: text("title").notNull(),
+    meetingType: meetingTypeEnum("meeting_type").notNull().default("other"),
+    notes: text("notes").notNull(),
+    reflection: text("reflection"),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "set null",
+    }),
+    // Nullable, work-track only — the same belt-and-braces composite-FK +
+    // CHECK pattern as `streams.eventId`/`eventTrack` above, constrained to
+    // 'work' instead of 'content'. `unique(eventId)` mirrors
+    // `streams_event_id_unique`: at most one meeting note per event.
+    eventId: uuid("event_id"),
+    eventTrack: trackEnum("event_track"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("meeting_notes_date_idx").on(table.date),
+    index("meeting_notes_project_id_idx").on(table.projectId),
+    unique("meeting_notes_event_id_unique").on(table.eventId),
+    foreignKey({
+      columns: [table.eventId, table.eventTrack],
+      foreignColumns: [events.id, events.track],
+      name: "meeting_notes_event_id_event_track_fk",
+    }).onDelete("set null"),
+    check(
+      "meeting_notes_event_track_work",
+      sql`${table.eventTrack} is null or ${table.eventTrack} = 'work'`
+    ),
+  ]
+);
+
+export type MeetingNote = typeof meetingNotes.$inferSelect;
+export type NewMeetingNote = typeof meetingNotes.$inferInsert;
+
+/**
+ * Many-to-many: a retro can revisit an improvement across meetings, and an
+ * improvement may come up in more than one meeting (see docs/meetings.md).
+ * Composite PK, cascade both ways — deleting either side removes only the
+ * link row, never the other entity.
+ */
+export const meetingNoteImprovements = pgTable(
+  "meeting_note_improvements",
+  {
+    meetingNoteId: uuid("meeting_note_id")
+      .notNull()
+      .references(() => meetingNotes.id, { onDelete: "cascade" }),
+    improvementId: uuid("improvement_id")
+      .notNull()
+      .references(() => improvements.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.meetingNoteId, table.improvementId] }),
+  ]
+);
+
+export type MeetingNoteImprovement =
+  typeof meetingNoteImprovements.$inferSelect;
+export type NewMeetingNoteImprovement =
+  typeof meetingNoteImprovements.$inferInsert;

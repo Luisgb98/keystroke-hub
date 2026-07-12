@@ -2,12 +2,10 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Check, Loader2 } from "lucide-react";
-import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { toast } from "sonner";
 
 import { saveProjectNotes } from "@/lib/projects/actions";
-import { cn } from "@/lib/utils";
+import { MarkdownContent } from "@/components/shared/markdown-content";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -24,42 +22,6 @@ type NotesView = "write" | "preview";
 // than the script editor's (`docs/scripts.md`) since project notes are
 // typically short running notes, not a multi-thousand-word script.
 const AUTOSAVE_DELAY_MS = 1200;
-
-/** Track-agnostic neutral tokens — projects are connective tissue for both worlds, so no track color (see docs/projects.md, unlike `ScriptReadingView`'s content-track styling). */
-const markdownComponents: Components = {
-  p: ({ className, ...props }) => (
-    <p className={cn("text-small leading-relaxed", className)} {...props} />
-  ),
-  ul: ({ className, ...props }) => (
-    <ul
-      className={cn("list-disc pl-5 text-small leading-relaxed", className)}
-      {...props}
-    />
-  ),
-  ol: ({ className, ...props }) => (
-    <ol
-      className={cn("list-decimal pl-5 text-small leading-relaxed", className)}
-      {...props}
-    />
-  ),
-  a: ({ className, ...props }) => (
-    <a
-      className={cn("underline underline-offset-2", className)}
-      target="_blank"
-      rel="noreferrer"
-      {...props}
-    />
-  ),
-  code: ({ className, ...props }) => (
-    <code
-      className={cn(
-        "rounded bg-muted px-1 py-0.5 font-mono text-small",
-        className
-      )}
-      {...props}
-    />
-  ),
-};
 
 function SaveStateIndicator({ state }: { state: SaveState }) {
   if (state === "saving") {
@@ -170,12 +132,7 @@ export function ProjectNotes({
         />
       ) : content.trim() ? (
         <div className="rounded-lg border border-border p-3">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={markdownComponents}
-          >
-            {content}
-          </ReactMarkdown>
+          <MarkdownContent content={content} />
         </div>
       ) : (
         <p className="text-small text-muted-foreground">Nothing written yet.</p>
