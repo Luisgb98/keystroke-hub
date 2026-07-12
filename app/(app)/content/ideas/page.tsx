@@ -18,6 +18,10 @@ import {
   getScheduledEventsForIdeas,
   type ScheduledEventSummary,
 } from "@/lib/data/idea-event-links";
+import {
+  getProjectSummariesForIdeas,
+  type LinkedProjectSummary,
+} from "@/lib/data/projects";
 import type { Idea } from "@/lib/db/schema";
 
 export const metadata: Metadata = {
@@ -49,15 +53,18 @@ export default async function IdeasPage({ searchParams }: IdeasPageProps) {
   let availableTags: string[] = [];
   let ideaIdsWithScripts = new Set<string>();
   let scheduledEventsByIdea = new Map<string, ScheduledEventSummary[]>();
+  let projectByIdea = new Map<string, LinkedProjectSummary>();
   try {
     [ideas, availableTags, ideaIdsWithScripts] = await Promise.all([
       getIdeas(filters),
       getDistinctIdeaTags(),
       getIdeaIdsWithScripts(),
     ]);
-    scheduledEventsByIdea = await getScheduledEventsForIdeas(
-      ideas.map((idea) => idea.id)
-    );
+    const ideaIds = ideas.map((idea) => idea.id);
+    [scheduledEventsByIdea, projectByIdea] = await Promise.all([
+      getScheduledEventsForIdeas(ideaIds),
+      getProjectSummariesForIdeas(ideaIds),
+    ]);
   } catch (error) {
     console.error("Failed to load ideas:", error);
   }
@@ -96,6 +103,7 @@ export default async function IdeasPage({ searchParams }: IdeasPageProps) {
               idea={idea}
               hasScript={ideaIdsWithScripts.has(idea.id)}
               scheduledEvents={scheduledEventsByIdea.get(idea.id) ?? []}
+              project={projectByIdea.get(idea.id)}
             />
           ))}
         </div>

@@ -197,9 +197,14 @@ export const ideas = pgTable(
     // Free-form, single-user tags — filter options are derived from tags in
     // use rather than a normalized tag table (see docs/content-ideas.md).
     tags: text("tags").array().notNull().default([]),
-    // Nullable, no UI yet: forward-compat for the projects tracker (#24),
-    // which doesn't exist. Avoids a data migration once it lands.
-    projectId: uuid("project_id"),
+    // Links an idea to its project (#24). `onDelete: "set null"` — there is
+    // no delete action for projects (archive-only, see `projects` below), but
+    // this keeps ideas safe even against a hypothetical future one. Was a
+    // bare nullable uuid with no FK before #24 landed; every existing value
+    // was NULL, so wiring up the FK needed no backfill.
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "set null",
+    }),
     // When the idea last entered its current `status` — powers the board's
     // (#16) time-in-stage chip and oldest-first column sort. Set by
     // `updateIdeaStatus` only when the status actually changes (re-selecting
@@ -222,6 +227,7 @@ export const ideas = pgTable(
     index("ideas_created_at_idx").on(table.createdAt),
     index("ideas_tags_idx").using("gin", table.tags),
     index("ideas_stage_entered_at_idx").on(table.stageEnteredAt),
+    index("ideas_project_id_idx").on(table.projectId),
   ]
 );
 
@@ -553,3 +559,51 @@ export const weeklyReviews = pgTable(
 
 export type WeeklyReview = typeof weeklyReviews.$inferSelect;
 export type NewWeeklyReview = typeof weeklyReviews.$inferInsert;
+
+// --- Projects tracker (issue #24) ---
+//
+// See docs/projects.md. The connective tissue the rest of
+// `epic:projects-meetings` points at — `ideas.projectId` above gets its real
+// FK the moment this table exists.
+//
+// Archival is `archivedAt`, not a fourth status value: archival answers "is
+// this visible in day-to-day lists?" while `status` answers "where did this
+// end up?" — orthogonal questions, so a `done` project and a paused-then-
+// abandoned project can both be archived without losing what their status
+// was. Per the issue's acceptance criteria there is no delete action at
+// all — archive is the only way off the active list, so linked history
+// always survives.
+
+export const projectStatusEnum = pgEnum("project_status", [
+  "active",
+  "paused",
+  "done",
+]);
+
+export const projects = pgTable(
+  "projects",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    description: text("description"),
+    status: projectStatusEnum("status").notNull().default("active"),
+    // Running notes, markdown — a single append/edit document rather than a
+    // timeline of entries (see docs/projects.md open question 1).
+    notes: text("notes").notNull().default(""),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("projects_status_idx").on(table.status),
+    index("projects_archived_at_idx").on(table.archivedAt),
+  ]
+);
+
+export type Project = typeof projects.$inferSelect;
+export type NewProject = typeof projects.$inferInsert;
