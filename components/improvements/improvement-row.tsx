@@ -7,6 +7,7 @@ import { Briefcase } from "lucide-react";
 
 import type { ImprovementSummary } from "@/lib/data/improvements";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { GithubIssueLinkSection } from "@/components/shared/github-issue-link-section";
 
 import { ImprovementStatusBadge } from "./improvement-status-badge";
 import { ImprovementStatusSelect } from "./improvement-status-select";
@@ -74,6 +75,12 @@ export function ImprovementRow({ improvement }: ImprovementRowProps) {
             </button>
           ) : null}
         </div>
+
+        <GithubIssueLinkSection
+          target={{ type: "improvement", id: improvement.id }}
+          links={improvement.githubIssueLinks}
+          compact
+        />
       </CardContent>
 
       <RecordOutcomeDialog

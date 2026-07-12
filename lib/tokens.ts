@@ -18,6 +18,11 @@ export const semanticColorTokens: ColorToken[] = [
     cssVar: "destructive",
     description: "Destructive actions",
   },
+  {
+    name: "Success",
+    cssVar: "success",
+    description: "Positive/open state (e.g. an open GitHub issue)",
+  },
   { name: "Border", cssVar: "border", description: "Default border" },
   { name: "Ring", cssVar: "ring", description: "Focus ring" },
 ];

@@ -8,6 +8,7 @@ import {
   E2E_GOOGLE_TOKEN_ENCRYPTION_KEY,
   E2E_PASSWORD_HASH,
   E2E_SESSION_SECRET,
+  FAKE_GITHUB_BASE_URL,
   FAKE_GOOGLE_BASE_URL,
   STORAGE_STATE,
 } from "./e2e/support/credentials";
@@ -48,15 +49,16 @@ export default defineConfig({
       // drag-reschedule.spec.ts, agenda.spec.ts, board.spec.ts, scripts.spec.ts,
       // content-links.spec.ts, streams.spec.ts, publish-checklist.spec.ts,
       // journal.spec.ts, weekly-summary.spec.ts, weekly-assessment.spec.ts,
-      // projects.spec.ts, improvements.spec.ts, meetings.spec.ts, and
-      // mobile.spec.ts (whose journal and weekly-summary cases write real
-      // rows) seed/create/clear real rows (calendar-sync.spec.ts's
-      // connection rows are also unique-per-track) in the dev database and
-      // already cover their own mobile-viewport checks via `test.use`, so
-      // running them again under this project would race against the
-      // chromium project's runs against the same shared DB.
+      // projects.spec.ts, improvements.spec.ts, meetings.spec.ts,
+      // github-links.spec.ts, and mobile.spec.ts (whose journal and
+      // weekly-summary cases write real rows) seed/create/clear real rows
+      // (calendar-sync.spec.ts's connection rows are also unique-per-track)
+      // in the dev database and already cover their own mobile-viewport
+      // checks via `test.use`, so running them again under this project
+      // would race against the chromium project's runs against the same
+      // shared DB.
       testIgnore:
-        /(calendar|calendar-sync|event-management|drag-reschedule|agenda|board|scripts|content-links|streams|publish-checklist|journal|weekly-summary|weekly-assessment|projects|improvements|meetings|mobile)\.spec\.ts$/,
+        /(calendar|calendar-sync|event-management|drag-reschedule|agenda|board|scripts|content-links|streams|publish-checklist|journal|weekly-summary|weekly-assessment|projects|improvements|meetings|github-links|mobile)\.spec\.ts$/,
     },
   ],
   webServer: [
@@ -67,6 +69,15 @@ export default defineConfig({
       // interception can't reach them (see e2e/support/fake-google-server.ts).
       command: "node e2e/support/fake-google-server.ts",
       url: `${FAKE_GOOGLE_BASE_URL}/__control/health`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+    },
+    {
+      // Stands in for the GitHub REST issues endpoint (issue #27) — same
+      // rationale as the fake Google server above (see
+      // e2e/support/fake-github-server.ts).
+      command: "node e2e/support/fake-github-server.ts",
+      url: `${FAKE_GITHUB_BASE_URL}/__control/health`,
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
     },
@@ -87,6 +98,7 @@ export default defineConfig({
         GOOGLE_CALENDAR_API_BASE_URL: FAKE_GOOGLE_BASE_URL,
         GOOGLE_OAUTH_TOKEN_BASE_URL: FAKE_GOOGLE_BASE_URL,
         CRON_SECRET: E2E_CRON_SECRET,
+        GITHUB_API_BASE_URL: FAKE_GITHUB_BASE_URL,
       },
     },
   ],

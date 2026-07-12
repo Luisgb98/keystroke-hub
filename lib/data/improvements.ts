@@ -4,6 +4,10 @@ import { desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { improvements, projects } from "@/lib/db/schema";
 import type { ImprovementStatus } from "@/lib/improvements/improvement-status";
+import {
+  listGithubIssueLinksForImprovements,
+  type GithubIssueLinkSummary,
+} from "@/lib/data/github-links";
 
 export interface ImprovementSummary {
   id: string;
@@ -15,6 +19,7 @@ export interface ImprovementSummary {
   projectName: string | null;
   createdAt: Date;
   updatedAt: Date;
+  githubIssueLinks: GithubIssueLinkSummary[];
 }
 
 export interface ImprovementsOverview {
@@ -71,6 +76,10 @@ export async function listImprovements(): Promise<ImprovementsOverview> {
     .from(improvements)
     .leftJoin(projects, eq(improvements.projectId, projects.id));
 
+  const githubLinksByImprovement = await listGithubIssueLinksForImprovements(
+    rows.map((row) => row.id)
+  );
+
   const summaries: ImprovementSummary[] = rows.map((row) => ({
     id: row.id,
     title: row.title,
@@ -81,6 +90,7 @@ export async function listImprovements(): Promise<ImprovementsOverview> {
     projectName: row.projectName,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+    githubIssueLinks: githubLinksByImprovement.get(row.id) ?? [],
   }));
 
   return {
