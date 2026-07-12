@@ -7,7 +7,9 @@ import { ProjectImprovements } from "@/components/projects/project-improvements"
 import { ProjectLinkedIdeas } from "@/components/projects/project-linked-ideas";
 import { ProjectMeetingNotes } from "@/components/projects/project-meeting-notes";
 import { ProjectNotes } from "@/components/projects/project-notes";
+import { GithubIssueLinkSection } from "@/components/shared/github-issue-link-section";
 import { getImprovementsForProject } from "@/lib/data/improvements";
+import { listGithubIssueLinksForProject } from "@/lib/data/github-links";
 import { getMeetingNotesForProject } from "@/lib/data/meeting-notes";
 import { getProject } from "@/lib/data/projects";
 
@@ -30,6 +32,7 @@ export default async function ProjectDetailPage({
   const archived = Boolean(project.archivedAt);
   const improvements = await getImprovementsForProject(id);
   const meetingNotes = await getMeetingNotesForProject(id);
+  const githubIssueLinks = await listGithubIssueLinksForProject(id);
 
   return (
     <div className="flex flex-1 flex-col gap-6 px-4 py-6 sm:mx-auto sm:w-full sm:max-w-2xl sm:px-10 sm:py-8">
@@ -55,6 +58,12 @@ export default async function ProjectDetailPage({
       <ProjectImprovements improvements={improvements} />
 
       <ProjectMeetingNotes meetingNotes={meetingNotes} />
+
+      <GithubIssueLinkSection
+        target={{ type: "project", id: project.id }}
+        links={githubIssueLinks}
+        disabled={archived}
+      />
     </div>
   );
 }

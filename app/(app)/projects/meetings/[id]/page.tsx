@@ -5,7 +5,9 @@ import { MeetingNoteDetailHeader } from "@/components/meetings/meeting-note-deta
 import { MeetingNoteDetailsForm } from "@/components/meetings/meeting-note-details-form";
 import { MeetingNoteEventSection } from "@/components/meetings/meeting-note-event-section";
 import { MeetingNoteImprovementsSection } from "@/components/meetings/meeting-note-improvements-section";
+import { GithubIssueLinkSection } from "@/components/shared/github-issue-link-section";
 import { listLinkableProjects } from "@/lib/data/improvements";
+import { listGithubIssueLinksForMeetingNote } from "@/lib/data/github-links";
 import { getMeetingNote } from "@/lib/data/meeting-notes";
 
 export const metadata: Metadata = {
@@ -24,6 +26,9 @@ export default async function MeetingNoteDetailPage({
   if (!meetingNote) notFound();
 
   const projects = await listLinkableProjects();
+  const githubIssueLinks = await listGithubIssueLinksForMeetingNote(
+    meetingNote.id
+  );
 
   return (
     <div className="flex flex-1 flex-col gap-6 px-4 py-6 sm:mx-auto sm:w-full sm:max-w-2xl sm:px-10 sm:py-8">
@@ -39,6 +44,11 @@ export default async function MeetingNoteDetailPage({
       <MeetingNoteImprovementsSection
         meetingNoteId={meetingNote.id}
         linkedImprovements={meetingNote.linkedImprovements}
+      />
+
+      <GithubIssueLinkSection
+        target={{ type: "meetingNote", id: meetingNote.id }}
+        links={githubIssueLinks}
       />
     </div>
   );

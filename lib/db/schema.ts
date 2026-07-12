@@ -13,6 +13,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -748,3 +749,85 @@ export type MeetingNoteImprovement =
   typeof meetingNoteImprovements.$inferSelect;
 export type NewMeetingNoteImprovement =
   typeof meetingNoteImprovements.$inferInsert;
+
+// --- GitHub issue linking (issue #27) ---
+//
+// See docs/github-links.md. Attaches a GitHub issue (or PR — GitHub's
+// issues API resolves both, and `/issues/{n}` redirects to `/pull/{n}` when
+// `n` is a PR, so no separate "kind" column is needed) to a project,
+// improvement, or meeting note. The app never writes to GitHub — the only
+// traffic is read-only `GET`s to enrich the cached `title`/`state` snapshot.
+//
+// Three nullable FKs plus a CHECK that exactly one is set is real
+// referential integrity Postgres can enforce, unlike a polymorphic
+// `target_type`/`target_id` pair. `owner`/`repo`/`issue_number` are the
+// source of truth (what the user pasted); `title`/`state`/`fetched_at` are
+// best-effort cached metadata that never blocks attaching if the GitHub API
+// is unreachable, rate-limited, or the issue is private.
+
+export const githubIssueStateEnum = pgEnum("github_issue_state", [
+  "open",
+  "closed",
+]);
+
+export const githubIssueLinks = pgTable(
+  "github_issue_links",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "cascade",
+    }),
+    improvementId: uuid("improvement_id").references(() => improvements.id, {
+      onDelete: "cascade",
+    }),
+    meetingNoteId: uuid("meeting_note_id").references(() => meetingNotes.id, {
+      onDelete: "cascade",
+    }),
+    // Canonical casing from the GitHub API when the metadata fetch
+    // succeeds; otherwise exactly what the user pasted.
+    owner: text("owner").notNull(),
+    repo: text("repo").notNull(),
+    issueNumber: integer("issue_number").notNull(),
+    // Cached, best-effort snapshot — null until the first successful fetch,
+    // and left stale (never cleared) on a failed refresh.
+    title: text("title"),
+    state: githubIssueStateEnum("state"),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    check(
+      "github_issue_links_issue_number_positive",
+      sql`${table.issueNumber} > 0`
+    ),
+    check(
+      "github_issue_links_exactly_one_target",
+      sql`num_nonnulls(${table.projectId}, ${table.improvementId}, ${table.meetingNoteId}) = 1`
+    ),
+    // Composite unique across nullable columns wouldn't dedupe (Postgres
+    // treats NULLs as distinct), so one partial unique index per target
+    // column instead — same issue linked to two *different* items is fine,
+    // duplicating it on the *same* item is not.
+    uniqueIndex("github_issue_links_project_unique")
+      .on(table.projectId, table.owner, table.repo, table.issueNumber)
+      .where(sql`${table.projectId} is not null`),
+    uniqueIndex("github_issue_links_improvement_unique")
+      .on(table.improvementId, table.owner, table.repo, table.issueNumber)
+      .where(sql`${table.improvementId} is not null`),
+    uniqueIndex("github_issue_links_meeting_note_unique")
+      .on(table.meetingNoteId, table.owner, table.repo, table.issueNumber)
+      .where(sql`${table.meetingNoteId} is not null`),
+    index("github_issue_links_project_id_idx").on(table.projectId),
+    index("github_issue_links_improvement_id_idx").on(table.improvementId),
+    index("github_issue_links_meeting_note_id_idx").on(table.meetingNoteId),
+  ]
+);
+
+export type GithubIssueLink = typeof githubIssueLinks.$inferSelect;
+export type NewGithubIssueLink = typeof githubIssueLinks.$inferInsert;

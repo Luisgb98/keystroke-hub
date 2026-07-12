@@ -32,3 +32,12 @@ export const E2E_GOOGLE_CLIENT_SECRET = "e2e-fake-client-secret";
 export const E2E_GOOGLE_TOKEN_ENCRYPTION_KEY =
   "Xxd7oidPxvoey2tpYyV+fGHHcFLVRzFtc2ETs1lD7io=";
 export const E2E_CRON_SECRET = "e2e-cron-secret";
+
+// --- GitHub issue linking (issue #27) ---
+//
+// The metadata fetch happens server-side, so Playwright's page-level route
+// interception can't reach it — same rationale as the fake Google server
+// above. `GITHUB_API_BASE_URL` points the app under test at
+// e2e/support/fake-github-server.ts instead of the real GitHub API.
+export const FAKE_GITHUB_PORT = 4311;
+export const FAKE_GITHUB_BASE_URL = `http://127.0.0.1:${FAKE_GITHUB_PORT}`;

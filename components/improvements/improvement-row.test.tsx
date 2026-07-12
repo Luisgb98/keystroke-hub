@@ -23,6 +23,7 @@ function summary(
     projectName: null,
     createdAt: new Date(),
     updatedAt: new Date(),
+    githubIssueLinks: [],
     ...overrides,
   };
 }
