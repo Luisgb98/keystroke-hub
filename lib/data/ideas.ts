@@ -2,9 +2,11 @@ import "server-only";
 import {
   and,
   arrayContains,
+  asc,
   desc,
   eq,
   ilike,
+  notInArray,
   sql,
   type SQL,
 } from "drizzle-orm";
@@ -12,7 +14,10 @@ import {
 import { getDb } from "@/lib/db";
 import { ideas, type Idea } from "@/lib/db/schema";
 import type { IdeaFormat } from "@/lib/content/idea-format";
-import type { IdeaStatus } from "@/lib/content/idea-status";
+import { PARKED_IDEA_STATUS, type IdeaStatus } from "@/lib/content/idea-status";
+
+/** Statuses the dashboard's content-in-flight block never counts — shipped or dead. */
+const NOT_IN_FLIGHT_STATUSES: IdeaStatus[] = ["published", PARKED_IDEA_STATUS];
 
 export interface IdeaFilters {
   /** Matched case-insensitively against the title. */
@@ -74,4 +79,20 @@ export async function getDistinctIdeaTags(): Promise<string[]> {
 export async function getIdeasForBoard(): Promise<Idea[]> {
   const db = getDb();
   return db.select().from(ideas);
+}
+
+/**
+ * Ideas still moving through the pipeline — every status except `published`
+ * (shipped) and `parked` (dead) — oldest-in-stage first, feeding the
+ * dashboard's content-in-flight block (issue #28/#16). The stage-count
+ * tally and stuck-longest pick are computed by the pure
+ * `buildContentSnapshot` (`lib/dashboard/content-snapshot.ts`).
+ */
+export async function getIdeasInFlight(): Promise<Idea[]> {
+  const db = getDb();
+  return db
+    .select()
+    .from(ideas)
+    .where(notInArray(ideas.status, NOT_IN_FLIGHT_STATUSES))
+    .orderBy(asc(ideas.stageEnteredAt));
 }

@@ -27,6 +27,8 @@ export async function seedTestIdea(fixture: {
   format?: IdeaFormat;
   status?: IdeaStatus;
   tags?: string[];
+  /** Overrides the default-now `stage_entered_at` — for dashboard specs that need a deterministic "stuck longest" pick regardless of other rows in the dev DB. */
+  stageEnteredAt?: Date;
 }): Promise<void> {
   const db = getTestDb();
   await db.insert(ideas).values({
@@ -35,5 +37,8 @@ export async function seedTestIdea(fixture: {
     format: fixture.format ?? "either",
     status: fixture.status ?? "spark",
     tags: fixture.tags ?? [],
+    ...(fixture.stageEnteredAt
+      ? { stageEnteredAt: fixture.stageEnteredAt }
+      : {}),
   });
 }
