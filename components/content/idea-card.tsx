@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { ScrollText, Trash2 } from "lucide-react";
+import { Briefcase, ScrollText, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { updateIdeaStatus } from "@/lib/content/actions";
@@ -11,6 +11,7 @@ import { IDEA_FORMAT_LABEL } from "@/lib/content/idea-format";
 import { IDEA_STATUSES, IDEA_STATUS_LABEL } from "@/lib/content/idea-status";
 import type { Idea } from "@/lib/db/schema";
 import type { ScheduledEventSummary } from "@/lib/data/idea-event-links";
+import type { LinkedProjectSummary } from "@/lib/data/projects";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -25,6 +26,8 @@ interface IdeaCardProps {
   hasScript?: boolean;
   /** Content-track events this idea is linked to, chronological (see docs/content-links.md). */
   scheduledEvents?: ScheduledEventSummary[];
+  /** The project this idea belongs to, if any — read-only here; linking happens from the project page (see docs/projects.md). */
+  project?: LinkedProjectSummary;
 }
 
 /**
@@ -36,6 +39,7 @@ export function IdeaCard({
   idea,
   hasScript = false,
   scheduledEvents = [],
+  project,
 }: IdeaCardProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -109,6 +113,16 @@ export function IdeaCard({
                 </Badge>
               ))}
             </div>
+          ) : null}
+
+          {project ? (
+            <Link
+              href={`/projects/${project.id}`}
+              className="flex w-fit items-center gap-1 text-caption text-muted-foreground hover:underline"
+            >
+              <Briefcase aria-hidden className="size-3.5 shrink-0" />
+              {project.name}
+            </Link>
           ) : null}
 
           <IdeaScheduledEvents

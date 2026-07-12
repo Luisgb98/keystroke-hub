@@ -141,6 +141,24 @@ describe("IdeaCard", () => {
     expect(toastFn).not.toHaveBeenCalled();
   });
 
+  it("shows a project chip linking to the project when one is provided", () => {
+    render(
+      <IdeaCard
+        idea={makeIdea()}
+        project={{ id: "project-1", name: "Keystroke Hub" }}
+      />
+    );
+    const link = screen.getByRole("link", { name: "Keystroke Hub" });
+    expect(link).toHaveAttribute("href", "/projects/project-1");
+  });
+
+  it("omits the project chip when no project is linked", () => {
+    render(<IdeaCard idea={makeIdea()} />);
+    expect(
+      screen.queryByRole("link", { name: /project/i })
+    ).not.toBeInTheDocument();
+  });
+
   it("opens a delete confirmation and calls deleteIdea on confirm", async () => {
     deleteIdea.mockResolvedValue({});
     const user = userEvent.setup();
