@@ -53,6 +53,14 @@ export default async function ProjectsPage() {
         <ArrowRight aria-hidden className="size-4 shrink-0" />
       </Link>
 
+      <Link
+        href="/projects/meetings"
+        className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-small hover:bg-muted/50"
+      >
+        <span>Meeting notes</span>
+        <ArrowRight aria-hidden className="size-4 shrink-0" />
+      </Link>
+
       <ProjectCapture />
 
       {overview.active.length === 0 ? (

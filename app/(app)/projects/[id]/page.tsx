@@ -5,8 +5,10 @@ import { ProjectDetailHeader } from "@/components/projects/project-detail-header
 import { ProjectDetailsForm } from "@/components/projects/project-details-form";
 import { ProjectImprovements } from "@/components/projects/project-improvements";
 import { ProjectLinkedIdeas } from "@/components/projects/project-linked-ideas";
+import { ProjectMeetingNotes } from "@/components/projects/project-meeting-notes";
 import { ProjectNotes } from "@/components/projects/project-notes";
 import { getImprovementsForProject } from "@/lib/data/improvements";
+import { getMeetingNotesForProject } from "@/lib/data/meeting-notes";
 import { getProject } from "@/lib/data/projects";
 
 export const metadata: Metadata = {
@@ -27,6 +29,7 @@ export default async function ProjectDetailPage({
   const { project, linkedIdeas } = result;
   const archived = Boolean(project.archivedAt);
   const improvements = await getImprovementsForProject(id);
+  const meetingNotes = await getMeetingNotesForProject(id);
 
   return (
     <div className="flex flex-1 flex-col gap-6 px-4 py-6 sm:mx-auto sm:w-full sm:max-w-2xl sm:px-10 sm:py-8">
@@ -50,6 +53,8 @@ export default async function ProjectDetailPage({
       />
 
       <ProjectImprovements improvements={improvements} />
+
+      <ProjectMeetingNotes meetingNotes={meetingNotes} />
     </div>
   );
 }
