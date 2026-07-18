@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Settings } from "lucide-react";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { PaletteTriggerChip } from "@/components/command-palette/palette-trigger";
 import { NavLink } from "@/components/shell/nav-link";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,10 @@ export function Sidebar() {
           <span className="font-heading text-h3 font-semibold">Keystroke</span>
           <span className="font-mono text-small text-primary">Hub</span>
         </Link>
+      </div>
+
+      <div className="px-3 pb-3">
+        <PaletteTriggerChip />
       </div>
 
       <nav aria-label="Primary" className="flex flex-1 flex-col gap-1 px-3">

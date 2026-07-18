@@ -17,6 +17,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -134,6 +142,19 @@ export function ComponentsGallery() {
             <DropdownMenuItem>Delete</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <div className="max-w-sm overflow-hidden rounded-xl border border-border">
+          <Command>
+            <CommandInput placeholder="Search or jump to..." />
+            <CommandList>
+              <CommandEmpty>No results found.</CommandEmpty>
+              <CommandGroup heading="Navigate">
+                <CommandItem>Dashboard</CommandItem>
+                <CommandItem>Calendar</CommandItem>
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </div>
 
         <Tooltip>
           <TooltipTrigger render={<Button variant="outline" />}>
