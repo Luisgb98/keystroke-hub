@@ -1,6 +1,7 @@
 import {
   CalendarRange,
   Columns3,
+  Inbox,
   Lightbulb,
   ListChecks,
   Radio,
@@ -23,6 +24,8 @@ export interface SearchNavItem extends NavItem {
  * truth rather than duplicating it (see docs/command-palette.md).
  */
 export const secondaryNavItems: SearchNavItem[] = [
+  // Track-neutral (pre-classification) — no `world`, like Dashboard/Calendar.
+  { href: "/inbox", label: "Inbox", icon: Inbox },
   {
     href: "/journal/week",
     label: "Weekly review",
