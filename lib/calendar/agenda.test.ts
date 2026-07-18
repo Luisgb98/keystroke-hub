@@ -136,6 +136,102 @@ describe("buildAgenda", () => {
     expect(buildAgenda([allDayYesterday], NOW)).toEqual([]);
   });
 
+  it("shows a timed cross-midnight event once, under Today with its start-time label (issue #58)", () => {
+    const crossMidnight = makeEvent({
+      id: "cross-midnight",
+      startsAt: new Date("2026-07-08T23:45:00"),
+      endsAt: new Date("2026-07-09T00:15:00"),
+    });
+
+    const groups = buildAgenda([crossMidnight], NOW);
+
+    const occurrences = groups.flatMap((g) =>
+      g.items.filter((i) => i.event.id === "cross-midnight")
+    );
+    expect(occurrences).toHaveLength(1);
+    expect(groups[0].label).toBe("Today");
+    expect(groups[0].items.map((i) => i.event.id)).toEqual(["cross-midnight"]);
+    expect(groups[0].items[0].timeLabel).toBe("23:45");
+  });
+
+  it("shows a timed event ending exactly at midnight once, under Today", () => {
+    const endsAtMidnight = makeEvent({
+      id: "ends-midnight",
+      startsAt: new Date("2026-07-08T22:00:00"),
+      endsAt: new Date("2026-07-09T00:00:00"),
+    });
+
+    const groups = buildAgenda([endsAtMidnight], NOW);
+
+    const occurrences = groups.flatMap((g) =>
+      g.items.filter((i) => i.event.id === "ends-midnight")
+    );
+    expect(occurrences).toHaveLength(1);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].label).toBe("Today");
+  });
+
+  it("shows a timed event in progress since yesterday once, under Today, labeled 'Now'", () => {
+    const now = new Date("2026-07-08T00:30:00");
+    const overnight = makeEvent({
+      id: "overnight",
+      startsAt: new Date("2026-07-07T23:00:00"),
+      endsAt: new Date("2026-07-08T01:00:00"),
+    });
+
+    const groups = buildAgenda([overnight], now);
+
+    const occurrences = groups.flatMap((g) =>
+      g.items.filter((i) => i.event.id === "overnight")
+    );
+    expect(occurrences).toHaveLength(1);
+    expect(groups[0].label).toBe("Today");
+    expect(groups[0].items[0].timeLabel).toBe("Now");
+    expect(groups[0].items[0].inProgress).toBe(true);
+  });
+
+  it("shows a timed event starting tomorrow and ending the day after once, under Tomorrow", () => {
+    const tomorrowNight = makeEvent({
+      id: "tomorrow-night",
+      startsAt: new Date("2026-07-09T23:30:00"),
+      endsAt: new Date("2026-07-10T00:30:00"),
+    });
+
+    const groups = buildAgenda([tomorrowNight], NOW);
+
+    const occurrences = groups.flatMap((g) =>
+      g.items.filter((i) => i.event.id === "tomorrow-night")
+    );
+    expect(occurrences).toHaveLength(1);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].label).toBe("Tomorrow");
+    expect(groups[0].items[0].timeLabel).toBe("23:30");
+  });
+
+  it("counts a cross-midnight timed event as a single row against maxItems", () => {
+    const crossMidnight = makeEvent({
+      id: "cross-midnight",
+      startsAt: new Date("2026-07-08T23:45:00"),
+      endsAt: new Date("2026-07-09T00:15:00"),
+    });
+    const tomorrowEvents = Array.from({ length: 3 }, (_, i) =>
+      makeEvent({
+        id: `tomorrow-${i}`,
+        startsAt: new Date(
+          `2026-07-09T${String(9 + i).padStart(2, "0")}:00:00`
+        ),
+        endsAt: new Date(`2026-07-09T${String(9 + i).padStart(2, "0")}:30:00`),
+      })
+    );
+
+    const groups = buildAgenda([crossMidnight, ...tomorrowEvents], NOW, 2);
+    const rows = groups.flatMap((g) => g.items.map((i) => i.event.id));
+
+    // The cross-midnight event takes exactly one of the two slots (Today),
+    // leaving one for Tomorrow — not two slots via a duplicated row.
+    expect(rows).toEqual(["cross-midnight", "tomorrow-0"]);
+  });
+
   it("shows a multi-day all-day event once per day bucket it covers", () => {
     const spanning = makeEvent({
       id: "spanning",

@@ -46,11 +46,25 @@ function timeLabelFor(event: CalendarEvent, now: Date): string {
 }
 
 /**
+ * The single day bucket a timed event belongs to: the first horizon day it
+ * overlaps, i.e. its start day, or Today if it began before Today (an
+ * in-progress event whose start day is off the horizon). This keeps a
+ * cross-midnight event (e.g. a late stream ending after 00:00) in exactly
+ * one bucket instead of duplicating it across Today and Tomorrow (issue #58).
+ */
+function timedEventBucketStart(event: CalendarEvent, todayStart: Date): Date {
+  const startDay = startOfDay(event.startsAt);
+  return startDay < todayStart ? todayStart : startDay;
+}
+
+/**
  * Groups upcoming events into day buckets ("Today"/"Tomorrow") for the
  * agenda widget: within a day, all-day items are pinned before timed ones
  * (matching the calendar's own convention), and the whole agenda is capped
- * at `maxItems` rows. A multi-day all-day event appears once per day bucket
- * it covers within the horizon, mirroring the calendar's segment behavior
+ * at `maxItems` rows. A **timed** event appears once, in the first horizon
+ * day it overlaps, so a cross-midnight event isn't rendered twice (issue
+ * #58). A **multi-day all-day** event still appears once per day bucket it
+ * covers within the horizon, mirroring the calendar's segment behavior
  * (docs/calendar.md) rather than collapsing to a single row.
  */
 export function buildAgenda(
@@ -67,7 +81,11 @@ export function buildAgenda(
   for (let i = 0; i < AGENDA_HORIZON_DAYS && remaining > 0; i++) {
     const day = addDays(todayStart, i);
     const dayEvents = active
-      .filter((event) => eventOverlapsDay(event, day))
+      .filter((event) =>
+        event.allDay
+          ? eventOverlapsDay(event, day)
+          : isSameDay(timedEventBucketStart(event, todayStart), day)
+      )
       .sort((a, b) => {
         if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
         return a.startsAt.getTime() - b.startsAt.getTime();
