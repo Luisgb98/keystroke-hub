@@ -86,9 +86,10 @@ device.
 
 **`lib/search/navigation.ts`** — `secondaryNavItems` extends `navItems`
 (`lib/navigation.ts`, the sidebar/bottom-nav source of truth) with
-destinations that have no primary nav slot: `/journal/week`,
-`/journal/standup`, `/content/ideas`, `/content/board`, `/content/streams`,
-`/projects/improvements`, `/projects/meetings`, `/settings/calendars`, each
+destinations that have no primary nav slot: `/inbox` (track-neutral, added by
+#30), `/journal/week`, `/journal/standup`, `/content/ideas`, `/content/board`,
+`/content/streams`, `/projects/improvements`, `/projects/meetings`,
+`/settings/calendars`, each
 tagged with an optional `world` (primary nav items stay track-agnostic,
 matching `docs/design-system.md`'s rule that only genuinely single-track
 things get a track color). `filterNavItems` is a pure case-insensitive
@@ -104,6 +105,14 @@ default behavior.
 other action, short-circuits to empty result groups for a blank/whitespace
 query before touching the database, otherwise delegates to `searchEntities`.
 `getRecentPaletteItems()` — session-guarded wrapper around `getRecentItems`.
+
+**Palette actions** (added by #30) — beyond Navigate/search results, the
+palette renders an **Actions** group for things that _do_ something rather
+than navigate. The first is **Capture a thought**, which closes the palette
+and dispatches the `keystroke:open-capture` window event to pop the global
+quick-capture dialog (`docs/inbox.md`) — a decoupled trigger, so the palette
+needs no capture context. Actions are filtered by the same case-insensitive
+label match as nav items.
 
 ## UI
 

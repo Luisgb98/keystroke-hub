@@ -19,7 +19,7 @@ vi.mock("@/components/command-palette/palette-trigger", () => ({
 describe("Sidebar", () => {
   it("renders every nav item with an accessible name", () => {
     usePathname.mockReturnValue("/");
-    render(<Sidebar />);
+    render(<Sidebar untriagedCount={0} />);
 
     const nav = screen.getByRole("navigation", { name: "Primary" });
     for (const item of navItems) {
@@ -32,7 +32,7 @@ describe("Sidebar", () => {
 
   it("puts aria-current on the item matching the current route", () => {
     usePathname.mockReturnValue("/journal");
-    render(<Sidebar />);
+    render(<Sidebar untriagedCount={0} />);
 
     expect(screen.getByRole("link", { name: "Journal" })).toHaveAttribute(
       "aria-current",
@@ -41,5 +41,19 @@ describe("Sidebar", () => {
     expect(screen.getByRole("link", { name: "Dashboard" })).not.toHaveAttribute(
       "aria-current"
     );
+  });
+
+  it("shows the inbox link with a count badge only when there are untriaged entries", () => {
+    usePathname.mockReturnValue("/");
+    const { rerender } = render(<Sidebar untriagedCount={0} />);
+    // The link is always present…
+    expect(screen.getByRole("link", { name: /Inbox/ })).toBeInTheDocument();
+    // …but the count badge only appears when there's something to triage.
+    expect(document.querySelector('[data-slot="inbox-count"]')).toBeNull();
+
+    rerender(<Sidebar untriagedCount={4} />);
+    const badge = document.querySelector('[data-slot="inbox-count"]');
+    expect(badge).not.toBeNull();
+    expect(badge).toHaveTextContent("4");
   });
 });

@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { PlusCircle } from "lucide-react";
 
 import {
   TRACK_ICON,
   TRACK_LABEL,
   TRACK_SURFACE_CLASSES,
 } from "@/components/calendar/track-styles";
+import { requestOpenCapture } from "@/components/inbox/inbox-capture-provider";
 import {
   Command,
   CommandDialog,
@@ -165,14 +167,37 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     router.push(href);
   }
 
+  // Palette actions do something rather than navigate — capture opens the
+  // global capture dialog via the decoupled window event (see docs/inbox.md).
+  const paletteActions = useMemo(
+    () => [
+      {
+        id: "capture",
+        label: "Capture a thought",
+        icon: PlusCircle,
+        run: () => {
+          onOpenChange(false);
+          requestOpenCapture();
+        },
+      },
+    ],
+    [onOpenChange]
+  );
+
   const trimmed = query.trim();
+  const matchingActions = paletteActions.filter((action) =>
+    action.label.toLowerCase().includes(trimmed.toLowerCase())
+  );
   const matchingNavItems = filterNavItems(allSearchNavItems, trimmed);
   const entityGroups = groups
     ? RESULT_GROUP_ORDER.map((key) => ({ key, results: groups[key] })).filter(
         (group) => group.results.length > 0
       )
     : [];
-  const hasAnyMatch = matchingNavItems.length > 0 || entityGroups.length > 0;
+  const hasAnyMatch =
+    matchingActions.length > 0 ||
+    matchingNavItems.length > 0 ||
+    entityGroups.length > 0;
 
   return (
     <CommandDialog
@@ -197,6 +222,21 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                   onSelect={() => navigateTo(result.href)}
                 >
                   <ResultRow result={result} />
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+
+          {matchingActions.length > 0 && (
+            <CommandGroup heading="Actions">
+              {matchingActions.map((action) => (
+                <CommandItem
+                  key={action.id}
+                  value={`action-${action.id}`}
+                  onSelect={action.run}
+                >
+                  <action.icon aria-hidden className="size-4 shrink-0" />
+                  <span>{action.label}</span>
                 </CommandItem>
               ))}
             </CommandGroup>

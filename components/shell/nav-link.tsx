@@ -12,9 +12,11 @@ interface NavLinkProps {
   label: string;
   icon: ReactNode;
   variant: "sidebar" | "bottom";
+  /** Optional trailing adornment (e.g. the inbox count) — sidebar variant only. */
+  badge?: ReactNode;
 }
 
-export function NavLink({ href, label, icon, variant }: NavLinkProps) {
+export function NavLink({ href, label, icon, variant, badge }: NavLinkProps) {
   const pathname = usePathname();
   const active = isNavItemActive(pathname, href);
 
@@ -59,6 +61,7 @@ export function NavLink({ href, label, icon, variant }: NavLinkProps) {
     >
       {icon}
       <span>{label}</span>
+      {badge != null ? <span className="ml-auto">{badge}</span> : null}
     </Link>
   );
 }

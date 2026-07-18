@@ -831,3 +831,62 @@ export const githubIssueLinks = pgTable(
 
 export type GithubIssueLink = typeof githubIssueLinks.$inferSelect;
 export type NewGithubIssueLink = typeof githubIssueLinks.$inferInsert;
+
+// --- Quick-capture inbox (issue #30) ---
+//
+// See docs/inbox.md. One frictionless capture box for any thought: a row
+// lands here first (no category, no required choice), then triage converts it
+// into a content idea, improvement, daily-log item, or meeting note — or
+// discards it. Deliberately track-neutral: entries are pre-classification, so
+// unlike `events`/`ideas`/etc. there's no track discriminator here.
+//
+// Triaged entries are KEPT, not deleted — "leaving the inbox" is
+// `WHERE triaged_at IS NULL`, which preserves an audit trail of where each
+// thought went (cheap for a single-user app). `discarded` is a triage
+// outcome like any other, so junk also leaves the inbox by the same filter.
+//
+// `triagedToId` has no FK: it points into four different destination tables
+// (and is null for discards), which real referential integrity can't express
+// polymorphically — an acceptable trade-off for a single-user app, same
+// spirit as `event_sync_links.google_event_id`.
+
+export const inboxDestinationEnum = pgEnum("inbox_destination", [
+  "content_idea",
+  "improvement",
+  "daily_log_item",
+  "meeting_note",
+  "discarded",
+]);
+
+export const inboxEntries = pgTable(
+  "inbox_entries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // The raw captured thought — the only thing capture collects. ~2,000-char
+    // cap is enforced in Zod (paste-a-whole-document isn't the use case), not
+    // as a DB constraint.
+    body: text("body").notNull(),
+    // `NULL` = still in the inbox. Set by both triage and discard.
+    triagedAt: timestamp("triaged_at", { withTimezone: true }),
+    triagedToType: inboxDestinationEnum("triaged_to_type"),
+    triagedToId: uuid("triaged_to_id"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    // Untriaged reads are the hot path (the inbox list + the nav count), all
+    // filtered on `triaged_at IS NULL` and ordered oldest-first by creation.
+    index("inbox_entries_triaged_at_created_at_idx").on(
+      table.triagedAt,
+      table.createdAt
+    ),
+  ]
+);
+
+export type InboxEntry = typeof inboxEntries.$inferSelect;
+export type NewInboxEntry = typeof inboxEntries.$inferInsert;

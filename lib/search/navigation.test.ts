@@ -11,6 +11,7 @@ import {
 describe("secondaryNavItems", () => {
   it("includes every documented secondary destination with a valid href/label/world", () => {
     const expected = [
+      { href: "/inbox", label: "Inbox", world: undefined },
       { href: "/journal/week", label: "Weekly review", world: "work" },
       { href: "/journal/standup", label: "Standup prep", world: "work" },
       { href: "/content/ideas", label: "Ideas", world: "content" },
