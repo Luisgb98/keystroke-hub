@@ -214,9 +214,15 @@ page doesn't provide data, just drops it in.
   "Today"/"Tomorrow", pins all-day items before timed ones within a day,
   labels the currently-in-progress item "Now", and tightens the "hasn't
   ended" boundary to strictly exclude an event ending exactly at `now` (it
-  just finished). A multi-day all-day event appears once per day bucket it
-  covers, mirroring the calendar's own segment behavior rather than
-  collapsing to one row.
+  just finished). Bucketing is **track-specific by event kind**:
+  - A **timed** event lands in exactly one bucket — the first horizon day it
+    overlaps (its start day, or Today if it began earlier and is still in
+    progress). This keeps a **cross-midnight** event (e.g. a late stream
+    ending after 00:00) from rendering twice — once under Today and again
+    under Tomorrow with a misleading start-time label (issue #58).
+  - A **multi-day all-day** event still appears once per day bucket it
+    covers, mirroring the calendar's own segment behavior rather than
+    collapsing to one row.
 - **`AgendaItemRow`** (`components/agenda/agenda-item.tsx`) reuses the same
   visual language as `EventChip`/`EventBlock` (track icon + surface classes
   - label, conflict-note indicator) and opens the same `EventEditor` edit
