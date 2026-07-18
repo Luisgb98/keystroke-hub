@@ -10,6 +10,7 @@ const PREFIX = "[e2e-agenda]";
 const WORK_TITLE = `${PREFIX} Work sync`;
 const CONTENT_TITLE = `${PREFIX} Record stream`;
 const TOMORROW_TITLE = `${PREFIX} All-day work offsite`;
+const CROSS_MIDNIGHT_TITLE = `${PREFIX} Late stream`;
 
 const skip = !process.env.DATABASE_URL;
 const skipReason =
@@ -28,6 +29,11 @@ test.describe("upcoming agenda widget", () => {
   test.skip(skip, skipReason);
 
   test.beforeAll(async () => {
+    // Pre-clean under this prefix: an interrupted earlier run only clears in
+    // afterAll, so a leftover `[e2e-agenda]` row would otherwise make this
+    // run fail confusingly.
+    await clearEventsWithPrefix(PREFIX);
+
     const now = new Date();
     // Offsets from "now" (rather than fixed clock hours) guarantee these
     // land in the widget's "hasn't ended" window regardless of when the
@@ -56,6 +62,23 @@ test.describe("upcoming agenda widget", () => {
       startsAt: tomorrow,
       endsAt: tomorrow,
       allDay: true,
+    });
+    // A timed event crossing midnight (today 23:59 → tomorrow 00:30). It
+    // overlaps both Today and Tomorrow, but must render exactly once, under
+    // its start day (Today) — regression fixture for issue #58. Anchored to
+    // fixed clock hours (not `now`-relative) so it stays inside the widget's
+    // "hasn't ended" window and keeps its Today bucket at any run time of
+    // day: endsAt is 00:30 tomorrow, always after `now` while today lasts.
+    const todayStart = startOfDay(now);
+    const crossMidnightStart = new Date(todayStart);
+    crossMidnightStart.setHours(23, 59, 0, 0);
+    const crossMidnightEnd = new Date(addDays(todayStart, 1));
+    crossMidnightEnd.setHours(0, 30, 0, 0);
+    await insertTestEvent({
+      title: CROSS_MIDNIGHT_TITLE,
+      track: "content",
+      startsAt: crossMidnightStart,
+      endsAt: crossMidnightEnd,
     });
   });
 
@@ -92,6 +115,19 @@ test.describe("upcoming agenda widget", () => {
     await expect(contentItem.locator("svg")).toBeVisible();
   });
 
+  test("renders a cross-midnight event exactly once, not duplicated across days (issue #58)", async ({
+    page,
+  }) => {
+    await page.goto("/");
+
+    // The event spans Today 23:59 → Tomorrow 00:30, so it overlaps both day
+    // buckets; before the fix it rendered a row under each. It must appear
+    // once, under its start day.
+    await expect(
+      page.locator(AGENDA_ITEM_SELECTOR, { hasText: CROSS_MIDNIGHT_TITLE })
+    ).toHaveCount(1);
+  });
+
   test("tapping an agenda item opens the edit dialog with that event's data", async ({
     page,
   }) => {
@@ -117,6 +153,8 @@ test.describe("upcoming agenda widget mobile viewport", () => {
   test.skip(skip, skipReason);
 
   test.beforeAll(async () => {
+    await clearEventsWithPrefix(PREFIX);
+
     const now = new Date();
     await insertTestEvent({
       title: WORK_TITLE,
