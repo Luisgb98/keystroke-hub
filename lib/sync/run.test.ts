@@ -188,6 +188,72 @@ describe("runInboundSync", () => {
     });
   });
 
+  it("re-adopts an orphaned link (nulls-back its connectionId) when its unchanged remote echoes after reconnect (issue #67)", async () => {
+    fake.queue(calendarConnections, [baseConnection()]);
+    fake.queue(eventSyncLinks, []); // ownLinks: none for this connection yet
+    // orphanedLinks: a link left connectionId-null by a past disconnect, whose
+    // pending push is still waiting for the retry cron.
+    fake.queue(eventSyncLinks, [
+      {
+        link: {
+          id: "link-1",
+          eventId: "evt-1",
+          connectionId: null,
+          googleEventId: "g-1",
+          googleEtag: '"e1"',
+          updatedAt: new Date("2026-07-08T08:00:00Z"),
+          pushState: "pending_push",
+        },
+        event: {
+          id: "evt-1",
+          track: "work",
+          title: "Standup",
+          description: null,
+          allDay: false,
+          startsAt: new Date("2026-07-08T09:00:00Z"),
+          endsAt: new Date("2026-07-08T09:15:00Z"),
+          updatedAt: new Date("2026-07-08T08:00:00Z"),
+        },
+      },
+    ]);
+    fake.queue(events, [
+      {
+        id: "evt-1",
+        track: "work",
+        title: "Standup",
+        description: null,
+        allDay: false,
+        startsAt: new Date("2026-07-08T09:00:00Z"),
+        endsAt: new Date("2026-07-08T09:15:00Z"),
+        updatedAt: new Date("2026-07-08T08:00:00Z"),
+      },
+    ]);
+
+    const client = fakeClient({
+      listEvents: vi.fn().mockResolvedValue({
+        items: [
+          {
+            id: "g-1",
+            status: "confirmed",
+            summary: "Standup",
+            start: { dateTime: "2026-07-08T09:00:00Z" },
+            end: { dateTime: "2026-07-08T09:15:00Z" },
+            updated: "2026-07-08T08:00:00Z",
+            etag: '"e1"', // unchanged since our last sync → own echo
+          },
+        ],
+        nextSyncToken: "sync-token-2",
+      }),
+    });
+
+    await runInboundSync("conn-1", client);
+
+    const linkUpdate = fake.writes.find(
+      (w) => w.op === "update" && w.table === eventSyncLinks
+    );
+    expect(linkUpdate?.values).toEqual({ connectionId: "conn-1" });
+  });
+
   it("falls back to a full re-list on a 410 SyncTokenExpiredError", async () => {
     fake.queue(calendarConnections, [
       baseConnection({ syncToken: "stale-token" }),
