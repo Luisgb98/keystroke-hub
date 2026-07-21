@@ -11,6 +11,7 @@ import {
   eventSyncLinks,
   events,
   ideaEventLinks,
+  meetingNotes,
   streams,
 } from "@/lib/db/schema";
 import {
@@ -100,18 +101,43 @@ export async function updateEvent(
 
   const db = getDb();
 
-  // Flipping a linked content event to `work` would otherwise fail on the
-  // composite FK `idea_event_links` carries against `events (id, track)`
-  // (see docs/content-links.md issue #18) — caught here first for a
-  // friendly, UI-facing message instead of a raw constraint-violation error.
+  // A track flip breaks any composite FK a child row holds against
+  // `events (id, track)` (idea links + streams are content-pinned, meeting
+  // notes are work-pinned) — Postgres would raise a raw constraint violation.
+  // Catch each here first for a friendly, UI-facing "unlink first" message.
+  // Content-pinned children (ideas, streams) can only exist on a content
+  // event, and work-pinned children (meeting notes) only on a work event, so
+  // the target track alone tells us which to guard (issue #67, finding C8).
   if (parsed.data.track === "work") {
-    const [existingLink] = await db
+    const [ideaLink] = await db
       .select({ ideaId: ideaEventLinks.ideaId })
       .from(ideaEventLinks)
       .where(eq(ideaEventLinks.eventId, id));
-    if (existingLink) {
+    if (ideaLink) {
       return {
         error: "Unlink content first — this event still has linked ideas.",
+      };
+    }
+    const [stream] = await db
+      .select({ id: streams.id })
+      .from(streams)
+      .where(eq(streams.eventId, id));
+    if (stream) {
+      return {
+        error: "Unlink the stream first — this event is still scheduling one.",
+      };
+    }
+  }
+
+  if (parsed.data.track === "content") {
+    const [meetingNote] = await db
+      .select({ id: meetingNotes.id })
+      .from(meetingNotes)
+      .where(eq(meetingNotes.eventId, id));
+    if (meetingNote) {
+      return {
+        error:
+          "Unlink the meeting note first — this event is still attached to one.",
       };
     }
   }
