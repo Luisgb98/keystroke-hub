@@ -88,6 +88,23 @@ export async function getConnectionForTrack(
   return connection ?? null;
 }
 
+/**
+ * The connection a sync link currently lives on (by id) — the authoritative
+ * "which Google calendar does this event's remote copy exist on", which the
+ * outbound push hook needs to detect a track flip (the event's track no longer
+ * matches its link's calendar) without pushing onto the wrong calendar.
+ */
+export async function getConnectionById(
+  connectionId: string
+): Promise<CalendarConnection | null> {
+  const db = getDb();
+  const [connection] = await db
+    .select()
+    .from(calendarConnections)
+    .where(eq(calendarConnections.id, connectionId));
+  return connection ?? null;
+}
+
 function toLocalEventSnapshot(
   row: typeof events.$inferSelect
 ): LocalEventSnapshot {

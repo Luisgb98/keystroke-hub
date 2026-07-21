@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./run", () => ({
   getConnectionForTrack: vi.fn(),
+  getConnectionById: vi.fn(),
   getValidAccessToken: vi.fn(),
 }));
 vi.mock("@/lib/google/client", () => ({
@@ -57,7 +58,11 @@ vi.mock("@/lib/db", () => ({ getDb: () => dbMock }));
 
 import { events } from "@/lib/db/schema";
 import { createGoogleCalendarClient } from "@/lib/google/client";
-import { getConnectionForTrack, getValidAccessToken } from "./run";
+import {
+  getConnectionById,
+  getConnectionForTrack,
+  getValidAccessToken,
+} from "./run";
 import { pushEventCreated, pushEventDeleted, pushEventUpdated } from "./push";
 
 // Matched against the `table` argument `db.select().from(table)` receives —
@@ -90,6 +95,7 @@ beforeEach(() => {
   dbMock.state.deletedWhere = undefined;
 
   vi.mocked(getConnectionForTrack).mockResolvedValue(connection as never);
+  vi.mocked(getConnectionById).mockResolvedValue(null);
   vi.mocked(getValidAccessToken).mockResolvedValue("access-token");
 });
 
@@ -195,6 +201,84 @@ describe("pushEventUpdated", () => {
     await pushEventUpdated("evt-1", "work");
 
     expect(dbMock.state.updated).toEqual({ pushState: "pending_push" });
+  });
+
+  it("on a track flip, deletes from the old calendar and re-creates on the new one — never patches the old id onto the new calendar (issue #67)", async () => {
+    // Event now lives on the `work` track, but its link still points at the
+    // content calendar it was synced to before the flip.
+    dbMock.state.linkRows = [
+      { id: "link-1", googleEventId: "g-old", connectionId: "conn-content" },
+    ];
+    vi.mocked(getConnectionById).mockResolvedValue({
+      id: "conn-content",
+      track: "content",
+      googleCalendarId: "cal-content",
+    } as never);
+
+    const deleteEvent = vi.fn().mockResolvedValue(undefined);
+    const patchEvent = vi.fn();
+    const insertEvent = vi.fn().mockResolvedValue({
+      id: "g-new",
+      etag: '"e-new"',
+      updated: "2026-07-08T11:00:00Z",
+    });
+    vi.mocked(createGoogleCalendarClient).mockReturnValue({
+      deleteEvent,
+      patchEvent,
+      insertEvent,
+    } as never);
+
+    await pushEventUpdated("evt-1", "work");
+
+    // Removed from the OLD calendar with the OLD id...
+    expect(deleteEvent).toHaveBeenCalledWith(
+      "access-token",
+      "cal-content",
+      "g-old"
+    );
+    // ...created fresh on the NEW track's calendar...
+    expect(insertEvent).toHaveBeenCalledWith(
+      "access-token",
+      "cal-1",
+      expect.objectContaining({ summary: "Sprint planning" })
+    );
+    // ...and the old id is never patched onto the new calendar.
+    expect(patchEvent).not.toHaveBeenCalled();
+    expect(dbMock.state.updated).toMatchObject({
+      connectionId: "conn-1",
+      googleEventId: "g-new",
+      pushState: "synced",
+    });
+  });
+
+  it("on a track flip to an unconnected track, deletes the old copy and drops the link (issue #67)", async () => {
+    dbMock.state.linkRows = [
+      { id: "link-1", googleEventId: "g-old", connectionId: "conn-content" },
+    ];
+    vi.mocked(getConnectionById).mockResolvedValue({
+      id: "conn-content",
+      track: "content",
+      googleCalendarId: "cal-content",
+    } as never);
+    // New track (work) isn't connected to any calendar.
+    vi.mocked(getConnectionForTrack).mockResolvedValue(null);
+
+    const deleteEvent = vi.fn().mockResolvedValue(undefined);
+    const insertEvent = vi.fn();
+    vi.mocked(createGoogleCalendarClient).mockReturnValue({
+      deleteEvent,
+      insertEvent,
+    } as never);
+
+    await pushEventUpdated("evt-1", "work");
+
+    expect(deleteEvent).toHaveBeenCalledWith(
+      "access-token",
+      "cal-content",
+      "g-old"
+    );
+    expect(insertEvent).not.toHaveBeenCalled();
+    expect(dbMock.delete).toHaveBeenCalled();
   });
 });
 
