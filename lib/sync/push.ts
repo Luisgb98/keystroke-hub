@@ -9,7 +9,10 @@ import {
   type CalendarConnection,
 } from "@/lib/db/schema";
 import type { Track } from "@/lib/calendar/types";
-import { createGoogleCalendarClient } from "@/lib/google/client";
+import {
+  createGoogleCalendarClient,
+  type GoogleCalendarClient,
+} from "@/lib/google/client";
 
 import { toGooglePayload } from "./engine";
 import {
@@ -86,12 +89,14 @@ export async function pushEventUpdated(
   // The link's own connection is where the event's Google copy actually lives.
   // If that calendar belongs to a *different* track than the event now has,
   // the track was flipped: the event must leave the old calendar and be
-  // re-created on the new track's calendar — never patched onto it with the
-  // old calendar's event id (issue #67, finding A2).
+  // re-created on the new track's calendar — never pushed onto it with the old
+  // calendar's event id (issue #67, finding A2). This holds even when the link
+  // has no Google id yet (a never-pushed pending link): otherwise it would
+  // fall through and insert the flipped event onto the *old* track's calendar.
   const linkConnection = link.connectionId
     ? await getConnectionById(link.connectionId)
     : null;
-  if (link.googleEventId && linkConnection && linkConnection.track !== track) {
+  if (linkConnection && linkConnection.track !== track) {
     await pushEventTrackFlipped(
       { id: link.id, googleEventId: link.googleEventId },
       linkConnection,
@@ -101,16 +106,23 @@ export async function pushEventUpdated(
     return;
   }
 
-  // Otherwise the event is still on its own calendar (or the link was orphaned
-  // by a disconnect and we re-adopt it by patching against the current track's
-  // reconnected calendar).
+  // Otherwise the event is still on its own calendar, or the link was orphaned
+  // by a disconnect (connectionId nulled). For an orphaned link we push onto
+  // the current track's connection.
+  const orphaned = !link.connectionId;
   const connection = linkConnection ?? (await getConnectionForTrack(track));
   if (!connection) return;
 
   const client = createGoogleCalendarClient();
   try {
     const accessToken = await getValidAccessToken(connection);
-    if (!link.googleEventId) {
+    // Insert fresh — rather than patch — when the link has no Google id yet,
+    // or when it's orphaned. A reconnect can point the track at a *different*
+    // Google calendar, where the old event id is invalid and a patch would
+    // 404 forever; inbound skip-echo already re-adopts same-calendar
+    // reconnects before any edit, so an orphaned link reaching here needs a
+    // fresh push, not a patch (issue #67, finding A2 follow-up).
+    if (!link.googleEventId || orphaned) {
       const pushed = await client.insertEvent(
         accessToken,
         connection.googleCalendarId,
@@ -145,84 +157,88 @@ export async function pushEventUpdated(
       })
       .where(eq(eventSyncLinks.id, link.id));
   } catch {
+    // Re-point `connectionId` too: an orphaned link (nulled by a disconnect)
+    // whose push failed would otherwise stay `connectionId`-null and never be
+    // picked up by the retry cron (which filters by connection), stranding the
+    // edit (issue #67, finding A2 follow-up).
     await db
       .update(eventSyncLinks)
-      .set({ pushState: "pending_push" })
+      .set({ connectionId: connection.id, pushState: "pending_push" })
       .where(eq(eventSyncLinks.id, link.id));
   }
 }
 
 /**
- * Moves a synced event from its old track's Google calendar to the new
- * track's calendar after a track flip: delete the old-calendar copy, then
- * re-create on the new calendar. The old Google event id is only valid on the
- * old calendar, so it must never be patched onto the new one — that would 404
- * and, via the retry cron, keep pushing one track's data at the other track's
- * calendar (issue #67, finding A2).
+ * Best-effort removal of an event's copy from its old-track calendar during a
+ * track flip. Returns `true` when the copy is gone (deleted, or never existed
+ * because the link had no Google id yet), `false` when a live copy could not
+ * be deleted — the caller keeps a tombstone so the delete is retried.
+ */
+async function removeOldCalendarCopy(
+  client: GoogleCalendarClient,
+  connection: CalendarConnection,
+  googleEventId: string | null
+): Promise<boolean> {
+  if (!googleEventId) return true;
+  try {
+    const accessToken = await getValidAccessToken(connection);
+    await client.deleteEvent(
+      accessToken,
+      connection.googleCalendarId,
+      googleEventId
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Moves a synced event off its old track's calendar after a track flip: remove
+ * the old-calendar copy, then re-create it on the new track's calendar via
+ * `pushEventCreated`. The old Google event id is only valid on the old
+ * calendar, so it is never pushed onto the new one (issue #67, finding A2).
+ *
+ * If the old-calendar delete fails, the link is kept as a `pending_delete`
+ * tombstone decoupled from the event (`eventId` nulled) — so the cron finishes
+ * deleting the old copy (otherwise a later full re-list would re-import it as a
+ * cross-track ghost) while freeing the event's unique link slot for the fresh
+ * link `pushEventCreated` makes on the new calendar.
  */
 async function pushEventTrackFlipped(
-  link: { id: string; googleEventId: string },
+  link: { id: string; googleEventId: string | null },
   oldConnection: CalendarConnection,
   event: typeof events.$inferSelect,
   newTrack: Track
 ): Promise<void> {
   const db = getDb();
   const client = createGoogleCalendarClient();
-  const newConnection = await getConnectionForTrack(newTrack);
 
-  // Remove the copy from the old track's calendar first (best-effort — a stale
-  // copy left behind is far better than writing this event onto the wrong
-  // track's calendar).
-  try {
-    const oldToken = await getValidAccessToken(oldConnection);
-    await client.deleteEvent(
-      oldToken,
-      oldConnection.googleCalendarId,
-      link.googleEventId
-    );
-  } catch {
-    // Leave the old copy; the important guarantee is that we stop pushing the
-    // old id onto the new calendar below.
-  }
+  const oldCopyRemoved = await removeOldCalendarCopy(
+    client,
+    oldConnection,
+    link.googleEventId
+  );
 
-  // New track isn't connected to any calendar — the event is simply unsynced
-  // now, so drop the link rather than keep pushing a dead id.
-  if (!newConnection) {
+  if (oldCopyRemoved) {
+    // Old copy gone (or never existed) — drop the stale link entirely.
     await db.delete(eventSyncLinks).where(eq(eventSyncLinks.id, link.id));
-    return;
+  } else {
+    // Old copy still live and its delete failed — keep this link as a
+    // decoupled pending_delete tombstone so the cron finishes removing it.
+    await db
+      .update(eventSyncLinks)
+      .set({
+        eventId: null,
+        connectionId: oldConnection.id,
+        pushState: "pending_delete",
+      })
+      .where(eq(eventSyncLinks.id, link.id));
   }
 
-  try {
-    const newToken = await getValidAccessToken(newConnection);
-    const pushed = await client.insertEvent(
-      newToken,
-      newConnection.googleCalendarId,
-      toGooglePayload(event)
-    );
-    await db
-      .update(eventSyncLinks)
-      .set({
-        connectionId: newConnection.id,
-        googleEventId: pushed.id,
-        googleEtag: pushed.etag,
-        googleUpdatedAt: new Date(pushed.updated),
-        pushState: "synced",
-        conflictNote: null,
-      })
-      .where(eq(eventSyncLinks.id, link.id));
-  } catch {
-    // Couldn't create on the new calendar yet — point the link at the new
-    // connection with no Google id so the retry cron does a fresh insert
-    // there, never a patch against the old calendar's id.
-    await db
-      .update(eventSyncLinks)
-      .set({
-        connectionId: newConnection.id,
-        googleEventId: null,
-        pushState: "pending_push",
-      })
-      .where(eq(eventSyncLinks.id, link.id));
-  }
+  // Re-create the event on the new track's calendar — a no-op if that track
+  // has no connection, in which case the event is simply unsynced now.
+  await pushEventCreated(event.id, newTrack);
 }
 
 /**

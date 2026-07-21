@@ -170,7 +170,10 @@ describe("pushEventUpdated", () => {
   });
 
   it("patches the existing Google event when a link exists", async () => {
-    dbMock.state.linkRows = [{ id: "link-1", googleEventId: "g-1" }];
+    dbMock.state.linkRows = [
+      { id: "link-1", googleEventId: "g-1", connectionId: "conn-1" },
+    ];
+    vi.mocked(getConnectionById).mockResolvedValue(connection as never);
     const patchEvent = vi.fn().mockResolvedValue({
       id: "g-1",
       etag: '"e2"',
@@ -192,7 +195,10 @@ describe("pushEventUpdated", () => {
   });
 
   it("marks pending_push on failure without touching the local event", async () => {
-    dbMock.state.linkRows = [{ id: "link-1", googleEventId: "g-1" }];
+    dbMock.state.linkRows = [
+      { id: "link-1", googleEventId: "g-1", connectionId: "conn-1" },
+    ];
+    vi.mocked(getConnectionById).mockResolvedValue(connection as never);
     const patchEvent = vi.fn().mockRejectedValue(new Error("network error"));
     vi.mocked(createGoogleCalendarClient).mockReturnValue({
       patchEvent,
@@ -200,7 +206,43 @@ describe("pushEventUpdated", () => {
 
     await pushEventUpdated("evt-1", "work");
 
-    expect(dbMock.state.updated).toEqual({ pushState: "pending_push" });
+    expect(dbMock.state.updated).toEqual({
+      connectionId: "conn-1",
+      pushState: "pending_push",
+    });
+  });
+
+  it("inserts fresh (not patch) for an orphaned link, so a reconnect to a different calendar doesn't 404 forever (issue #67)", async () => {
+    // Link was orphaned by a disconnect (connectionId null) but kept its old
+    // Google id; the track was then reconnected. The stale id may not exist on
+    // the reconnected calendar, so we must create fresh, not patch.
+    dbMock.state.linkRows = [
+      { id: "link-1", googleEventId: "g-stale", connectionId: null },
+    ];
+    const patchEvent = vi.fn();
+    const insertEvent = vi.fn().mockResolvedValue({
+      id: "g-new",
+      etag: '"e-new"',
+      updated: "2026-07-08T11:00:00Z",
+    });
+    vi.mocked(createGoogleCalendarClient).mockReturnValue({
+      patchEvent,
+      insertEvent,
+    } as never);
+
+    await pushEventUpdated("evt-1", "work");
+
+    expect(patchEvent).not.toHaveBeenCalled();
+    expect(insertEvent).toHaveBeenCalledWith(
+      "access-token",
+      "cal-1",
+      expect.objectContaining({ summary: "Sprint planning" })
+    );
+    expect(dbMock.state.updated).toMatchObject({
+      connectionId: "conn-1",
+      googleEventId: "g-new",
+      pushState: "synced",
+    });
   });
 
   it("on a track flip, deletes from the old calendar and re-creates on the new one — never patches the old id onto the new calendar (issue #67)", async () => {
@@ -244,10 +286,96 @@ describe("pushEventUpdated", () => {
     );
     // ...and the old id is never patched onto the new calendar.
     expect(patchEvent).not.toHaveBeenCalled();
-    expect(dbMock.state.updated).toMatchObject({
+    // The stale link is dropped and a fresh one is created for the new copy.
+    expect(dbMock.delete).toHaveBeenCalled();
+    expect(dbMock.state.inserted).toMatchObject({
+      eventId: "evt-1",
       connectionId: "conn-1",
       googleEventId: "g-new",
       pushState: "synced",
+    });
+  });
+
+  it("flips a never-pushed pending link onto the NEW track's calendar, not the old one (issue #67)", async () => {
+    // Link has no Google id yet (its initial create-push failed), still
+    // pointing at the old content calendar. Flipping to work must insert onto
+    // the work calendar — the earlier guard wrongly inserted onto content.
+    dbMock.state.linkRows = [
+      { id: "link-1", googleEventId: null, connectionId: "conn-content" },
+    ];
+    vi.mocked(getConnectionById).mockResolvedValue({
+      id: "conn-content",
+      track: "content",
+      googleCalendarId: "cal-content",
+    } as never);
+
+    const deleteEvent = vi.fn();
+    const insertEvent = vi.fn().mockResolvedValue({
+      id: "g-new",
+      etag: '"e-new"',
+      updated: "2026-07-08T11:00:00Z",
+    });
+    vi.mocked(createGoogleCalendarClient).mockReturnValue({
+      deleteEvent,
+      insertEvent,
+    } as never);
+
+    await pushEventUpdated("evt-1", "work");
+
+    // Nothing to delete on the old calendar (never pushed there)...
+    expect(deleteEvent).not.toHaveBeenCalled();
+    // ...and the insert lands on the WORK calendar (cal-1), not content.
+    expect(insertEvent).toHaveBeenCalledWith(
+      "access-token",
+      "cal-1",
+      expect.objectContaining({ summary: "Sprint planning" })
+    );
+    expect(dbMock.state.inserted).toMatchObject({
+      connectionId: "conn-1",
+      googleEventId: "g-new",
+    });
+  });
+
+  it("on a failed old-calendar delete during a flip, tombstones the old link and still re-creates on the new calendar (issue #67)", async () => {
+    dbMock.state.linkRows = [
+      { id: "link-1", googleEventId: "g-old", connectionId: "conn-content" },
+    ];
+    vi.mocked(getConnectionById).mockResolvedValue({
+      id: "conn-content",
+      track: "content",
+      googleCalendarId: "cal-content",
+    } as never);
+
+    const deleteEvent = vi.fn().mockRejectedValue(new Error("network error"));
+    const insertEvent = vi.fn().mockResolvedValue({
+      id: "g-new",
+      etag: '"e-new"',
+      updated: "2026-07-08T11:00:00Z",
+    });
+    vi.mocked(createGoogleCalendarClient).mockReturnValue({
+      deleteEvent,
+      insertEvent,
+    } as never);
+
+    await pushEventUpdated("evt-1", "work");
+
+    // Old link kept as a decoupled pending_delete tombstone so the cron
+    // finishes removing the still-live old-calendar copy (no ghost re-import).
+    expect(dbMock.state.updated).toMatchObject({
+      eventId: null,
+      connectionId: "conn-content",
+      pushState: "pending_delete",
+    });
+    // A fresh link is still created for the copy on the new calendar.
+    expect(insertEvent).toHaveBeenCalledWith(
+      "access-token",
+      "cal-1",
+      expect.objectContaining({ summary: "Sprint planning" })
+    );
+    expect(dbMock.state.inserted).toMatchObject({
+      eventId: "evt-1",
+      connectionId: "conn-1",
+      googleEventId: "g-new",
     });
   });
 
