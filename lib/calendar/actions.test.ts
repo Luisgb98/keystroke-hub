@@ -1,0 +1,322 @@
+// @vitest-environment node
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/auth/session", () => ({
+  verifySession: vi.fn(),
+}));
+vi.mock("next/navigation", () => ({
+  redirect: vi.fn((url: string) => {
+    throw new Error(`NEXT_REDIRECT:${url}`);
+  }),
+}));
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+// `after()` requires a real request scope, which vitest's node environment
+// doesn't provide — the outbound Google push it schedules is exercised by
+// lib/sync/push.test.ts instead, so it's mocked away here entirely.
+vi.mock("next/server", () => ({ after: vi.fn((fn: () => unknown) => fn()) }));
+vi.mock("@/lib/sync/push", () => ({
+  pushEventCreated: vi.fn(),
+  pushEventUpdated: vi.fn(),
+  pushEventDeleted: vi.fn(),
+}));
+
+const dbMock = vi.hoisted(() => {
+  const insertReturning = vi.fn();
+  const insertValues = vi.fn(() => ({ returning: insertReturning }));
+  const updateReturning = vi.fn();
+  const deleteReturning = vi.fn();
+  const selectWhere = vi.fn();
+
+  return {
+    insertReturning,
+    insertValues,
+    updateReturning,
+    deleteReturning,
+    selectWhere,
+    insert: vi.fn(() => ({ values: insertValues })),
+    update: vi.fn(() => ({
+      set: vi.fn(() => ({
+        where: vi.fn(() => ({ returning: updateReturning })),
+      })),
+    })),
+    delete: vi.fn(() => ({
+      where: vi.fn(() => ({ returning: deleteReturning })),
+    })),
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({ where: selectWhere })),
+    })),
+  };
+});
+
+vi.mock("@/lib/db", () => ({
+  getDb: () => dbMock,
+}));
+
+import { revalidatePath } from "next/cache";
+
+import { verifySession } from "@/lib/auth/session";
+import { pushEventUpdated } from "@/lib/sync/push";
+import {
+  createEvent,
+  deleteEvent,
+  rescheduleEvent,
+  updateEvent,
+} from "./actions";
+
+function form(entries: Record<string, string>): FormData {
+  const data = new FormData();
+  for (const [key, value] of Object.entries(entries)) data.set(key, value);
+  return data;
+}
+
+const validTimedForm = {
+  title: "Sprint planning",
+  track: "work",
+  description: "",
+  allDay: "false",
+  startDate: "2026-07-08",
+  startTime: "09:00",
+  endDate: "2026-07-08",
+  endTime: "10:00",
+};
+
+beforeEach(() => {
+  vi.mocked(verifySession).mockResolvedValue({ isAuth: true });
+  dbMock.insertReturning.mockResolvedValue([{ id: "evt-1", track: "work" }]);
+  dbMock.deleteReturning.mockResolvedValue([{ id: "1", track: "work" }]);
+  dbMock.updateReturning.mockResolvedValue([{ id: "evt-1", track: "work" }]);
+  // deleteEvent's pre-delete sync-link lookup — no link by default.
+  dbMock.selectWhere.mockResolvedValue([]);
+});
+
+afterEach(() => {
+  vi.clearAllMocks();
+});
+
+describe("createEvent", () => {
+  it("verifies the session before touching the database", async () => {
+    await createEvent(undefined, form(validTimedForm));
+    expect(verifySession).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects an unauthenticated call before writing", async () => {
+    vi.mocked(verifySession).mockRejectedValueOnce(
+      new Error("NEXT_REDIRECT:/login")
+    );
+    await expect(createEvent(undefined, form(validTimedForm))).rejects.toThrow(
+      "NEXT_REDIRECT:/login"
+    );
+    expect(dbMock.insert).not.toHaveBeenCalled();
+  });
+
+  it("inserts a valid event and revalidates the calendar", async () => {
+    const state = await createEvent(undefined, form(validTimedForm));
+    expect(state).toEqual({ success: true });
+    expect(dbMock.insert).toHaveBeenCalledTimes(1);
+    expect(dbMock.insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Sprint planning", track: "work" })
+    );
+    expect(revalidatePath).toHaveBeenCalledWith("/calendar");
+  });
+
+  it("returns field errors without writing on invalid input", async () => {
+    const state = await createEvent(
+      undefined,
+      form({ ...validTimedForm, title: "" })
+    );
+    expect(state.error).toBe("Check the highlighted fields.");
+    expect(state.fieldErrors?.title).toBeTruthy();
+    expect(dbMock.insert).not.toHaveBeenCalled();
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("returns a field error when no track is chosen", async () => {
+    const data = { ...validTimedForm };
+    // @ts-expect-error deliberately omitting a required field
+    delete data.track;
+    const state = await createEvent(undefined, form(data));
+    expect(state.fieldErrors?.track).toEqual(["Choose a track"]);
+    expect(dbMock.insert).not.toHaveBeenCalled();
+  });
+});
+
+describe("updateEvent", () => {
+  it("verifies the session before touching the database", async () => {
+    await updateEvent("evt-1", undefined, form(validTimedForm));
+    expect(verifySession).toHaveBeenCalledTimes(1);
+  });
+
+  it("updates a valid event and revalidates the calendar", async () => {
+    const state = await updateEvent("evt-1", undefined, form(validTimedForm));
+    expect(state).toEqual({ success: true });
+    expect(dbMock.update).toHaveBeenCalledTimes(1);
+    expect(revalidatePath).toHaveBeenCalledWith("/calendar");
+  });
+
+  it("returns field errors without writing on invalid input", async () => {
+    const state = await updateEvent(
+      "evt-1",
+      undefined,
+      form({ ...validTimedForm, endTime: "08:00" })
+    );
+    expect(state.error).toBe("Check the highlighted fields.");
+    expect(dbMock.update).not.toHaveBeenCalled();
+  });
+
+  it("returns an error (not a throw) when updating a nonexistent event", async () => {
+    dbMock.updateReturning.mockResolvedValueOnce([]);
+    const state = await updateEvent("missing", undefined, form(validTimedForm));
+    expect(state).toEqual({ error: "That event no longer exists." });
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("blocks flipping a linked content event to work with a friendly error", async () => {
+    dbMock.selectWhere.mockResolvedValueOnce([{ ideaId: "idea-1" }]);
+    const state = await updateEvent("evt-1", undefined, form(validTimedForm));
+    expect(state).toEqual({
+      error: "Unlink content first — this event still has linked ideas.",
+    });
+    expect(dbMock.update).not.toHaveBeenCalled();
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("blocks flipping a stream-scheduling event to work with a friendly error (issue #67)", async () => {
+    // First guard (idea links) finds nothing; the stream guard trips.
+    dbMock.selectWhere
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: "stream-1" }]);
+    const state = await updateEvent("evt-1", undefined, form(validTimedForm));
+    expect(state).toEqual({
+      error: "Unlink the stream first — this event is still scheduling one.",
+    });
+    expect(dbMock.update).not.toHaveBeenCalled();
+  });
+
+  it("blocks flipping a meeting-note event to content with a friendly error (issue #67)", async () => {
+    dbMock.selectWhere.mockResolvedValueOnce([{ id: "meeting-1" }]);
+    const state = await updateEvent(
+      "evt-1",
+      undefined,
+      form({ ...validTimedForm, track: "content" })
+    );
+    expect(state).toEqual({
+      error:
+        "Unlink the meeting note first — this event is still attached to one.",
+    });
+    expect(dbMock.update).not.toHaveBeenCalled();
+  });
+
+  it("allows updating to work when the event has no links", async () => {
+    const state = await updateEvent("evt-1", undefined, form(validTimedForm));
+    expect(state).toEqual({ success: true });
+    expect(dbMock.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows flipping to content when no meeting note is attached", async () => {
+    const state = await updateEvent(
+      "evt-1",
+      undefined,
+      form({ ...validTimedForm, track: "content" })
+    );
+    expect(state).toEqual({ success: true });
+    expect(dbMock.update).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("rescheduleEvent", () => {
+  const start = new Date("2026-07-08T09:00:00");
+  const end = new Date("2026-07-08T10:00:00");
+
+  it("verifies the session before touching the database", async () => {
+    await rescheduleEvent("evt-1", start, end);
+    expect(verifySession).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects an unauthenticated call before writing", async () => {
+    vi.mocked(verifySession).mockRejectedValueOnce(
+      new Error("NEXT_REDIRECT:/login")
+    );
+    await expect(rescheduleEvent("evt-1", start, end)).rejects.toThrow(
+      "NEXT_REDIRECT:/login"
+    );
+    expect(dbMock.update).not.toHaveBeenCalled();
+  });
+
+  it("updates only the time bounds and revalidates the calendar", async () => {
+    const result = await rescheduleEvent("evt-1", start, end);
+    expect(result).toEqual({});
+    expect(dbMock.update).toHaveBeenCalledTimes(1);
+    expect(revalidatePath).toHaveBeenCalledWith("/calendar");
+  });
+
+  it("schedules a Google push for the updated event", async () => {
+    await rescheduleEvent("evt-1", start, end);
+    expect(pushEventUpdated).toHaveBeenCalledWith("evt-1", "work");
+  });
+
+  it("returns an error without writing when endsAt is before startsAt", async () => {
+    const result = await rescheduleEvent("evt-1", end, start);
+    expect(result).toEqual({ error: "That reschedule isn't valid." });
+    expect(dbMock.update).not.toHaveBeenCalled();
+  });
+
+  it("returns an error (not a throw) when rescheduling a nonexistent event", async () => {
+    dbMock.updateReturning.mockResolvedValueOnce([]);
+    const result = await rescheduleEvent("missing", start, end);
+    expect(result).toEqual({ error: "That event no longer exists." });
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+});
+
+describe("deleteEvent", () => {
+  it("verifies the session before touching the database", async () => {
+    await deleteEvent("evt-1");
+    expect(verifySession).toHaveBeenCalledTimes(1);
+  });
+
+  it("deletes an existing event and revalidates the calendar", async () => {
+    dbMock.deleteReturning.mockResolvedValueOnce([{ id: "evt-1" }]);
+    const result = await deleteEvent("evt-1");
+    expect(result).toEqual({});
+    expect(revalidatePath).toHaveBeenCalledWith("/calendar");
+  });
+
+  it("returns an error (not a throw) when the event no longer exists", async () => {
+    dbMock.deleteReturning.mockResolvedValueOnce([]);
+    const result = await deleteEvent("missing");
+    expect(result).toEqual({ error: "That event no longer exists." });
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unauthenticated call before deleting", async () => {
+    vi.mocked(verifySession).mockRejectedValueOnce(
+      new Error("NEXT_REDIRECT:/login")
+    );
+    await expect(deleteEvent("evt-1")).rejects.toThrow("NEXT_REDIRECT:/login");
+    expect(dbMock.delete).not.toHaveBeenCalled();
+  });
+
+  it("also revalidates the stream planner when a stream was linked to this event", async () => {
+    // Two pre-delete lookups, in order: the sync link (none here), then the
+    // stream lookup that this test cares about.
+    dbMock.selectWhere
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: "stream-1" }]);
+    dbMock.deleteReturning.mockResolvedValueOnce([{ id: "evt-1" }]);
+
+    await deleteEvent("evt-1");
+
+    expect(revalidatePath).toHaveBeenCalledWith("/content/streams");
+    expect(revalidatePath).toHaveBeenCalledWith("/content/streams/stream-1");
+  });
+
+  it("does not revalidate the stream planner when no stream was linked", async () => {
+    dbMock.deleteReturning.mockResolvedValueOnce([{ id: "evt-1" }]);
+
+    await deleteEvent("evt-1");
+
+    expect(revalidatePath).not.toHaveBeenCalledWith("/content/streams");
+  });
+});
