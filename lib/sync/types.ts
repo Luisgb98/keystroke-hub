@@ -5,6 +5,12 @@ import type { EventSyncLink } from "@/lib/db/schema";
 export interface SyncLinkRecord {
   id: string;
   eventId: string | null;
+  /**
+   * The connection this link currently belongs to, or `null` when orphaned by
+   * a past disconnect. Used to re-adopt an orphaned link on reconnect without
+   * a redundant write on every echo (see `runInboundSync`'s skip-echo case).
+   */
+  connectionId: string | null;
   googleEventId: string;
   googleEtag: string | null;
   /** When this link was last written by *our* side — the conflict-detection boundary. */

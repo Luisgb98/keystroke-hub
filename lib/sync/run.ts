@@ -69,6 +69,7 @@ function toSyncLinkRecord(
   return {
     id: row.id,
     eventId: row.eventId,
+    connectionId: row.connectionId,
     googleEventId: row.googleEventId,
     googleEtag: row.googleEtag,
     updatedAt: row.updatedAt,
@@ -328,24 +329,26 @@ export async function runInboundSync(
           }
           break;
         }
-        case "skip-echo":
+        case "skip-echo": {
           // Re-adopt an orphaned link (its `connectionId` nulled by a past
           // disconnect on this track) when its unchanged remote echoes back
           // after a reconnect. Without this the retry cron — which filters by
           // `connectionId` — would never retry the link's pending push, and
           // its outbound edit would be stranded forever (issue #67, finding
-          // A4). Guarded to `connectionId IS NULL` so a normal echo doesn't
-          // needlessly bump the link's `updatedAt` (the conflict boundary).
-          await db
-            .update(eventSyncLinks)
-            .set({ connectionId: connection.id })
-            .where(
-              and(
-                eq(eventSyncLinks.googleEventId, action.googleEventId),
-                isNull(eventSyncLinks.connectionId)
-              )
-            );
+          // A4). Decide from the in-memory link so a normal echo issues no
+          // write at all (its conflict-boundary `updatedAt` stays put), and
+          // target the specific track-scoped link by id — the `orphanedLinks`
+          // query already filtered by track, so this can't adopt a same-id
+          // link belonging to the other track.
+          const matched = linksByGoogleId.get(action.googleEventId);
+          if (matched && matched.connectionId === null) {
+            await db
+              .update(eventSyncLinks)
+              .set({ connectionId: connection.id })
+              .where(eq(eventSyncLinks.id, matched.id));
+          }
           break;
+        }
       }
     }
 

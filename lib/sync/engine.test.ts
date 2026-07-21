@@ -48,6 +48,7 @@ function link(overrides: Partial<SyncLinkRecord> = {}): SyncLinkRecord {
   return {
     id: "link-1",
     eventId: "local-1",
+    connectionId: "conn-1",
     googleEventId: "g-1",
     googleEtag: '"etag-0"',
     updatedAt: new Date("2026-07-08T08:00:00.000Z"),
