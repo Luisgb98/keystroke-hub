@@ -72,6 +72,7 @@ function toSyncLinkRecord(
     googleEventId: row.googleEventId,
     googleEtag: row.googleEtag,
     updatedAt: row.updatedAt,
+    pushState: row.pushState,
   };
 }
 

@@ -51,6 +51,7 @@ function link(overrides: Partial<SyncLinkRecord> = {}): SyncLinkRecord {
     googleEventId: "g-1",
     googleEtag: '"etag-0"',
     updatedAt: new Date("2026-07-08T08:00:00.000Z"),
+    pushState: "synced",
     ...overrides,
   };
 }
@@ -210,14 +211,77 @@ describe("planInboundActions", () => {
     }
   });
 
-  it("re-creates the event when the link points at a local event that no longer exists", () => {
-    const orphanLink = link({ eventId: "gone", googleEtag: '"etag-0"' });
+  it("does not resurrect a locally-deleted event whose delete push is still pending (issue #67)", () => {
+    // Link's `eventId` was nulled by the local delete (ON DELETE SET NULL) and
+    // its Google delete hasn't been pushed yet, so the remote copy is still
+    // live. Re-creating it here would resurrect what the owner just deleted.
+    const deletedLink = link({
+      eventId: null,
+      googleEtag: '"etag-0"',
+      pushState: "pending_delete",
+    });
     const [action] = planInboundActions({
       remoteEvents: [googleEvent({ etag: '"etag-new"' })],
-      linksByGoogleId: new Map([["g-1", orphanLink]]),
+      linksByGoogleId: new Map([["g-1", deletedLink]]),
       localEventsById: new Map(),
     });
-    expect(action.type).toBe("create-local");
+    expect(action).toEqual({ type: "skip-echo", googleEventId: "g-1" });
+  });
+
+  it("does not resurrect when a stale in-memory eventId points at an already-deleted event (issue #67)", () => {
+    // TOCTOU: the link still carries a non-null eventId in memory, but the
+    // event row was deleted mid-run, so no local snapshot exists for it.
+    const staleLink = link({ eventId: "gone", googleEtag: '"etag-0"' });
+    const [action] = planInboundActions({
+      remoteEvents: [googleEvent({ etag: '"etag-new"' })],
+      linksByGoogleId: new Map([["g-1", staleLink]]),
+      localEventsById: new Map(),
+    });
+    expect(action).toEqual({ type: "skip-echo", googleEventId: "g-1" });
+  });
+
+  it("treats a remote change against a pending local push as a conflict, never a silent overwrite (issue #67)", () => {
+    // The local edit's push failed (pending_push) and that failure already
+    // bumped the link's updatedAt past the local edit, so isConflict alone
+    // would see no divergence and silently update-local, losing the edit.
+    const pendingLink = link({
+      googleEtag: '"etag-0"',
+      pushState: "pending_push",
+      updatedAt: new Date("2026-07-08T12:00:00.000Z"), // bumped by the failed push
+    });
+    const local = localEvent({
+      updatedAt: new Date("2026-07-08T10:00:00.000Z"), // the un-pushed edit
+    });
+    const remote = googleEvent({
+      etag: '"etag-new"',
+      summary: "Remote edit",
+      updated: "2026-07-08T13:00:00.000Z", // newer than the local edit
+    });
+    const [action] = planInboundActions({
+      remoteEvents: [remote],
+      linksByGoogleId: new Map([["g-1", pendingLink]]),
+      localEventsById: new Map([["local-1", local]]),
+    });
+    expect(action.type).toBe("conflict-remote-wins");
+    if (action.type === "conflict-remote-wins") {
+      expect(action.note).toContain("Google Calendar");
+    }
+  });
+
+  it("keeps a pending local push retryable when the remote hasn't changed (own echo)", () => {
+    // Remote etag still matches the link (our failed push never changed it),
+    // so this is a no-op echo — the pending push must survive for the cron to
+    // retry, not be cancelled by an update-local.
+    const pendingLink = link({
+      googleEtag: '"etag-1"',
+      pushState: "pending_push",
+    });
+    const [action] = planInboundActions({
+      remoteEvents: [googleEvent({ etag: '"etag-1"' })],
+      linksByGoogleId: new Map([["g-1", pendingLink]]),
+      localEventsById: new Map([["local-1", localEvent()]]),
+    });
+    expect(action).toEqual({ type: "skip-echo", googleEventId: "g-1" });
   });
 
   it("resolves in favor of remote when both sides changed and Google is newer", () => {
