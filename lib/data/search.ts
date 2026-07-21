@@ -21,6 +21,22 @@ const RECENT_LIMIT_PER_ENTITY = 5;
 const RECENT_TOTAL_LIMIT = 8;
 const SNIPPET_LENGTH = 140;
 
+/**
+ * Escapes `ILIKE` wildcard metacharacters (`%`, `_`) and the escape character
+ * (`\`) itself so a query is matched literally. Without this, `%`/`_` act as
+ * wildcards and a trailing `\` leaves a dangling escape that errors the whole
+ * search action (e.g. "100%", "C:\"). Relies on Postgres `LIKE`'s default
+ * backslash escape character.
+ */
+export function escapeLikePattern(query: string): string {
+  return query.replace(/[\\%_]/g, (char) => `\\${char}`);
+}
+
+/** Wraps an escaped query in a contains-pattern for `ILIKE '%…%'`. */
+function containsPattern(query: string): string {
+  return `%${escapeLikePattern(query)}%`;
+}
+
 /** Server-side truncation so long markdown/plain bodies never blow out a result row (see docs/command-palette.md). */
 export function truncateSnippet(
   value: string | null | undefined
@@ -35,10 +51,8 @@ export function truncateSnippet(
 // --- Ideas ---
 
 export function buildIdeaSearchCondition(query: string): SQL {
-  return or(
-    ilike(ideas.title, `%${query}%`),
-    ilike(ideas.notes, `%${query}%`)
-  )!;
+  const pattern = containsPattern(query);
+  return or(ilike(ideas.title, pattern), ilike(ideas.notes, pattern))!;
 }
 
 interface IdeaSearchRow {
@@ -55,7 +69,7 @@ export function mapIdeaToResult(row: IdeaSearchRow): SearchResult {
     world: "content",
     title: row.title,
     snippet: truncateSnippet(row.notes),
-    href: `/content/ideas/${row.id}`,
+    href: `/content/ideas/${row.id}/script`,
     updatedAt: row.updatedAt,
   };
 }
@@ -91,7 +105,7 @@ async function recentIdeas(limit: number): Promise<SearchResult[]> {
 // --- Scripts ---
 
 export function buildScriptSearchCondition(query: string): SQL {
-  return ilike(scripts.content, `%${query}%`);
+  return ilike(scripts.content, containsPattern(query));
 }
 
 interface ScriptSearchRow {
@@ -109,7 +123,7 @@ export function mapScriptToResult(row: ScriptSearchRow): SearchResult {
     world: "content",
     title: row.ideaTitle,
     snippet: truncateSnippet(row.content),
-    href: `/content/ideas/${row.ideaId}`,
+    href: `/content/ideas/${row.ideaId}/script`,
     updatedAt: row.updatedAt,
   };
 }
@@ -190,7 +204,7 @@ export function mapDailyLogMatchToResult(row: DailyLogMatchRow): SearchResult {
 
 async function searchDailyLogs(query: string): Promise<SearchResult[]> {
   const db = getDb();
-  const pattern = `%${query}%`;
+  const pattern = containsPattern(query);
 
   const retroRows = await db
     .select({
@@ -252,10 +266,11 @@ async function recentDailyLogs(limit: number): Promise<SearchResult[]> {
 // --- Meeting notes ---
 
 export function buildMeetingNoteSearchCondition(query: string): SQL {
+  const pattern = containsPattern(query);
   return or(
-    ilike(meetingNotes.title, `%${query}%`),
-    ilike(meetingNotes.notes, `%${query}%`),
-    ilike(meetingNotes.reflection, `%${query}%`)
+    ilike(meetingNotes.title, pattern),
+    ilike(meetingNotes.notes, pattern),
+    ilike(meetingNotes.reflection, pattern)
   )!;
 }
 
@@ -311,10 +326,11 @@ async function recentMeetingNotes(limit: number): Promise<SearchResult[]> {
 // --- Projects ---
 
 export function buildProjectSearchCondition(query: string): SQL {
+  const pattern = containsPattern(query);
   return or(
-    ilike(projects.name, `%${query}%`),
-    ilike(projects.description, `%${query}%`),
-    ilike(projects.notes, `%${query}%`)
+    ilike(projects.name, pattern),
+    ilike(projects.description, pattern),
+    ilike(projects.notes, pattern)
   )!;
 }
 
@@ -368,10 +384,11 @@ async function recentProjects(limit: number): Promise<SearchResult[]> {
 // --- Improvements ---
 
 export function buildImprovementSearchCondition(query: string): SQL {
+  const pattern = containsPattern(query);
   return or(
-    ilike(improvements.title, `%${query}%`),
-    ilike(improvements.rationale, `%${query}%`),
-    ilike(improvements.outcome, `%${query}%`)
+    ilike(improvements.title, pattern),
+    ilike(improvements.rationale, pattern),
+    ilike(improvements.outcome, pattern)
   )!;
 }
 

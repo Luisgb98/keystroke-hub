@@ -169,18 +169,22 @@ export function planInboundActions({
     const local = link.eventId ? localEventsById.get(link.eventId) : undefined;
 
     if (!local) {
-      // Link points at an event that no longer exists locally (e.g. deleted
-      // out from under us between sync runs) — nothing sane to conflict
-      // against, so the inbound side just wins and re-creates it.
-      actions.push({
-        type: "create-local",
-        input: fromGooglePayload(remote),
-        remote: remoteStamp,
-      });
+      // The link exists but its local event is gone — the only way that
+      // happens is a local delete (`event_sync_links.event_id` is
+      // `ON DELETE SET NULL`, and a stale in-memory `eventId` means the row
+      // was deleted mid-run). The delete's own Google push is still pending,
+      // so re-creating the event here would resurrect something the owner
+      // just deleted (the delete-resurrection race, issue #67). Leave it for
+      // the pending delete to reconcile instead of re-creating it.
+      actions.push({ type: "skip-echo", googleEventId: remote.id });
       continue;
     }
 
-    if (isConflict(local, link)) {
+    // A pending outbound push means a local edit hasn't reached Google yet.
+    // Its failed push already bumped the link's `updatedAt`, so `isConflict`
+    // can no longer see the divergence — treat it as a conflict explicitly so
+    // the un-pushed edit is never silently overwritten (issue #67).
+    if (isConflict(local, link) || link.pushState === "pending_push") {
       const { winner, note } = resolveConflict(local, remote);
       actions.push(
         winner === "remote"

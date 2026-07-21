@@ -182,19 +182,45 @@ describe("updateEvent", () => {
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
+  it("blocks flipping a stream-scheduling event to work with a friendly error (issue #67)", async () => {
+    // First guard (idea links) finds nothing; the stream guard trips.
+    dbMock.selectWhere
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: "stream-1" }]);
+    const state = await updateEvent("evt-1", undefined, form(validTimedForm));
+    expect(state).toEqual({
+      error: "Unlink the stream first — this event is still scheduling one.",
+    });
+    expect(dbMock.update).not.toHaveBeenCalled();
+  });
+
+  it("blocks flipping a meeting-note event to content with a friendly error (issue #67)", async () => {
+    dbMock.selectWhere.mockResolvedValueOnce([{ id: "meeting-1" }]);
+    const state = await updateEvent(
+      "evt-1",
+      undefined,
+      form({ ...validTimedForm, track: "content" })
+    );
+    expect(state).toEqual({
+      error:
+        "Unlink the meeting note first — this event is still attached to one.",
+    });
+    expect(dbMock.update).not.toHaveBeenCalled();
+  });
+
   it("allows updating to work when the event has no links", async () => {
     const state = await updateEvent("evt-1", undefined, form(validTimedForm));
     expect(state).toEqual({ success: true });
     expect(dbMock.update).toHaveBeenCalledTimes(1);
   });
 
-  it("skips the link guard entirely when the track isn't work", async () => {
-    await updateEvent(
+  it("allows flipping to content when no meeting note is attached", async () => {
+    const state = await updateEvent(
       "evt-1",
       undefined,
       form({ ...validTimedForm, track: "content" })
     );
-    expect(dbMock.select).not.toHaveBeenCalled();
+    expect(state).toEqual({ success: true });
     expect(dbMock.update).toHaveBeenCalledTimes(1);
   });
 });

@@ -25,6 +25,7 @@ const dbMock = vi.hoisted(() => {
   function makeSelectChain(): any {
     const chain = {
       where: vi.fn(() => chain),
+      innerJoin: vi.fn(() => chain),
       orderBy: vi.fn(() => chain),
       limit: vi.fn(() => chain),
       then: (resolve: (v: unknown[]) => void, reject?: (e: unknown) => void) =>
@@ -214,6 +215,13 @@ describe("deleteItem", () => {
 });
 
 describe("rolloverItem", () => {
+  it("rejects an invalid date without touching the database (issue #67)", async () => {
+    const result = await rolloverItem("item-1", "not-a-date");
+    expect(result.error).toBe("That date isn't valid.");
+    expect(dbMock.select).not.toHaveBeenCalled();
+    expect(dbMock.batch).not.toHaveBeenCalled();
+  });
+
   it("returns an error when the item no longer exists", async () => {
     dbMock.selectQueue.push([]);
     const result = await rolloverItem("item-1", "2026-07-08");
@@ -221,15 +229,36 @@ describe("rolloverItem", () => {
   });
 
   it("rejects rolling over an item that isn't planned", async () => {
-    dbMock.selectQueue.push([{ id: "item-1", status: "done", title: "x" }]);
+    dbMock.selectQueue.push([
+      {
+        item: { id: "item-1", status: "done", title: "x" },
+        logDate: "2026-07-08",
+      },
+    ]);
     const result = await rolloverItem("item-1", "2026-07-08");
     expect(result.error).toBe("Only planned items can be rolled over.");
     expect(dbMock.batch).not.toHaveBeenCalled();
   });
 
+  it("rejects a date that doesn't match the item's own log day (issue #67)", async () => {
+    dbMock.selectQueue.push([
+      {
+        item: { id: "item-1", status: "planned", title: "Finish the draft" },
+        logDate: "2026-07-08",
+      },
+    ]);
+    // A stale date from a day other than the item's own.
+    const result = await rolloverItem("item-1", "2026-07-01");
+    expect(result.error).toMatch(/different day/i);
+    expect(dbMock.batch).not.toHaveBeenCalled();
+  });
+
   it("copies the item onto tomorrow's log and marks the source rolled_over, in one batch", async () => {
     dbMock.selectQueue.push([
-      { id: "item-1", status: "planned", title: "Finish the draft" },
+      {
+        item: { id: "item-1", status: "planned", title: "Finish the draft" },
+        logDate: "2026-07-08",
+      },
     ]);
 
     const result = await rolloverItem("item-1", "2026-07-08");
@@ -254,6 +283,13 @@ describe("rolloverItem", () => {
 });
 
 describe("rolloverAllUnfinished", () => {
+  it("rejects an invalid date without reading the day's log (issue #67)", async () => {
+    const result = await rolloverAllUnfinished("not-a-date");
+    expect(result.error).toBe("That date isn't valid.");
+    expect(getDayLogMock).not.toHaveBeenCalled();
+    expect(dbMock.batch).not.toHaveBeenCalled();
+  });
+
   it("is a no-op when the day has no log yet", async () => {
     getDayLogMock.mockResolvedValue({ log: null, items: [] });
     const result = await rolloverAllUnfinished("2026-07-08");

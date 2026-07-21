@@ -174,17 +174,30 @@ export async function rolloverItem(
 ): Promise<JournalActionResult> {
   await verifySession();
 
+  const parsedDate = logDateSchema.safeParse(fromLogDate);
+  if (!parsedDate.success) return { error: "That date isn't valid." };
+
   const db = getDb();
-  const [item] = await db
-    .select()
+  // Join the log so we can confirm `fromLogDate` actually matches the item's
+  // day. A stale-but-valid date would otherwise compute the wrong target day
+  // (`fromLogDate + 1`) and scatter the copy onto a day the item never lived
+  // on (issue #67, finding C9).
+  const [row] = await db
+    .select({ item: dailyLogItems, logDate: dailyLogs.logDate })
     .from(dailyLogItems)
+    .innerJoin(dailyLogs, eq(dailyLogItems.logId, dailyLogs.id))
     .where(eq(dailyLogItems.id, itemId));
-  if (!item) return { error: "That item no longer exists." };
-  if (item.status !== "planned") {
+  if (!row) return { error: "That item no longer exists." };
+  if (row.item.status !== "planned") {
     return { error: "Only planned items can be rolled over." };
   }
+  if (row.logDate !== parsedDate.data) {
+    return {
+      error: "That item belongs to a different day — refresh and retry.",
+    };
+  }
 
-  await performRollover(item, fromLogDate);
+  await performRollover(row.item, parsedDate.data);
 
   revalidateJournalPaths();
   return {};
@@ -196,12 +209,15 @@ export async function rolloverAllUnfinished(
 ): Promise<JournalActionResult> {
   await verifySession();
 
-  const { log, items } = await getDayLog(logDate);
+  const parsedDate = logDateSchema.safeParse(logDate);
+  if (!parsedDate.success) return { error: "That date isn't valid." };
+
+  const { log, items } = await getDayLog(parsedDate.data);
   if (!log) return {};
 
   const planned = items.filter((item) => item.status === "planned");
   for (const item of planned) {
-    await performRollover(item, logDate);
+    await performRollover(item, parsedDate.data);
   }
 
   if (planned.length > 0) revalidateJournalPaths();

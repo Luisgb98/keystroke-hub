@@ -72,6 +72,7 @@ function toSyncLinkRecord(
     googleEventId: row.googleEventId,
     googleEtag: row.googleEtag,
     updatedAt: row.updatedAt,
+    pushState: row.pushState,
   };
 }
 
@@ -84,6 +85,23 @@ export async function getConnectionForTrack(
     .select()
     .from(calendarConnections)
     .where(eq(calendarConnections.track, track));
+  return connection ?? null;
+}
+
+/**
+ * The connection a sync link currently lives on (by id) — the authoritative
+ * "which Google calendar does this event's remote copy exist on", which the
+ * outbound push hook needs to detect a track flip (the event's track no longer
+ * matches its link's calendar) without pushing onto the wrong calendar.
+ */
+export async function getConnectionById(
+  connectionId: string
+): Promise<CalendarConnection | null> {
+  const db = getDb();
+  const [connection] = await db
+    .select()
+    .from(calendarConnections)
+    .where(eq(calendarConnections.id, connectionId));
   return connection ?? null;
 }
 
@@ -311,6 +329,22 @@ export async function runInboundSync(
           break;
         }
         case "skip-echo":
+          // Re-adopt an orphaned link (its `connectionId` nulled by a past
+          // disconnect on this track) when its unchanged remote echoes back
+          // after a reconnect. Without this the retry cron — which filters by
+          // `connectionId` — would never retry the link's pending push, and
+          // its outbound edit would be stranded forever (issue #67, finding
+          // A4). Guarded to `connectionId IS NULL` so a normal echo doesn't
+          // needlessly bump the link's `updatedAt` (the conflict boundary).
+          await db
+            .update(eventSyncLinks)
+            .set({ connectionId: connection.id })
+            .where(
+              and(
+                eq(eventSyncLinks.googleEventId, action.googleEventId),
+                isNull(eventSyncLinks.connectionId)
+              )
+            );
           break;
       }
     }

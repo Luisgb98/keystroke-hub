@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -87,13 +87,29 @@ export async function finishConnect(
   }
 
   const db = getDb();
-  const [existing] = await db
+  // One query covers both uniqueness rules: a track has at most one calendar,
+  // and — because inbound sync matches links by Google event id alone — a
+  // single Google calendar must never be connected to *both* tracks, or its
+  // events would duplicate across tracks and remote edits would rewrite both
+  // tracks' links (issue #67, finding A3).
+  const conflicts = await db
     .select()
     .from(calendarConnections)
-    .where(eq(calendarConnections.track, pending.track));
-  if (existing) {
+    .where(
+      or(
+        eq(calendarConnections.track, pending.track),
+        eq(calendarConnections.googleCalendarId, calendarId)
+      )
+    );
+  if (conflicts.some((c) => c.track === pending.track)) {
     return {
       error: `${TRACK_LABEL[pending.track]} already has a connected calendar — disconnect it first.`,
+    };
+  }
+  if (conflicts.some((c) => c.googleCalendarId === calendarId)) {
+    return {
+      error:
+        "That Google calendar is already connected to your other track — pick a different calendar.",
     };
   }
 

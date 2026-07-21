@@ -207,6 +207,26 @@ describe("finishConnect", () => {
     expect(dbMock.state.inserted).toBeUndefined();
   });
 
+  it("rejects connecting a Google calendar already used by the other track (issue #67)", async () => {
+    cookieStore.value = JSON.stringify({
+      track: "content",
+      accessToken: "a",
+      refreshToken: "r",
+      expiresAt: Date.now() + 3600_000,
+      googleAccountEmail: "owner@example.com",
+    });
+    // No content connection yet, but the work track already syncs this exact
+    // Google calendar.
+    dbMock.state.connections = [
+      { id: "conn-work", track: "work", googleCalendarId: "cal-1" },
+    ];
+
+    const result = await finishConnect("cal-1");
+
+    expect(result.error).toMatch(/already connected to your other track/i);
+    expect(dbMock.state.inserted).toBeUndefined();
+  });
+
   it("creates the connection, clears the cookie, and syncs on success", async () => {
     cookieStore.value = JSON.stringify({
       track: "work",

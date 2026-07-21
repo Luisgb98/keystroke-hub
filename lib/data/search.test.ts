@@ -8,6 +8,7 @@ import {
   buildMeetingNoteSearchCondition,
   buildProjectSearchCondition,
   buildScriptSearchCondition,
+  escapeLikePattern,
   mapDailyLogMatchToResult,
   mapIdeaToResult,
   mapImprovementToResult,
@@ -45,6 +46,22 @@ describe("truncateSnippet", () => {
   });
 });
 
+describe("escapeLikePattern", () => {
+  it("leaves a plain query untouched", () => {
+    expect(escapeLikePattern("speedrun")).toBe("speedrun");
+  });
+
+  it("escapes ILIKE wildcards so they match literally", () => {
+    expect(escapeLikePattern("100%")).toBe("100\\%");
+    expect(escapeLikePattern("a_b")).toBe("a\\_b");
+  });
+
+  it("escapes a trailing backslash so it never dangles the escape char", () => {
+    // Unescaped, `%C:\%` ends with an escape char and errors the whole query.
+    expect(escapeLikePattern("C:\\")).toBe("C:\\\\");
+  });
+});
+
 describe("buildIdeaSearchCondition", () => {
   it("matches title or notes case-insensitively", () => {
     const { sql, params } = render(buildIdeaSearchCondition("speedrun"));
@@ -53,6 +70,11 @@ describe("buildIdeaSearchCondition", () => {
     expect(sql).toContain('"notes"');
     expect(sql).toContain(" or ");
     expect(params).toEqual(["%speedrun%", "%speedrun%"]);
+  });
+
+  it("escapes wildcard metacharacters in the query (issue #67)", () => {
+    const { params } = render(buildIdeaSearchCondition("100%"));
+    expect(params).toEqual(["%100\\%%", "%100\\%%"]);
   });
 });
 
@@ -110,7 +132,7 @@ describe("mapIdeaToResult", () => {
       world: "content",
       title: "Speedrun commentary",
       snippet: "Cover the wrong warp",
-      href: "/content/ideas/idea-1",
+      href: "/content/ideas/idea-1/script",
       updatedAt,
     });
   });
@@ -138,7 +160,7 @@ describe("mapScriptToResult", () => {
     expect(result.type).toBe("script");
     expect(result.world).toBe("content");
     expect(result.title).toBe("Speedrun commentary");
-    expect(result.href).toBe("/content/ideas/idea-1");
+    expect(result.href).toBe("/content/ideas/idea-1/script");
     expect(result.snippet).toContain("Cold open");
   });
 });

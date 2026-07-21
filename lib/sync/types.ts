@@ -1,4 +1,5 @@
 import type { Track } from "@/lib/calendar/types";
+import type { EventSyncLink } from "@/lib/db/schema";
 
 /** The subset of `event_sync_links` the pure engine needs to make decisions. */
 export interface SyncLinkRecord {
@@ -8,6 +9,14 @@ export interface SyncLinkRecord {
   googleEtag: string | null;
   /** When this link was last written by *our* side — the conflict-detection boundary. */
   updatedAt: Date;
+  /**
+   * The link's outbound push state. `pending_push` means a local edit hasn't
+   * reached Google yet, so an inbound remote change must be treated as a
+   * conflict rather than silently overwriting the un-pushed edit — a failed
+   * push bumps `updatedAt`, which would otherwise mask the divergence (see
+   * `planInboundActions`).
+   */
+  pushState: EventSyncLink["pushState"];
 }
 
 /** The subset of `events` the pure engine needs. */
