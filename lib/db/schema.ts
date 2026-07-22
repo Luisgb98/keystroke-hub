@@ -175,16 +175,15 @@ export const ideaFormatEnum = pgEnum("idea_format", [
 // The full pipeline vocabulary is defined here (not just the initial stage)
 // so issue #16's board consumes this single source of truth rather than
 // inventing its own — see docs/content-ideas.md. Adding a stage later is a
-// cheap `ALTER TYPE ... ADD VALUE` migration. `edited` was added by #16,
-// between `recorded` and `published`, to cover the board's pipeline.
+// cheap `ALTER TYPE ... ADD VALUE` migration. #70 trimmed the pipeline to
+// these five real production stages (dropping `spark`/`outlined`/`parked`);
+// removing enum values needs a type-swap migration, not `DROP VALUE`.
 export const ideaStatusEnum = pgEnum("idea_status", [
-  "spark",
-  "outlined",
+  "idea",
   "scripted",
   "recorded",
   "edited",
   "published",
-  "parked",
 ]);
 
 export const ideas = pgTable(
@@ -194,7 +193,7 @@ export const ideas = pgTable(
     title: text("title").notNull(),
     notes: text("notes"),
     format: ideaFormatEnum("format").notNull().default("either"),
-    status: ideaStatusEnum("status").notNull().default("spark"),
+    status: ideaStatusEnum("status").notNull().default("idea"),
     // Free-form, single-user tags — filter options are derived from tags in
     // use rather than a normalized tag table (see docs/content-ideas.md).
     tags: text("tags").array().notNull().default([]),

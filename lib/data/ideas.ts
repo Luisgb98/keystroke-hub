@@ -14,10 +14,10 @@ import {
 import { getDb } from "@/lib/db";
 import { ideas, type Idea } from "@/lib/db/schema";
 import type { IdeaFormat } from "@/lib/content/idea-format";
-import { PARKED_IDEA_STATUS, type IdeaStatus } from "@/lib/content/idea-status";
+import { type IdeaStatus } from "@/lib/content/idea-status";
 
-/** Statuses the dashboard's content-in-flight block never counts — shipped or dead. */
-const NOT_IN_FLIGHT_STATUSES: IdeaStatus[] = ["published", PARKED_IDEA_STATUS];
+/** Statuses the dashboard's content-in-flight block never counts — shipped. */
+const NOT_IN_FLIGHT_STATUSES: IdeaStatus[] = ["published"];
 
 export interface IdeaFilters {
   /** Matched case-insensitively against the title. */
@@ -83,7 +83,7 @@ export async function getIdeasForBoard(): Promise<Idea[]> {
 
 /**
  * Ideas still moving through the pipeline — every status except `published`
- * (shipped) and `parked` (dead) — oldest-in-stage first, feeding the
+ * (shipped) — oldest-in-stage first, feeding the
  * dashboard's content-in-flight block (issue #28/#16). The stage-count
  * tally and stuck-longest pick are computed by the pure
  * `buildContentSnapshot` (`lib/dashboard/content-snapshot.ts`).

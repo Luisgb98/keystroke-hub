@@ -1,18 +1,17 @@
 import {
   IDEA_STATUSES,
   IDEA_STATUS_LABEL,
-  PARKED_IDEA_STATUS,
   type IdeaStatus,
 } from "@/lib/content/idea-status";
 import type { Idea } from "@/lib/db/schema";
 
 /**
  * Pipeline stages the dashboard's content-in-flight block counts — every
- * stage except `published` (shipped) and `parked` (dead), matching the
- * `getIdeasInFlight` query (`lib/data/ideas.ts`).
+ * stage except `published` (shipped), matching the `getIdeasInFlight` query
+ * (`lib/data/ideas.ts`).
  */
 export const IN_FLIGHT_STATUSES: readonly IdeaStatus[] = IDEA_STATUSES.filter(
-  (status) => status !== "published" && status !== PARKED_IDEA_STATUS
+  (status) => status !== "published"
 );
 
 export interface StageCount {
