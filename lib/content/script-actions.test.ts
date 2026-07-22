@@ -91,9 +91,10 @@ describe("saveScript", () => {
     expect(result).toEqual({ updatedAt: UPDATED_AT });
   });
 
-  it("revalidates the script page, ideas list, and board", async () => {
+  it("revalidates the script page, idea detail page, ideas list, and board", async () => {
     await saveScript("idea-1", "content");
     expect(revalidatePath).toHaveBeenCalledWith("/content/ideas/idea-1/script");
+    expect(revalidatePath).toHaveBeenCalledWith("/content/ideas/idea-1");
     expect(revalidatePath).toHaveBeenCalledWith("/content/ideas");
     expect(revalidatePath).toHaveBeenCalledWith("/content/board");
   });
