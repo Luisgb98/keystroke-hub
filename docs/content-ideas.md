@@ -157,9 +157,35 @@ Mobile-first, one-handed capture is the design center:
   (`app/globals.css`), which is what keeps their picker popups (and the status
   `<select>`'s option list) from rendering browser-default white in dark mode.
 - **List**: `IdeaCard` shows title, format icon + label, tag chips (mono
-  font per the keystroke identity) with an `n/5` incomplete hint, relative
-  created time, the inline status `<select>`, and edit/script/delete actions.
-  Cards render in a responsive grid.
+  font per the keystroke identity) with an `n/5` incomplete hint, the four
+  publish copy blocks (below), relative created time, the inline status
+  control, and edit/script/delete actions. Cards render in a responsive grid.
+- **Uniform, publish-ready cards (#72)**: every card is the **same height**
+  regardless of description length — the grid uses `auto-rows-fr` and each
+  `IdeaCard` is `h-full` with a `flex-1` content column and the status footer
+  pinned via `mt-auto`, so a long description never stretches its card past
+  its neighbours. The title is `line-clamp-2` and the description
+  `line-clamp-3`; the description uses `whitespace-pre-line` so the author's
+  paragraph breaks show inside the clamp rather than collapsing.
+- **Copy-to-clipboard blocks (#72)**: `IdeaCopyActions`
+  (`components/content/idea-copy-actions.tsx`) renders four comfortable-tap-target
+  buttons — **Title**, **Title + tags**, **Description + tags**, **Tags** — each
+  copying one exact text block so publishing metadata is copy-paste, never a
+  retype. The block text is built by the pure `formatIdeaCopyBlocks`
+  (`lib/content/idea-copy.ts`): title/description and tags are separated by a
+  blank line, the author's line breaks are preserved verbatim, and tags render
+  **comma-separated** (matching the platform tags field; safe for multi-word
+  tags, unlike hashtag form). A block with nothing to copy (no description, no
+  tags) renders disabled. Clipboard idiom follows `CopySummaryButton`
+  (see docs/journal.md): success toast + brief check-icon confirmation, error
+  toast when the browser blocks clipboard access.
+- **Status control (#72)**: moved from a native `<select>` to the themed
+  shadcn `Select` (`components/ui/select.tsx`, Base UI) so its trigger and
+  option popup follow the app theme in both light and dark mode rather than
+  rendering a browser-default white dropdown. It still commits inline through
+  `updateIdeaStatus` (no confirmation), unchanged from #71; the closed trigger
+  shows the human status label via `SelectValue`'s formatter, and the same
+  publish nudge (`uncheckedCount`) applies.
 - **Filters**: `IdeaFilters` — debounced search plus horizontally-scrollable
   chip rows for format/status/tag. Holds a local optimistic copy of every
   filter (not just search text) so rapid successive chip clicks compose
@@ -278,15 +304,20 @@ from primary navigation.
 
 ## Testing
 
-Unit (Vitest + RTL): `idea-schema`, `idea-status`, `publish-checklist`
-(defaults, `isLateStage` boundaries), `lib/content/board`'s
-grouping/sorting, `lib/data/ideas`'s filter → SQL mapping,
-`lib/data/idea-checklists`'s progress aggregation, `actions` (DB mocked,
-including the stage-clock guard, checklist seeding on first late-stage
-entry, no-reseed on a second one, the seeding-error-doesn't-fail-the-request
-path, and `uncheckedCount` on publish), `checklist-actions`, the
-`idea-capture`/`idea-card`/`idea-filters`/`idea-empty-state` components, and
-the board's `pipeline-board`/`stage-column`/`board-card`/`move-menu`/
+Unit (Vitest + RTL): `idea-schema`, `idea-status`, `idea-copy` (the four
+publish blocks — shapes, blank-line joins, line-break preservation, and
+empty-tag/empty-description degradation), `publish-checklist` (defaults,
+`isLateStage` boundaries), `lib/content/board`'s grouping/sorting,
+`lib/data/ideas`'s filter → SQL mapping, `lib/data/idea-checklists`'s progress
+aggregation, `actions` (DB mocked, including the stage-clock guard, checklist
+seeding on first late-stage entry, no-reseed on a second one, the
+seeding-error-doesn't-fail-the-request path, and `uncheckedCount` on publish),
+`checklist-actions`, the
+`idea-capture`/`idea-card`/`idea-copy-actions`/`idea-filters`/`idea-empty-state`
+components (the `idea-copy-actions` suite mocks `navigator.clipboard` and
+asserts the exact copied text per block, the disabled states, and the error
+toast; `idea-card` drives the themed status `Select` as a combobox), and the
+board's `pipeline-board`/`stage-column`/`board-card`/`move-menu`/
 `checklist-chip`/`publish-checklist-dialog` components.
 
 e2e (`e2e/ideas.spec.ts`, `e2e/board.spec.ts`, and
@@ -295,9 +326,14 @@ e2e (`e2e/ideas.spec.ts`, `e2e/board.spec.ts`, and
 is unset):
 
 - **Ideas list**: title-only and full capture, status change surviving a
-  reload, delete-with-confirmation, search/format/status/tag filtering
-  individually and combined (URL reflects state and survives a reload), the
-  "no matches" empty state, and a mobile-viewport FAB → dialog capture flow.
+  reload (through the themed `Select`), delete-with-confirmation,
+  search/format/status/tag filtering individually and combined (URL reflects
+  state and survives a reload), the "no matches" empty state, and a
+  mobile-viewport FAB → dialog capture flow. #72 adds: each of the four copy
+  buttons writes the exact expected block to the clipboard (with
+  `clipboard-read`/`clipboard-write` granted), two ideas whose descriptions
+  differ wildly in length render at identical card dimensions, and a
+  mobile-viewport check that the copy buttons are comfortable tap targets.
 - **Board**: seeded ideas render in their matching column, moving a card via
   the move menu updates its column and survives a reload, parking/un-parking
   round-trips correctly, and a mobile-viewport check that columns scroll
