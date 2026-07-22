@@ -9,15 +9,27 @@ import { toast } from "sonner";
 import { updateIdeaStatus } from "@/lib/content/actions";
 import { IDEA_FORMAT_LABEL } from "@/lib/content/idea-format";
 import { PUBLISHING_TAG_STANDARD } from "@/lib/content/idea-schema";
-import { IDEA_STATUSES, IDEA_STATUS_LABEL } from "@/lib/content/idea-status";
+import {
+  IDEA_STATUSES,
+  IDEA_STATUS_LABEL,
+  isIdeaStatus,
+} from "@/lib/content/idea-status";
 import type { Idea } from "@/lib/db/schema";
 import type { ScheduledEventSummary } from "@/lib/data/idea-event-links";
 import type { LinkedProjectSummary } from "@/lib/data/projects";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import { DeleteIdeaDialog } from "./delete-idea-dialog";
+import { IdeaCopyActions } from "./idea-copy-actions";
 import { IdeaEditor } from "./idea-editor";
 import { IDEA_FORMAT_ICON } from "./idea-format-styles";
 import { IdeaScheduledEvents } from "./idea-scheduled-events";
@@ -33,12 +45,17 @@ interface IdeaCardProps {
 }
 
 /**
+ * A uniform, publish-ready card (#72): every card is the same height regardless
+ * of description length (the grid's `auto-rows-fr` + `h-full` here, with the
+ * description clamped and line breaks preserved via `whitespace-pre-line`), and
+ * `IdeaCopyActions` hands over the four one-click publish blocks.
+ *
  * Every field is editable after capture via the pencil (issue #71) — it opens
- * the shared `IdeaEditor`. Status still commits inline through the same native
- * `<select>` as `ImprovementStatusSelect`/`ProjectStatusSelect` (no
- * confirmation; cheap to change back), whose option popup is now theme-aware
- * via the `color-scheme` token (#71), sharing `updateIdeaStatus` with the
- * board's move menu (see docs/content-ideas.md).
+ * the shared `IdeaEditor`. Status still commits inline (no confirmation; cheap
+ * to change back), sharing `updateIdeaStatus` with the board's move menu (see
+ * docs/content-ideas.md); #72 moved it from a native `<select>` to the themed
+ * shadcn `Select` so its trigger and option popup follow the app theme in both
+ * modes rather than relying on the browser default.
  */
 export function IdeaCard({
   idea,
@@ -77,7 +94,7 @@ export function IdeaCard({
 
   return (
     <>
-      <Card data-slot="idea-card">
+      <Card data-slot="idea-card" className="h-full">
         <CardHeader className="flex flex-row items-start justify-between gap-2">
           <div className="flex items-center gap-2 text-caption text-muted-foreground">
             <Icon aria-hidden className="size-4 shrink-0" />
@@ -118,10 +135,12 @@ export function IdeaCard({
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <h3 className="font-heading text-h3 font-semibold">{idea.title}</h3>
+        <CardContent className="flex flex-1 flex-col gap-3">
+          <h3 className="line-clamp-2 font-heading text-h3 font-semibold">
+            {idea.title}
+          </h3>
           {idea.notes ? (
-            <p className="line-clamp-3 text-small text-muted-foreground">
+            <p className="line-clamp-3 text-small whitespace-pre-line text-muted-foreground">
               {idea.notes}
             </p>
           ) : null}
@@ -145,6 +164,8 @@ export function IdeaCard({
             </span>
           )}
 
+          <IdeaCopyActions idea={idea} />
+
           {project ? (
             <Link
               href={`/projects/${project.id}`}
@@ -160,23 +181,29 @@ export function IdeaCard({
             scheduledEvents={scheduledEvents}
           />
 
-          <div className="flex items-center justify-between gap-2">
-            <label className="sr-only" htmlFor={`idea-status-${idea.id}`}>
-              Status
-            </label>
-            <select
-              id={`idea-status-${idea.id}`}
+          <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+            <Select
               value={idea.status}
+              onValueChange={(value) => {
+                if (value) handleStatusChange(value);
+              }}
               disabled={pending}
-              onChange={(e) => handleStatusChange(e.target.value)}
-              className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {IDEA_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {IDEA_STATUS_LABEL[status]}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger aria-label="Status" size="sm">
+                <SelectValue>
+                  {(value) =>
+                    isIdeaStatus(value) ? IDEA_STATUS_LABEL[value] : null
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {IDEA_STATUSES.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {IDEA_STATUS_LABEL[status]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <span className="text-caption text-muted-foreground">
               {formatDistanceToNow(idea.createdAt, { addSuffix: true })}
             </span>
