@@ -1,38 +1,25 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { Briefcase, Pencil, ScrollText, Trash2 } from "lucide-react";
-import { toast } from "sonner";
 
-import { updateIdeaStatus } from "@/lib/content/actions";
 import { IDEA_FORMAT_LABEL } from "@/lib/content/idea-format";
 import { PUBLISHING_TAG_STANDARD } from "@/lib/content/idea-schema";
-import {
-  IDEA_STATUSES,
-  IDEA_STATUS_LABEL,
-  isIdeaStatus,
-} from "@/lib/content/idea-status";
 import type { Idea } from "@/lib/db/schema";
 import type { ScheduledEventSummary } from "@/lib/data/idea-event-links";
 import type { LinkedProjectSummary } from "@/lib/data/projects";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 import { DeleteIdeaDialog } from "./delete-idea-dialog";
 import { IdeaCopyActions } from "./idea-copy-actions";
 import { IdeaEditor } from "./idea-editor";
 import { IDEA_FORMAT_ICON } from "./idea-format-styles";
 import { IdeaScheduledEvents } from "./idea-scheduled-events";
+import { IdeaStatusSelect } from "./idea-status-select";
 
 interface IdeaCardProps {
   idea: Idea;
@@ -50,12 +37,16 @@ interface IdeaCardProps {
  * description clamped and line breaks preserved via `whitespace-pre-line`), and
  * `IdeaCopyActions` hands over the four one-click publish blocks.
  *
+ * The title is a stretched link to the idea's detail page (#73): the whole
+ * card is the click target, while each interactive control opts back out with
+ * `relative z-10` so it stays independently clickable.
+ *
  * Every field is editable after capture via the pencil (issue #71) — it opens
  * the shared `IdeaEditor`. Status still commits inline (no confirmation; cheap
- * to change back), sharing `updateIdeaStatus` with the board's move menu (see
- * docs/content-ideas.md); #72 moved it from a native `<select>` to the themed
- * shadcn `Select` so its trigger and option popup follow the app theme in both
- * modes rather than relying on the browser default.
+ * to change back) via the shared `IdeaStatusSelect` (#73 extracted it so the
+ * detail page shares one implementation) — a themed shadcn `Select` (#72)
+ * rather than a native `<select>`, so its trigger and option popup follow the
+ * app theme in both modes.
  */
 export function IdeaCard({
   idea,
@@ -65,7 +56,6 @@ export function IdeaCard({
 }: IdeaCardProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
   const Icon = IDEA_FORMAT_ICON[idea.format];
 
   // The release is one of the linked events — the one the idea points at.
@@ -74,33 +64,18 @@ export function IdeaCard({
     : undefined;
   const tagsIncomplete = idea.tags.length !== PUBLISHING_TAG_STANDARD;
 
-  function handleStatusChange(status: string) {
-    startTransition(async () => {
-      const result = await updateIdeaStatus(idea.id, status);
-      if (result.error) {
-        toast.error(result.error);
-        return;
-      }
-      // No chip/dialog on this surface (the board card owns that — see
-      // docs/content-ideas.md), so the nudge here is a plain message.
-      if (status === "published" && (result.uncheckedCount ?? 0) > 0) {
-        const count = result.uncheckedCount ?? 0;
-        toast(
-          `Published with ${count} unchecked checklist item${count === 1 ? "" : "s"}`
-        );
-      }
-    });
-  }
-
   return (
     <>
-      <Card data-slot="idea-card" className="h-full">
+      {/* `relative` anchors the title's stretched link (#73): the whole card
+          navigates to the detail page, while the interactive controls below
+          opt back out with `relative z-10` so they stay clickable. */}
+      <Card data-slot="idea-card" className="relative h-full">
         <CardHeader className="flex flex-row items-start justify-between gap-2">
           <div className="flex items-center gap-2 text-caption text-muted-foreground">
             <Icon aria-hidden className="size-4 shrink-0" />
             <span>{IDEA_FORMAT_LABEL[idea.format]}</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="relative z-10 flex items-center gap-1">
             <Button
               type="button"
               variant="ghost"
@@ -137,7 +112,12 @@ export function IdeaCard({
         </CardHeader>
         <CardContent className="flex flex-1 flex-col gap-3">
           <h3 className="line-clamp-2 font-heading text-h3 font-semibold">
-            {idea.title}
+            <Link
+              href={`/content/ideas/${idea.id}`}
+              className="after:absolute after:inset-0 after:content-[''] hover:underline"
+            >
+              {idea.title}
+            </Link>
           </h3>
           {idea.notes ? (
             <p className="line-clamp-3 text-small whitespace-pre-line text-muted-foreground">
@@ -164,46 +144,29 @@ export function IdeaCard({
             </span>
           )}
 
-          <IdeaCopyActions idea={idea} />
+          <div className="relative z-10">
+            <IdeaCopyActions idea={idea} />
+          </div>
 
           {project ? (
             <Link
               href={`/projects/${project.id}`}
-              className="flex w-fit items-center gap-1 text-caption text-muted-foreground hover:underline"
+              className="relative z-10 flex w-fit items-center gap-1 text-caption text-muted-foreground hover:underline"
             >
               <Briefcase aria-hidden className="size-3.5 shrink-0" />
               {project.name}
             </Link>
           ) : null}
 
-          <IdeaScheduledEvents
-            ideaId={idea.id}
-            scheduledEvents={scheduledEvents}
-          />
+          <div className="relative z-10 empty:hidden">
+            <IdeaScheduledEvents
+              ideaId={idea.id}
+              scheduledEvents={scheduledEvents}
+            />
+          </div>
 
-          <div className="mt-auto flex items-center justify-between gap-2 pt-1">
-            <Select
-              value={idea.status}
-              onValueChange={(value) => {
-                if (value) handleStatusChange(value);
-              }}
-              disabled={pending}
-            >
-              <SelectTrigger aria-label="Status" size="sm">
-                <SelectValue>
-                  {(value) =>
-                    isIdeaStatus(value) ? IDEA_STATUS_LABEL[value] : null
-                  }
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {IDEA_STATUSES.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    {IDEA_STATUS_LABEL[status]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="relative z-10 mt-auto flex items-center justify-between gap-2 pt-1">
+            <IdeaStatusSelect ideaId={idea.id} status={idea.status} />
             <span className="text-caption text-muted-foreground">
               {formatDistanceToNow(idea.createdAt, { addSuffix: true })}
             </span>

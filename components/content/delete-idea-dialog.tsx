@@ -24,6 +24,12 @@ interface DeleteIdeaDialogProps {
   hasScript?: boolean;
   /** Whether this idea is linked to any calendar events — those links cascade-delete too (see docs/content-links.md). */
   hasScheduledEvents?: boolean;
+  /**
+   * Called after a successful delete. The list/board surfaces revalidate away
+   * on their own, but the idea detail page (#73) must navigate off the
+   * now-deleted idea — it passes a push back to the ideas list here.
+   */
+  onDeleted?: () => void;
 }
 
 /** Hard delete with confirmation — no soft-archive (see docs/content-ideas.md). */
@@ -33,6 +39,7 @@ export function DeleteIdeaDialog({
   onOpenChange,
   hasScript = false,
   hasScheduledEvents = false,
+  onDeleted,
 }: DeleteIdeaDialogProps) {
   const [pending, startTransition] = useTransition();
 
@@ -46,6 +53,7 @@ export function DeleteIdeaDialog({
       }
       toast.success(`"${idea.title}" deleted`);
       onOpenChange(false);
+      onDeleted?.();
     });
   }
 
