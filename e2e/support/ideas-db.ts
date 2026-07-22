@@ -2,7 +2,8 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { like } from "drizzle-orm";
 
-import { ideas } from "../../lib/db/schema";
+import { events, ideas } from "../../lib/db/schema";
+import { releaseEventTitle } from "../../lib/content/release";
 import type { IdeaFormat } from "../../lib/content/idea-format";
 import type { IdeaStatus } from "../../lib/content/idea-status";
 
@@ -14,9 +15,17 @@ function getTestDb() {
   return drizzle(neon(connectionString));
 }
 
-/** Removes every fixture row under a given title prefix — mirrors `clearEventsWithPrefix` in `events-db.ts`. */
+/**
+ * Removes every fixture row under a given title prefix — mirrors
+ * `clearEventsWithPrefix` in `events-db.ts`. An idea's managed release event
+ * (#71) is a separate `events` row (`Release: <title>`), not reached by a
+ * direct idea delete, so it's cleared here too.
+ */
 export async function clearTestIdeas(prefix: string): Promise<void> {
   const db = getTestDb();
+  await db
+    .delete(events)
+    .where(like(events.title, `${releaseEventTitle(prefix)}%`));
   await db.delete(ideas).where(like(ideas.title, `${prefix}%`));
 }
 

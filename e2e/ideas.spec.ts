@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { formatDateParam } from "../lib/calendar/range";
 import { clearTestIdeas, seedTestIdea } from "./support/ideas-db";
 
 // The ideas page queries the database on every render, so — like the
@@ -239,6 +240,124 @@ test.describe("idea filters", () => {
     await expect(
       page.getByRole("button", { name: "Reset filters" })
     ).toBeVisible();
+  });
+});
+
+test.describe("idea release scheduling and editing", () => {
+  test.skip(skip, skipReason);
+  test.describe.configure({ mode: "serial" });
+
+  const PREFIX = "[e2e-idea-release]";
+
+  // Two comfortably-future dates so the release lands on an unambiguous,
+  // otherwise-empty calendar day regardless of when the suite runs.
+  const dateParamOffsetDays = (offset: number): string => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() + offset);
+    return formatDateParam(date);
+  };
+  const releaseA = dateParamOffsetDays(30);
+  const releaseB = dateParamOffsetDays(45);
+
+  test.afterEach(async () => {
+    await clearTestIdeas(PREFIX);
+  });
+
+  test("a captured release date lands on the content calendar at 19:00", async ({
+    page,
+  }) => {
+    const title = `${PREFIX} Scheduled reveal`;
+    await page.goto("/content/ideas");
+
+    await page.getByRole("button", { name: "New idea" }).click();
+    const dialog = page.getByRole("dialog", { name: "New idea" });
+    await dialog.getByLabel("Title").fill(title);
+    await dialog.getByLabel("Release date").fill(releaseA);
+    // The time defaults to the channel's standard 19:00 publish slot.
+    await expect(dialog.getByLabel("Release time")).toHaveValue("19:00");
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 10000 });
+
+    await page.goto(`/calendar?view=day&date=${releaseA}`);
+    await expect(page.getByText(`Release: ${title}`)).toBeVisible();
+  });
+
+  test("changing the release date moves the calendar event; clearing it removes the event", async ({
+    page,
+  }) => {
+    const title = `${PREFIX} Movable release`;
+    await page.goto("/content/ideas");
+
+    await page.getByRole("button", { name: "New idea" }).click();
+    const createDialog = page.getByRole("dialog", { name: "New idea" });
+    await createDialog.getByLabel("Title").fill(title);
+    await createDialog.getByLabel("Release date").fill(releaseA);
+    await createDialog.getByRole("button", { name: "Save" }).click();
+    await expect(createDialog).not.toBeVisible({ timeout: 10000 });
+
+    // Move the release to a later date.
+    const card = page.locator(IDEA_CARD_SELECTOR, { hasText: title });
+    await card.getByRole("button", { name: `Edit "${title}"` }).click();
+    const editDialog = page.getByRole("dialog", { name: "Edit idea" });
+    await editDialog.getByLabel("Release date").fill(releaseB);
+    await editDialog.getByRole("button", { name: "Save" }).click();
+    await expect(editDialog).not.toBeVisible({ timeout: 10000 });
+
+    await page.goto(`/calendar?view=day&date=${releaseB}`);
+    await expect(page.getByText(`Release: ${title}`)).toBeVisible();
+    await page.goto(`/calendar?view=day&date=${releaseA}`);
+    await expect(page.getByText(`Release: ${title}`)).toHaveCount(0);
+
+    // Clear the release entirely.
+    await page.goto("/content/ideas");
+    await card.getByRole("button", { name: `Edit "${title}"` }).click();
+    await expect(editDialog).toBeVisible();
+    await editDialog.getByRole("button", { name: "Clear" }).click();
+    await editDialog.getByRole("button", { name: "Save" }).click();
+    await expect(editDialog).not.toBeVisible({ timeout: 10000 });
+
+    await page.goto(`/calendar?view=day&date=${releaseB}`);
+    await expect(page.getByText(`Release: ${title}`)).toHaveCount(0);
+  });
+
+  test("every field is editable after capture and the changes survive a reload", async ({
+    page,
+  }) => {
+    const title = `${PREFIX} Editable idea`;
+    await seedTestIdea({ title, format: "either" });
+    await page.goto("/content/ideas");
+
+    const card = page.locator(IDEA_CARD_SELECTOR, { hasText: title });
+    await card.getByRole("button", { name: `Edit "${title}"` }).click();
+    const dialog = page.getByRole("dialog", { name: "Edit idea" });
+    await dialog.getByRole("radio", { name: "Video" }).click();
+    await dialog.getByLabel("Notes").fill("Now with a plan");
+    await dialog.getByLabel("Tags").fill("speedrun, glitch, tutorial");
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 10000 });
+
+    await expect(card.getByText("Video")).toBeVisible();
+    await expect(card.getByText("Now with a plan")).toBeVisible();
+
+    await page.reload();
+    const reloaded = page.locator(IDEA_CARD_SELECTOR, { hasText: title });
+    await expect(reloaded.getByText("Video")).toBeVisible();
+    await expect(reloaded.getByText("tutorial", { exact: true })).toBeVisible();
+  });
+
+  test("the tag field counts toward the five-tag publishing standard", async ({
+    page,
+  }) => {
+    await page.goto("/content/ideas");
+    await page.getByRole("button", { name: "New idea" }).click();
+    const dialog = page.getByRole("dialog", { name: "New idea" });
+
+    await expect(dialog.getByText("0/5")).toBeVisible();
+    await dialog.getByLabel("Tags").fill("a, b, c, d, e");
+    await expect(dialog.getByText("5/5")).toBeVisible();
+    await dialog.getByLabel("Tags").fill("a, b, c, d, e, f");
+    await expect(dialog.getByText("6/5")).toBeVisible();
   });
 });
 

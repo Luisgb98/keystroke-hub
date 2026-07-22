@@ -53,13 +53,14 @@ export default defineConfig({
       // github-links.spec.ts, dashboard.spec.ts, mobile.spec.ts (whose
       // journal and weekly-summary cases write real rows), and
       // command-palette.spec.ts (whose content-search describe seeds/clears
-      // a real project + idea) seed/create/clear real rows (calendar-sync.spec.ts's
-      // connection rows are also unique-per-track) in the dev database and
-      // already cover their own mobile-viewport checks via `test.use`, so
-      // running them again under this project would race against the
-      // chromium project's runs against the same shared DB.
+      // a real project + idea) and ideas.spec.ts (capture/filters/release
+      // seed/create/clear real rows) seed/create/clear real rows
+      // (calendar-sync.spec.ts's connection rows are also unique-per-track) in
+      // the dev database and already cover their own mobile-viewport checks
+      // via `test.use`, so running them again under this project would race
+      // against the chromium project's runs against the same shared DB.
       testIgnore:
-        /(calendar|calendar-sync|event-management|drag-reschedule|agenda|board|scripts|content-links|streams|publish-checklist|journal|weekly-summary|weekly-assessment|projects|improvements|meetings|github-links|dashboard|mobile|command-palette|inbox)\.spec\.ts$/,
+        /(calendar|calendar-sync|event-management|drag-reschedule|agenda|board|scripts|content-links|streams|publish-checklist|journal|weekly-summary|weekly-assessment|projects|improvements|meetings|github-links|dashboard|mobile|command-palette|inbox|ideas)\.spec\.ts$/,
     },
   ],
   webServer: [

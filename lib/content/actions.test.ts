@@ -12,11 +12,22 @@ vi.mock("next/navigation", () => ({
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
+// `after` runs its callback inline here so we can assert on the sync pushes it
+// schedules (the real `after` defers past the response — see docs/google-sync.md).
+vi.mock("next/server", () => ({
+  after: vi.fn((fn: () => unknown) => {
+    fn();
+  }),
+}));
+vi.mock("@/lib/sync/push", () => ({
+  pushEventCreated: vi.fn(),
+  pushEventUpdated: vi.fn(),
+  pushEventDeleted: vi.fn(),
+}));
 
 const dbMock = vi.hoisted(() => {
-  // A `select().from().where()` chain is awaitable directly — mirrors
-  // `stream-actions.test.ts`'s `makeSelectChain` precedent, minus
-  // `.orderBy()` (unused by `updateIdeaStatus`'s checklist queries).
+  // A `select().from().where()` chain is awaitable directly; results are drawn
+  // from `selectQueue` in FIFO order (mirrors `stream-actions.test.ts`).
   const selectQueue: unknown[][] = [];
   function nextSelect(): Promise<unknown[]> {
     return Promise.resolve(selectQueue.shift() ?? []);
@@ -31,7 +42,8 @@ const dbMock = vi.hoisted(() => {
     return chain;
   }
 
-  const insertValues = vi.fn(() => Promise.resolve());
+  const insertValues = vi.fn();
+  const insertReturning = vi.fn();
   const updateSet = vi.fn();
   const updateReturning = vi.fn();
   const deleteReturning = vi.fn();
@@ -39,15 +51,33 @@ const dbMock = vi.hoisted(() => {
   return {
     selectQueue,
     insertValues,
+    insertReturning,
     updateSet,
     updateReturning,
     deleteReturning,
     select: vi.fn(() => ({ from: vi.fn(() => makeSelectChain()) })),
-    insert: vi.fn(() => ({ values: insertValues })),
+    // insert(table).values(v) is awaitable AND exposes `.returning()`.
+    insert: vi.fn(() => ({
+      values: vi.fn((v) => {
+        insertValues(v);
+        return {
+          returning: vi.fn(() => insertReturning()),
+          then: (resolve: () => void, reject?: (e: unknown) => void) =>
+            Promise.resolve().then(resolve, reject),
+        };
+      }),
+    })),
+    // update(table).set(v).where(...) is awaitable AND exposes `.returning()`.
     update: vi.fn(() => ({
-      set: vi.fn((values) => {
-        updateSet(values);
-        return { where: vi.fn(() => ({ returning: updateReturning })) };
+      set: vi.fn((v) => {
+        updateSet(v);
+        return {
+          where: vi.fn(() => ({
+            returning: vi.fn(() => updateReturning()),
+            then: (resolve: () => void, reject?: (e: unknown) => void) =>
+              Promise.resolve().then(resolve, reject),
+          })),
+        };
       }),
     })),
     delete: vi.fn(() => ({
@@ -63,7 +93,17 @@ vi.mock("@/lib/db", () => ({
 import { revalidatePath } from "next/cache";
 
 import { verifySession } from "@/lib/auth/session";
-import { createIdea, deleteIdea, updateIdeaStatus } from "./actions";
+import {
+  pushEventCreated,
+  pushEventDeleted,
+  pushEventUpdated,
+} from "@/lib/sync/push";
+import {
+  createIdea,
+  deleteIdea,
+  updateIdea,
+  updateIdeaStatus,
+} from "./actions";
 
 function form(entries: Record<string, string>): FormData {
   const data = new FormData();
@@ -80,12 +120,14 @@ const validCaptureForm = {
 
 beforeEach(() => {
   vi.mocked(verifySession).mockResolvedValue({ isAuth: true });
+  dbMock.insertReturning.mockResolvedValue([{ id: "idea-new" }]);
   dbMock.updateReturning.mockResolvedValue([{ id: "idea-1" }]);
   dbMock.deleteReturning.mockResolvedValue([{ id: "idea-1" }]);
 });
 
 afterEach(() => {
   vi.clearAllMocks();
+  dbMock.selectQueue.length = 0;
 });
 
 describe("createIdea", () => {
@@ -104,10 +146,9 @@ describe("createIdea", () => {
     expect(dbMock.insert).not.toHaveBeenCalled();
   });
 
-  it("inserts a title-only idea with defaults and revalidates the list", async () => {
+  it("inserts a title-only idea with defaults and revalidates the list and board", async () => {
     const state = await createIdea(undefined, form(validCaptureForm));
     expect(state).toEqual({ success: true });
-    expect(dbMock.insert).toHaveBeenCalledTimes(1);
     expect(dbMock.insertValues).toHaveBeenCalledWith({
       title: "Speedrun any% commentary",
       notes: null,
@@ -115,6 +156,9 @@ describe("createIdea", () => {
       tags: [],
     });
     expect(revalidatePath).toHaveBeenCalledWith("/content/ideas");
+    expect(revalidatePath).toHaveBeenCalledWith("/content/board");
+    // No release -> the calendar isn't touched.
+    expect(revalidatePath).not.toHaveBeenCalledWith("/calendar");
   });
 
   it("inserts full input with notes, format, and normalized tags", async () => {
@@ -135,6 +179,55 @@ describe("createIdea", () => {
     });
   });
 
+  it("saves a captured script against the new idea", async () => {
+    await createIdea(
+      undefined,
+      form({ ...validCaptureForm, script: "# Intro\n\nSay hi" })
+    );
+    expect(dbMock.insertValues).toHaveBeenCalledWith({
+      ideaId: "idea-new",
+      content: "# Intro\n\nSay hi",
+    });
+  });
+
+  it("creates the release event, links it, points the idea at it, and syncs", async () => {
+    dbMock.insertReturning
+      .mockResolvedValueOnce([{ id: "idea-1" }]) // the idea
+      .mockResolvedValueOnce([{ id: "evt-1" }]); // the release event
+
+    const state = await createIdea(
+      undefined,
+      form({
+        ...validCaptureForm,
+        releaseDate: "2026-08-01",
+        releaseTime: "19:00",
+      })
+    );
+
+    expect(state).toEqual({ success: true });
+    // Release event on the content track, timed, titled from the idea.
+    expect(dbMock.insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        track: "content",
+        title: "Release: Speedrun any% commentary",
+        allDay: false,
+        startsAt: new Date("2026-08-01T19:00:00"),
+      })
+    );
+    // Linked, and the idea points at the event.
+    expect(dbMock.insertValues).toHaveBeenCalledWith({
+      ideaId: "idea-1",
+      eventId: "evt-1",
+      eventTrack: "content",
+    });
+    expect(dbMock.updateSet).toHaveBeenCalledWith({
+      releaseEventId: "evt-1",
+      releaseEventTrack: "content",
+    });
+    expect(pushEventCreated).toHaveBeenCalledWith("evt-1", "content");
+    expect(revalidatePath).toHaveBeenCalledWith("/calendar");
+  });
+
   it("returns field errors without writing when the title is blank", async () => {
     const state = await createIdea(
       undefined,
@@ -153,6 +246,118 @@ describe("createIdea", () => {
     );
     expect(state.fieldErrors?.format).toBeTruthy();
     expect(dbMock.insert).not.toHaveBeenCalled();
+  });
+
+  it("returns a field error when more than five tags are given", async () => {
+    const state = await createIdea(
+      undefined,
+      form({ ...validCaptureForm, tags: "a, b, c, d, e, f" })
+    );
+    expect(state.fieldErrors?.tags).toBeTruthy();
+    expect(dbMock.insert).not.toHaveBeenCalled();
+  });
+});
+
+describe("updateIdea", () => {
+  const editForm = {
+    title: "Edited title",
+    notes: "new notes",
+    format: "video",
+    tags: "speedrun, glitch",
+  };
+
+  it("verifies the session before touching the database", async () => {
+    dbMock.selectQueue.push([{ id: "idea-1", releaseEventId: null }]);
+    await updateIdea("idea-1", undefined, form(editForm));
+    expect(verifySession).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns an error (not a throw) when the idea no longer exists", async () => {
+    dbMock.selectQueue.push([]); // existing-idea read finds nothing
+    const state = await updateIdea("missing", undefined, form(editForm));
+    expect(state).toEqual({ error: "That idea no longer exists." });
+    expect(dbMock.update).not.toHaveBeenCalled();
+  });
+
+  it("updates the core fields and revalidates the list and board", async () => {
+    dbMock.selectQueue.push([{ id: "idea-1", releaseEventId: null }]);
+    const state = await updateIdea("idea-1", undefined, form(editForm));
+    expect(state).toEqual({ success: true });
+    expect(dbMock.updateSet).toHaveBeenCalledWith({
+      title: "Edited title",
+      notes: "new notes",
+      format: "video",
+      tags: ["speedrun", "glitch"],
+    });
+    expect(revalidatePath).toHaveBeenCalledWith("/content/ideas");
+    expect(revalidatePath).toHaveBeenCalledWith("/content/board");
+  });
+
+  it("creates a release event when a date is set on a previously-unscheduled idea", async () => {
+    dbMock.selectQueue.push([{ id: "idea-1", releaseEventId: null }]);
+    dbMock.insertReturning.mockResolvedValueOnce([{ id: "evt-9" }]);
+
+    await updateIdea(
+      "idea-1",
+      undefined,
+      form({ ...editForm, releaseDate: "2026-09-10", releaseTime: "18:00" })
+    );
+
+    expect(dbMock.insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        track: "content",
+        startsAt: new Date("2026-09-10T18:00:00"),
+      })
+    );
+    expect(pushEventCreated).toHaveBeenCalledWith("evt-9", "content");
+    expect(revalidatePath).toHaveBeenCalledWith("/calendar");
+  });
+
+  it("rewrites the release event's time span when the date changes", async () => {
+    dbMock.selectQueue.push([{ id: "idea-1", releaseEventId: "evt-1" }]);
+    dbMock.updateReturning.mockResolvedValue([
+      { id: "evt-1", track: "content" },
+    ]);
+
+    await updateIdea(
+      "idea-1",
+      undefined,
+      form({ ...editForm, releaseDate: "2026-10-05", releaseTime: "20:00" })
+    );
+
+    expect(dbMock.updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Release: Edited title",
+        startsAt: new Date("2026-10-05T20:00:00"),
+      })
+    );
+    expect(pushEventUpdated).toHaveBeenCalledWith("evt-1", "content");
+  });
+
+  it("deletes the release event when the date is cleared", async () => {
+    dbMock.selectQueue.push([{ id: "idea-1", releaseEventId: "evt-1" }]);
+    dbMock.selectQueue.push([
+      { id: "link-1", googleEventId: "g-1", eventId: "evt-1" },
+    ]);
+    dbMock.deleteReturning.mockResolvedValueOnce([
+      { id: "evt-1", track: "content" },
+    ]);
+
+    await updateIdea("idea-1", undefined, form(editForm)); // no releaseDate
+
+    expect(dbMock.delete).toHaveBeenCalled();
+    expect(pushEventDeleted).toHaveBeenCalledWith("link-1", "g-1", "content");
+    expect(revalidatePath).toHaveBeenCalledWith("/calendar");
+  });
+
+  it("returns field errors without writing when the title is blank", async () => {
+    const state = await updateIdea(
+      "idea-1",
+      undefined,
+      form({ ...editForm, title: "" })
+    );
+    expect(state.fieldErrors?.title).toBeTruthy();
+    expect(dbMock.select).not.toHaveBeenCalled();
   });
 });
 
@@ -302,6 +507,7 @@ describe("updateIdeaStatus", () => {
 
 describe("deleteIdea", () => {
   it("verifies the session before touching the database", async () => {
+    dbMock.selectQueue.push([{ releaseEventId: null }]);
     await deleteIdea("idea-1");
     expect(verifySession).toHaveBeenCalledTimes(1);
   });
@@ -314,16 +520,36 @@ describe("deleteIdea", () => {
     expect(dbMock.delete).not.toHaveBeenCalled();
   });
 
-  it("deletes an existing idea and revalidates the list", async () => {
+  it("deletes an existing idea and revalidates the list and board", async () => {
+    dbMock.selectQueue.push([{ releaseEventId: null }]);
     const result = await deleteIdea("idea-1");
     expect(result).toEqual({});
     expect(revalidatePath).toHaveBeenCalledWith("/content/ideas");
+    expect(revalidatePath).toHaveBeenCalledWith("/content/board");
   });
 
   it("returns an error (not a throw) when the idea no longer exists", async () => {
+    dbMock.selectQueue.push([{ releaseEventId: null }]);
     dbMock.deleteReturning.mockResolvedValueOnce([]);
     const result = await deleteIdea("missing");
     expect(result).toEqual({ error: "That idea no longer exists." });
     expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("also deletes the idea's release event and syncs the deletion", async () => {
+    dbMock.selectQueue.push([{ releaseEventId: "evt-1" }]); // idea's pointer
+    dbMock.selectQueue.push([
+      { id: "link-1", googleEventId: "g-1", eventId: "evt-1" },
+    ]);
+    dbMock.deleteReturning
+      .mockResolvedValueOnce([{ id: "idea-1" }]) // the idea
+      .mockResolvedValueOnce([{ id: "evt-1", track: "content" }]); // the event
+
+    const result = await deleteIdea("idea-1");
+
+    expect(result).toEqual({});
+    expect(dbMock.delete).toHaveBeenCalledTimes(2);
+    expect(pushEventDeleted).toHaveBeenCalledWith("link-1", "g-1", "content");
+    expect(revalidatePath).toHaveBeenCalledWith("/calendar");
   });
 });

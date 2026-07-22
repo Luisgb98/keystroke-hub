@@ -18,6 +18,8 @@ function makeIdea(
     status,
     tags: [],
     projectId: null,
+    releaseEventId: null,
+    releaseEventTrack: null,
     stageEnteredAt,
     createdAt: stageEnteredAt,
     updatedAt: stageEnteredAt,
