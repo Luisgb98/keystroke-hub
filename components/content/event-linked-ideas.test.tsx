@@ -27,7 +27,7 @@ function makeIdea(
   return {
     id: "idea-1",
     title: "Speedrun any% commentary",
-    status: "spark",
+    status: "idea",
     hasScript: false,
     ...overrides,
   };
@@ -48,13 +48,13 @@ describe("EventLinkedIdeas", () => {
       <EventLinkedIdeas
         eventId="evt-1"
         linkedIdeas={[
-          makeIdea({ title: "Boss rush", status: "outlined" }),
+          makeIdea({ title: "Boss rush", status: "scripted" }),
           makeIdea({ id: "idea-2", title: "Glitch tutorial" }),
         ]}
       />
     );
     expect(screen.getByText("Boss rush")).toBeInTheDocument();
-    expect(screen.getByText("Outlined")).toBeInTheDocument();
+    expect(screen.getByText("Scripted")).toBeInTheDocument();
     expect(screen.getByText("Glitch tutorial")).toBeInTheDocument();
   });
 

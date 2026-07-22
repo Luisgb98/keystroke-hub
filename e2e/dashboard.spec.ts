@@ -37,7 +37,7 @@ test.describe("dashboard", () => {
     // regardless of whatever else exists in the dev database.
     await seedTestIdea({
       title: STUCK_IDEA_TITLE,
-      status: "spark",
+      status: "idea",
       stageEnteredAt: new Date("2000-01-01"),
     });
     await seedTestIdea({ title: SCRIPTED_IDEA_TITLE, status: "scripted" });
@@ -69,7 +69,7 @@ test.describe("dashboard", () => {
   }) => {
     await page.goto("/");
     await expect(page.getByText("Content in flight")).toBeVisible();
-    await expect(page.getByText(/Spark/)).toBeVisible();
+    await expect(page.getByText(/Idea/)).toBeVisible();
     await expect(page.getByText(STUCK_IDEA_TITLE)).toBeVisible();
 
     await page.getByRole("link", { name: "Open board →" }).click();

@@ -37,33 +37,30 @@ describe("buildContentSnapshot", () => {
   it("includes every in-flight stage, even when empty, in pipeline order", () => {
     const snapshot = buildContentSnapshot([]);
     expect(snapshot.counts.map((c) => c.status)).toEqual([
-      "spark",
-      "outlined",
+      "idea",
       "scripted",
       "recorded",
       "edited",
     ]);
     expect(IN_FLIGHT_STATUSES).not.toContain("published");
-    expect(IN_FLIGHT_STATUSES).not.toContain("parked");
   });
 
   it("tallies each stage independently", () => {
     const ideas = [
-      makeIdea("1", "spark"),
-      makeIdea("2", "spark"),
+      makeIdea("1", "idea"),
+      makeIdea("2", "idea"),
       makeIdea("3", "scripted"),
     ];
     const snapshot = buildContentSnapshot(ideas);
-    expect(snapshot.counts.find((c) => c.status === "spark")?.count).toBe(2);
+    expect(snapshot.counts.find((c) => c.status === "idea")?.count).toBe(2);
     expect(snapshot.counts.find((c) => c.status === "scripted")?.count).toBe(1);
     expect(snapshot.total).toBe(3);
   });
 
-  it("excludes published and parked ideas from counts, total, and the stuck pick", () => {
+  it("excludes published ideas from counts, total, and the stuck pick", () => {
     const ideas = [
-      makeIdea("1", "spark", new Date("2026-01-01")),
+      makeIdea("1", "idea", new Date("2026-01-01")),
       makeIdea("2", "published", new Date("2025-01-01")),
-      makeIdea("3", "parked", new Date("2024-01-01")),
     ];
     const snapshot = buildContentSnapshot(ideas);
     expect(snapshot.total).toBe(1);

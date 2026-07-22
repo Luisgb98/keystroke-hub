@@ -35,7 +35,7 @@ export async function seedTestIdea(fixture: {
     title: fixture.title,
     notes: fixture.notes ?? null,
     format: fixture.format ?? "either",
-    status: fixture.status ?? "spark",
+    status: fixture.status ?? "idea",
     tags: fixture.tags ?? [],
     ...(fixture.stageEnteredAt
       ? { stageEnteredAt: fixture.stageEnteredAt }

@@ -24,12 +24,12 @@ describe("publish-checklist", () => {
     }
   });
 
-  it("does not treat early stages or parked as late", () => {
-    const earlyOrParked = IDEA_STATUSES.filter(
+  it("does not treat early stages as late", () => {
+    const early = IDEA_STATUSES.filter(
       (status) => !LATE_IDEA_STATUSES.includes(status)
     );
-    expect(earlyOrParked).toEqual(["spark", "outlined", "scripted", "parked"]);
-    for (const status of earlyOrParked) {
+    expect(early).toEqual(["idea", "scripted"]);
+    for (const status of early) {
       expect(isLateStage(status)).toBe(false);
     }
   });

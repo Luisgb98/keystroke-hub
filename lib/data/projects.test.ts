@@ -168,13 +168,13 @@ describe("getProject", () => {
       },
     ]);
     dbMock.queue.push([
-      { id: "i-1", title: "Idea", format: "video", status: "spark" },
+      { id: "i-1", title: "Idea", format: "video", status: "idea" },
     ]);
 
     const result = await getProject("p-1");
     expect(result?.project.id).toBe("p-1");
     expect(result?.linkedIdeas).toEqual([
-      { id: "i-1", title: "Idea", format: "video", status: "spark" },
+      { id: "i-1", title: "Idea", format: "video", status: "idea" },
     ]);
   });
 });

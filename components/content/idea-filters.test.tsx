@@ -19,7 +19,7 @@ describe("IdeaFilters", () => {
     expect(screen.getByRole("button", { name: "Video" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Stream" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Either" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Spark" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Idea" })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Published" })
     ).toBeInTheDocument();
@@ -28,7 +28,7 @@ describe("IdeaFilters", () => {
   it("reflects the active filters via aria-pressed", () => {
     render(
       <IdeaFilters
-        value={{ format: "video", status: "spark" }}
+        value={{ format: "video", status: "idea" }}
         availableTags={[]}
       />
     );
@@ -41,7 +41,7 @@ describe("IdeaFilters", () => {
       "aria-pressed",
       "false"
     );
-    expect(screen.getByRole("button", { name: "Spark" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Idea" })).toHaveAttribute(
       "aria-pressed",
       "true"
     );
@@ -88,10 +88,10 @@ describe("IdeaFilters", () => {
       <IdeaFilters value={{ format: "video" }} availableTags={["speedrun"]} />
     );
 
-    await user.click(screen.getByRole("button", { name: "Spark" }));
+    await user.click(screen.getByRole("button", { name: "Idea" }));
 
     expect(replace).toHaveBeenCalledWith(
-      "/content/ideas?format=video&status=spark"
+      "/content/ideas?format=video&status=idea"
     );
   });
 
