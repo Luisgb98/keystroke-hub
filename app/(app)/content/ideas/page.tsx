@@ -96,7 +96,7 @@ export default async function IdeasPage({ searchParams }: IdeasPageProps) {
       {ideas.length === 0 ? (
         <IdeaEmptyState hasActiveFilters={hasActiveFilters} />
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid auto-rows-fr gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {ideas.map((idea) => (
             <IdeaCard
               key={idea.id}
