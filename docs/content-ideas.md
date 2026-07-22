@@ -18,7 +18,7 @@ calendar's `track` discriminator.
 | `title`                     | `text` **not null**                                | the only required field                                     |
 | `notes`                     | `text` null                                        | free text                                                   |
 | `format`                    | enum `video \| stream \| either`, default `either` |                                                             |
-| `status`                    | enum, default `spark`                              | pipeline stage — see below                                  |
+| `status`                    | enum, default `idea`                               | pipeline stage — see below                                  |
 | `tags`                      | `text[]` not null default `{}`                     | free-form, GIN-indexed for containment                      |
 | `project_id`                | `uuid` null                                        | forward-compat for #24 (Projects) — no UI yet               |
 | `stage_entered_at`          | `timestamptz` not null, default `now()`            | when `status` last changed — powers #16's board (see below) |
@@ -27,19 +27,27 @@ calendar's `track` discriminator.
 `format`/`status` are Postgres enums (`pgEnum`), matching the `track`/
 `connection_status` precedent in `docs/calendar.md` — adding a pipeline stage
 later is a cheap `ALTER TYPE ... ADD VALUE` migration rather than a data
-rewrite. `edited` was added this way by #16.
+rewrite. `edited` was added this way by #16. _Removing_ a value is the
+expensive direction — Postgres has no `DROP VALUE`, so #70 swapped the enum
+via a text round-trip (migration `0017`), remapping retired rows in the same
+step.
 
 ## Pipeline vocabulary
 
 `lib/content/idea-status.ts` defines the **full** stage set up front —
-`spark → outlined → scripted → recorded → edited → published`, plus
-`parked` — not just the initial stage, so #16's board consumes this one
-module as its single source of truth rather than inventing its own. `spark`
-is the initial stage every idea starts at. `edited` was added between
-`recorded` and `published` by #16 to cover the board's pipeline; every
-existing consumer (the list view's status `<select>`, the status filter
-chips) picked it up automatically since they all render from
-`IDEA_STATUSES`.
+`idea → scripted → recorded → edited → published` — not just the initial
+stage, so #16's board consumes this one module as its single source of truth
+rather than inventing its own. `idea` is the initial stage every idea starts
+at. Every consumer (the list view's status `<select>`, the status filter
+chips, the board columns) renders from `IDEA_STATUSES`, so the vocabulary
+changes in one place.
+
+#70 trimmed the pipeline to these five, dropping the never-used intake split
+(`spark`/`outlined`) and the `parked` side-track so every label maps 1:1 to a
+real video-production stage. The migration remapped all three retired
+statuses into `idea` (the closest surviving stage — mapping `outlined`
+forward to `scripted` would have falsely claimed a script exists), so no idea
+was lost from the grid or board.
 
 **Status is the only field editable after capture** — a plain `<select>` on
 `IdeaCard` and #16's board move menu both commit through the same
@@ -79,7 +87,7 @@ comma-separated text field, normalized by `normalizeTags`
   matching #11's event-delete precedent). Every action calls
   `verifySession()` first; `updateIdeaStatus`/`deleteIdea` revalidate both
   `/content/ideas` and `/content/board`, `createIdea` only the list (new
-  ideas always start at `spark`, which the board also renders).
+  ideas always start at `idea`, which the board also renders).
 - **Validation**: `lib/content/idea-schema.ts` — one zod schema
   (`ideaCaptureSchema`) shared by the capture form and `createIdea`; title
   required/trimmed/max-length, everything else optional with defaults
@@ -124,8 +132,7 @@ glance. Cross-linked with the ideas list via header links on both routes.
 - **Layout**: `PipelineBoard` renders a horizontally-scrolling, snap-scrolled
   (`scroll-snap-type: x mandatory`) row of `StageColumn`s — fixed-width
   (~85vw mobile, 20rem desktop) so the phone-usable acceptance criterion
-  needs no JS. `parked` renders last and visually muted (desaturated
-  heading/count) so dead ideas don't read as pipeline load.
+  needs no JS. Exactly five columns, one per pipeline stage.
 - **Sorting**: each column sorts oldest-in-stage first (by
   `stage_entered_at`) — the card that's been stuck longest surfaces first,
   the signal the board exists to expose. `groupIdeasByStatus`
