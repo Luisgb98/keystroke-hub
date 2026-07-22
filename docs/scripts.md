@@ -39,9 +39,12 @@ the surface for editing it afterwards.
 
 ## Route & data access
 
-- **Route**: `app/(app)/content/ideas/[id]/script/page.tsx` — the first
-  per-idea page in the app (ideas otherwise live entirely as cards, no detail
-  view). Shows the not-found UI via `notFound()` for an unknown idea id.
+- **Route**: `app/(app)/content/ideas/[id]/script/page.tsx` — nests under the
+  idea detail page (`[id]/page.tsx`, #73), which is the primary reading surface
+  for a script; this dedicated editor page remains for the full-screen
+  Write/Read experience and stays linked from search, the board card, the edit
+  dialog, and event-linked ideas. Shows the not-found UI via `notFound()` for
+  an unknown idea id.
   Because the route has a `loading.tsx`, the response is already streaming
   (HTTP 200) by the time `notFound()` resolves, so the wire status stays 200
   even though the not-found page renders — a documented Next.js tradeoff
@@ -64,13 +67,23 @@ the surface for editing it afterwards.
   client (see the Server Actions data-security guide), validates via
   `scriptSaveSchema` (`lib/content/script-schema.ts`, a generous 200,000
   character cap so a runaway paste can't create a megabyte row), then
-  upserts and revalidates the script page plus both idea surfaces (ideas
-  list, board) since they render the "has script" indicator.
+  upserts and revalidates the script page, the idea detail page (#73, which
+  renders the script), plus both idea list surfaces (ideas list, board) since
+  they render the "has script" indicator.
 
 ## Editor & autosave
 
+The autosave behavior lives in a shared hook, `useScriptAutosave`
+(`components/content/script/script-autosave.tsx`), so the two script write
+surfaces — the dedicated `ScriptEditor` page and the idea detail page's inline
+`IdeaScriptSection` (#73, see docs/content-ideas.md) — stay behaviorally
+identical. The hook owns the content state, the save-state machine, the
+debounced autosave, an immediate `saveNow` (Cmd/Ctrl+S and explicit controls),
+and the `beforeunload` guard; `SaveStateIndicator` (same module) is the visible
+readout. The `ScriptReadingView` is reused unchanged by both surfaces.
+
 `ScriptEditor` (`components/content/script/script-editor.tsx`), a Client
-Component:
+Component wrapping the hook with Write/Read tabs:
 
 - **Write surface**: the existing `components/ui/textarea.tsx`
   (auto-growing via CSS `field-sizing`) — deliberately not a rich/code
@@ -117,10 +130,12 @@ their existing idea query to compute this per card.
 
 Unit (Vitest + RTL): `script-schema` (max-length boundary), `script-actions`
 (DB mocked — session check, idea-existence check, the upsert shape,
-revalidation targets), `lib/data/scripts` (DB mocked), `script-editor`
-(fake timers for the debounce/coalescing behavior, Cmd/Ctrl+S, the Save
-button, retry-on-failure, the Write/Read URL sync, and the `beforeunload`
-guard), `script-reading-view` (Markdown fixtures render mapped, token-classed
+revalidation targets including the idea detail page), `lib/data/scripts` (DB
+mocked), `script-editor` (fake timers for the debounce/coalescing behavior,
+Cmd/Ctrl+S, the Save button, retry-on-failure, the Write/Read URL sync, and the
+`beforeunload` guard), `idea-script-section` (the detail page's read-default →
+Edit → autosave → Done surface, exercising the same shared `useScriptAutosave`
+hook), `script-reading-view` (Markdown fixtures render mapped, token-classed
 elements; inline vs. fenced code; raw HTML isn't rendered), plus the new
 script-link assertions added to `idea-card`/`board-card`'s existing tests.
 

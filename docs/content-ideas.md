@@ -160,6 +160,12 @@ Mobile-first, one-handed capture is the design center:
   font per the keystroke identity) with an `n/5` incomplete hint, the four
   publish copy blocks (below), relative created time, the inline status
   control, and edit/script/delete actions. Cards render in a responsive grid.
+  The **title is a stretched link** to the idea's detail page (#73, below): the
+  whole card is the click target, while each interactive control (the header
+  buttons, copy blocks, project chip, event chips, status select) opts back out
+  with `relative z-10` so it stays independently clickable — the standard
+  stretched-link pattern, since a card full of nested buttons can't be wrapped
+  in one anchor.
 - **Uniform, publish-ready cards (#72)**: every card is the **same height**
   regardless of description length — the grid uses `auto-rows-fr` and each
   `IdeaCard` is `h-full` with a `flex-1` content column and the status footer
@@ -179,13 +185,16 @@ Mobile-first, one-handed capture is the design center:
   tags) renders disabled. Clipboard idiom follows `CopySummaryButton`
   (see docs/journal.md): success toast + brief check-icon confirmation, error
   toast when the browser blocks clipboard access.
-- **Status control (#72)**: moved from a native `<select>` to the themed
-  shadcn `Select` (`components/ui/select.tsx`, Base UI) so its trigger and
-  option popup follow the app theme in both light and dark mode rather than
-  rendering a browser-default white dropdown. It still commits inline through
-  `updateIdeaStatus` (no confirmation), unchanged from #71; the closed trigger
-  shows the human status label via `SelectValue`'s formatter, and the same
-  publish nudge (`uncheckedCount`) applies.
+- **Status control (#72, #73)**: the themed shadcn `Select`
+  (`components/ui/select.tsx`, Base UI) — trigger and option popup follow the
+  app theme in both modes rather than rendering a browser-default white
+  dropdown. #73 extracted it into `IdeaStatusSelect`
+  (`components/content/idea-status-select.tsx`) so the card and the detail page
+  share one implementation (a `size` prop covers the compact card vs. the
+  roomier detail page). It commits inline through `updateIdeaStatus` (no
+  confirmation); the closed trigger shows the human status label via
+  `SelectValue`'s formatter, and the same publish nudge (`uncheckedCount`)
+  applies.
 - **Filters**: `IdeaFilters` — debounced search plus horizontally-scrollable
   chip rows for format/status/tag. Holds a local optimistic copy of every
   filter (not just search text) so rapid successive chip clicks compose
@@ -201,6 +210,42 @@ Mobile-first, one-handed capture is the design center:
 - **`/content`**: was a bare placeholder; now links to `/content/ideas` and
   `/content/board` via simple cards, leaving the rest of the placeholder in
   place for scripts and the streaming schedule (later issues).
+
+## Detail page (issue #73)
+
+`app/(app)/content/ideas/[id]/page.tsx` — a per-idea page reached by clicking a
+card's title. Shows **everything** about one idea on a single finished page:
+title, description (paragraph breaks preserved via `whitespace-pre-line`, no
+clamp), tags with the `n/5` standard hint, format, status, release date/time,
+linked calendar events and project, the four publish copy blocks, and the
+script. Nests the existing `[id]/script` editor route underneath, which is left
+untouched (still linked from search results, the board card, the edit dialog,
+and event-linked ideas).
+
+- **Data**: one `getIdeaWithScript(id)` (404s an unknown id via `notFound()`)
+  plus the same `getScheduledEventsForIdeas`/`getProjectSummariesForIdeas`
+  batch loaders the list uses, called with this one id. Like the script page
+  (and unlike the list/board), it has **no** missing-database resilience
+  contract (`docs/database.md`) — it's only reachable from a card link, and
+  there's nothing to show without the idea. The `notFound()` + `loading.tsx`
+  streaming-status tradeoff is the same one documented in `docs/scripts.md`.
+- **Composition**: `IdeaDetail` (`components/content/detail/idea-detail.tsx`) is
+  a presentational server component composing the interactive client pieces —
+  `IdeaDetailHeader` (format + edit/delete, reusing `IdeaEditor` and
+  `DeleteIdeaDialog`; a successful delete routes back to the list via
+  `DeleteIdeaDialog`'s new `onDeleted` callback, since the current idea is
+  gone), the shared `IdeaStatusSelect` and `IdeaCopyActions` and
+  `IdeaScheduledEvents`, and `IdeaScriptSection` (below). Mobile-first, centered
+  `sm:max-w-2xl` column like the stream/project detail pages.
+- **Script — read by default, explicit edit (#73)**: `IdeaScriptSection`
+  (`components/content/detail/idea-script-section.tsx`) renders the Markdown
+  **read-only by default** (the polished `ScriptReadingView`) so the creator's
+  default posture is reading their own content, e.g. while recording. An
+  explicit **Edit** button reveals the autosaving write surface; editing chrome
+  is visible only while editing, and **Done** flushes any pending save and
+  returns to the rendered view. The write surface reuses the shared
+  `useScriptAutosave` behavior, so it is identical to the dedicated
+  `ScriptEditor` page (see docs/scripts.md).
 
 ## Board (issue #16)
 
@@ -316,9 +361,13 @@ seeding-error-doesn't-fail-the-request path, and `uncheckedCount` on publish),
 `idea-capture`/`idea-card`/`idea-copy-actions`/`idea-filters`/`idea-empty-state`
 components (the `idea-copy-actions` suite mocks `navigator.clipboard` and
 asserts the exact copied text per block, the disabled states, and the error
-toast; `idea-card` drives the themed status `Select` as a combobox), and the
-board's `pipeline-board`/`stage-column`/`board-card`/`move-menu`/
-`checklist-chip`/`publish-checklist-dialog` components.
+toast; `idea-card` asserts the title's detail-page link and drives the themed
+status `Select` as a combobox), the extracted `idea-status-select`, the detail
+page's `idea-detail`/`idea-detail-header`/`idea-script-section` (read-only by
+default, Edit reveals the write surface, autosave, Done returns to the rendered
+view, delete routes back to the list), and the board's
+`pipeline-board`/`stage-column`/`board-card`/`move-menu`/`checklist-chip`/
+`publish-checklist-dialog` components.
 
 e2e (`e2e/ideas.spec.ts`, `e2e/board.spec.ts`, and
 `e2e/publish-checklist.spec.ts`, real DB via `e2e/support/ideas-db.ts` with
@@ -347,6 +396,14 @@ is unset):
   still moves the card (skipping stages included); completing every item
   avoids the nudge; a mobile-viewport chip-tap → toggle flow.
   `publish-checklist.spec.ts` is likewise excluded from `mobile-chrome`.
+
+- **Detail page** (`e2e/idea-detail.spec.ts`): clicking a card's title opens
+  the detail page with every field shown, the four copy blocks are present, the
+  script reads by default (no write surface) → Edit → autosave → Done returns to
+  the rendered view and survives a reload in read mode, an unknown id shows the
+  not-found UI, and a mobile-viewport check that a long script reads with no
+  horizontal overflow. Excluded from `mobile-chrome` (same shared-DB rationale
+  as the suites above).
 
 The true "no ideas exist at all" empty state isn't covered by e2e (no way to
 guarantee a shared dev database is genuinely empty) — it's covered by the
