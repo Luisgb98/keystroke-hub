@@ -119,7 +119,7 @@ describe("ideaStatusSchema", () => {
   it("accepts a known status", () => {
     const result = ideaStatusSchema.safeParse({
       id: "abc",
-      status: "outlined",
+      status: "scripted",
     });
     expect(result.success).toBe(true);
   });
@@ -130,7 +130,7 @@ describe("ideaStatusSchema", () => {
   });
 
   it("rejects an empty id", () => {
-    const result = ideaStatusSchema.safeParse({ id: "", status: "spark" });
+    const result = ideaStatusSchema.safeParse({ id: "", status: "idea" });
     expect(result.success).toBe(false);
   });
 });

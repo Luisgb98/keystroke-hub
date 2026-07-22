@@ -38,7 +38,7 @@ test.describe("idea capture", () => {
     const card = page.locator(IDEA_CARD_SELECTOR, { hasText: title });
     await expect(card).toBeVisible();
     await expect(card.getByLabel("Status", { exact: true })).toHaveValue(
-      "spark"
+      "idea"
     );
   });
 
@@ -74,9 +74,9 @@ test.describe("idea capture", () => {
     await page.goto("/content/ideas");
 
     const card = page.locator(IDEA_CARD_SELECTOR, { hasText: title });
-    await card.getByLabel("Status", { exact: true }).selectOption("outlined");
+    await card.getByLabel("Status", { exact: true }).selectOption("scripted");
     await expect(card.getByLabel("Status", { exact: true })).toHaveValue(
-      "outlined"
+      "scripted"
     );
 
     await page.reload();
@@ -84,7 +84,7 @@ test.describe("idea capture", () => {
       page
         .locator(IDEA_CARD_SELECTOR, { hasText: title })
         .getByLabel("Status", { exact: true })
-    ).toHaveValue("outlined");
+    ).toHaveValue("scripted");
   });
 
   test("delete requires confirmation; cancel keeps the idea", async ({
@@ -129,7 +129,7 @@ test.describe("idea filters", () => {
     await seedTestIdea({
       title: streamTitle,
       format: "stream",
-      status: "outlined",
+      status: "scripted",
     });
   });
 
@@ -183,10 +183,10 @@ test.describe("idea filters", () => {
     await page.goto("/content/ideas");
     await page
       .getByRole("group", { name: "Filter by status" })
-      .getByRole("button", { name: "Outlined" })
+      .getByRole("button", { name: "Scripted" })
       .click();
 
-    await expect(page).toHaveURL(/status=outlined/);
+    await expect(page).toHaveURL(/status=scripted/);
     await expect(
       page.locator(IDEA_CARD_SELECTOR, { hasText: streamTitle })
     ).toBeVisible();

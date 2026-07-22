@@ -22,7 +22,7 @@ function makeIdea(overrides: Partial<Idea> = {}): Idea {
     title: "Speedrun any% commentary",
     notes: null,
     format: "either",
-    status: "spark",
+    status: "idea",
     tags: [],
     projectId: null,
     stageEnteredAt: new Date(),
@@ -81,19 +81,19 @@ describe("IdeaCard", () => {
   });
 
   it("shows the idea's current status in the status control", () => {
-    render(<IdeaCard idea={makeIdea({ status: "outlined" })} />);
-    expect(screen.getByLabelText("Status")).toHaveValue("outlined");
+    render(<IdeaCard idea={makeIdea({ status: "scripted" })} />);
+    expect(screen.getByLabelText("Status")).toHaveValue("scripted");
   });
 
   it("changes status and calls updateIdeaStatus", async () => {
     updateIdeaStatus.mockResolvedValue({});
     const user = userEvent.setup();
-    render(<IdeaCard idea={makeIdea({ id: "idea-42", status: "spark" })} />);
+    render(<IdeaCard idea={makeIdea({ id: "idea-42", status: "idea" })} />);
 
-    await user.selectOptions(screen.getByLabelText("Status"), "outlined");
+    await user.selectOptions(screen.getByLabelText("Status"), "scripted");
 
     await waitFor(() =>
-      expect(updateIdeaStatus).toHaveBeenCalledWith("idea-42", "outlined")
+      expect(updateIdeaStatus).toHaveBeenCalledWith("idea-42", "scripted")
     );
   });
 
@@ -104,7 +104,7 @@ describe("IdeaCard", () => {
     const user = userEvent.setup();
     render(<IdeaCard idea={makeIdea()} />);
 
-    await user.selectOptions(screen.getByLabelText("Status"), "parked");
+    await user.selectOptions(screen.getByLabelText("Status"), "scripted");
 
     await waitFor(() =>
       expect(toastError).toHaveBeenCalledWith("That idea no longer exists.")

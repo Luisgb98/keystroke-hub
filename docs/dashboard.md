@@ -41,13 +41,13 @@ always deep-links to `/journal`; a secondary link goes to
 
 ## Content-in-flight snapshot
 
-`getIdeasInFlight()` queries every idea except `published` (shipped) and
-`parked` (dead), oldest-in-stage first. `buildContentSnapshot`
+`getIdeasInFlight()` queries every idea except `published` (shipped),
+oldest-in-stage first. `buildContentSnapshot`
 (`(Idea[]) → ContentSnapshot`) is a pure, self-contained filter + tally —
 it re-derives the in-flight set itself rather than trusting the caller to
 have pre-filtered, so it's safe to unit-test with a mixed idea list and
 stays correct even if a future caller forgets to filter. It returns a
-per-stage count for every in-flight pipeline stage (`spark` through
+per-stage count for every in-flight pipeline stage (`idea` through
 `edited`, reusing `IDEA_STATUSES`/`IDEA_STATUS_LABEL` from
 `lib/content/idea-status.ts` — the same source of truth #16's board uses)
 plus the single idea that has sat longest in its current stage, the same
@@ -81,7 +81,7 @@ block's empty state rather than throwing — CI's e2e job has no
 Unit (Vitest): `lib/dashboard/log-summary.test.ts` (not-started vs.
 started, planned/done counting, rolled-over exclusion, retro/mood-only
 days), `lib/dashboard/content-snapshot.test.ts` (per-stage tallies,
-published/parked exclusion, stuck-longest ordering, empty pipeline).
+published exclusion, stuck-longest ordering, empty pipeline).
 
 e2e (`e2e/dashboard.spec.ts`, real DB via `e2e/support/ideas-db.ts` and
 `e2e/support/events-db.ts` with `[e2e-dashboard]`-prefixed rows, serial

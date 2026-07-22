@@ -49,15 +49,16 @@ describe("PipelineBoard", () => {
     vi.clearAllMocks();
   });
 
-  it("renders one column per pipeline stage", () => {
-    render(<PipelineBoard ideas={[]} />);
-    expect(screen.getByText("Spark")).toBeInTheDocument();
-    expect(screen.getByText("Outlined")).toBeInTheDocument();
+  it("renders exactly one column per pipeline stage", () => {
+    const { container } = render(<PipelineBoard ideas={[]} />);
+    expect(screen.getByText("Idea")).toBeInTheDocument();
     expect(screen.getByText("Scripted")).toBeInTheDocument();
     expect(screen.getByText("Recorded")).toBeInTheDocument();
     expect(screen.getByText("Edited")).toBeInTheDocument();
     expect(screen.getByText("Published")).toBeInTheDocument();
-    expect(screen.getByText("Parked")).toBeInTheDocument();
+    expect(
+      container.querySelectorAll('[data-slot="stage-column"]')
+    ).toHaveLength(5);
   });
 
   it("groups ideas into their matching stage columns", () => {
@@ -69,12 +70,12 @@ describe("PipelineBoard", () => {
             title: "Scripted idea",
             status: "scripted",
           }),
-          makeIdea({ id: "idea-2", title: "Parked idea", status: "parked" }),
+          makeIdea({ id: "idea-2", title: "Fresh idea", status: "idea" }),
         ]}
       />
     );
     expect(screen.getByText("Scripted idea")).toBeInTheDocument();
-    expect(screen.getByText("Parked idea")).toBeInTheDocument();
+    expect(screen.getByText("Fresh idea")).toBeInTheDocument();
   });
 
   it("optimistically moves a card to the target column while the request is pending", async () => {

@@ -28,13 +28,11 @@ describe("groupIdeasByStatus", () => {
   it("gives every pipeline stage a bucket, even when empty", () => {
     const grouped = groupIdeasByStatus([]);
     expect(Object.keys(grouped)).toEqual([
-      "spark",
-      "outlined",
+      "idea",
       "scripted",
       "recorded",
       "edited",
       "published",
-      "parked",
     ]);
     for (const bucket of Object.values(grouped)) {
       expect(bucket).toEqual([]);
@@ -42,15 +40,15 @@ describe("groupIdeasByStatus", () => {
   });
 
   it("buckets each idea under its own status", () => {
-    const spark = makeIdea("1", "spark");
+    const idea = makeIdea("1", "idea");
     const scripted = makeIdea("2", "scripted");
-    const parked = makeIdea("3", "parked");
-    const grouped = groupIdeasByStatus([spark, scripted, parked]);
+    const published = makeIdea("3", "published");
+    const grouped = groupIdeasByStatus([idea, scripted, published]);
 
-    expect(grouped.spark).toEqual([spark]);
+    expect(grouped.idea).toEqual([idea]);
     expect(grouped.scripted).toEqual([scripted]);
-    expect(grouped.parked).toEqual([parked]);
-    expect(grouped.outlined).toEqual([]);
+    expect(grouped.published).toEqual([published]);
+    expect(grouped.recorded).toEqual([]);
   });
 
   it("sorts each bucket oldest-in-stage first, regardless of input order", () => {

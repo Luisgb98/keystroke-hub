@@ -158,7 +158,7 @@ describe("createIdea", () => {
 
 describe("updateIdeaStatus", () => {
   it("verifies the session before touching the database", async () => {
-    await updateIdeaStatus("idea-1", "outlined");
+    await updateIdeaStatus("idea-1", "scripted");
     expect(verifySession).toHaveBeenCalledTimes(1);
   });
 
@@ -166,14 +166,14 @@ describe("updateIdeaStatus", () => {
     vi.mocked(verifySession).mockRejectedValueOnce(
       new Error("NEXT_REDIRECT:/login")
     );
-    await expect(updateIdeaStatus("idea-1", "outlined")).rejects.toThrow(
+    await expect(updateIdeaStatus("idea-1", "scripted")).rejects.toThrow(
       "NEXT_REDIRECT:/login"
     );
     expect(dbMock.update).not.toHaveBeenCalled();
   });
 
   it("updates the status and revalidates both the list and the board", async () => {
-    const result = await updateIdeaStatus("idea-1", "outlined");
+    const result = await updateIdeaStatus("idea-1", "scripted");
     expect(result).toEqual({});
     expect(dbMock.update).toHaveBeenCalledTimes(1);
     expect(revalidatePath).toHaveBeenCalledWith("/content/ideas");
@@ -181,9 +181,9 @@ describe("updateIdeaStatus", () => {
   });
 
   it("sets stageEnteredAt via a conditional SQL expression, not a plain value", async () => {
-    await updateIdeaStatus("idea-1", "outlined");
+    await updateIdeaStatus("idea-1", "scripted");
     const [setArgs] = dbMock.updateSet.mock.calls[0];
-    expect(setArgs.status).toBe("outlined");
+    expect(setArgs.status).toBe("scripted");
     expect(setArgs.stageEnteredAt).toBeTruthy();
     expect(typeof setArgs.stageEnteredAt).toBe("object");
   });
@@ -196,7 +196,7 @@ describe("updateIdeaStatus", () => {
 
   it("returns an error (not a throw) when the idea no longer exists", async () => {
     dbMock.updateReturning.mockResolvedValueOnce([]);
-    const result = await updateIdeaStatus("missing", "outlined");
+    const result = await updateIdeaStatus("missing", "scripted");
     expect(result).toEqual({ error: "That idea no longer exists." });
     expect(revalidatePath).not.toHaveBeenCalled();
   });

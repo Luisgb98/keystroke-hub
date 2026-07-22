@@ -120,6 +120,13 @@
       "when": 1784369967639,
       "tag": "0016_bored_sue_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1784734055682,
+      "tag": "0017_open_viper",
+      "breakpoints": true
     }
   ]
 }

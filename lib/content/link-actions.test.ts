@@ -177,7 +177,7 @@ describe("searchLinkableIdeas", () => {
         id: "idea-1",
         title: "Glitch tutorial",
         format: "video",
-        status: "spark",
+        status: "idea",
       },
     ];
     searchLinkableIdeasQuery.mockResolvedValue(ideas);
