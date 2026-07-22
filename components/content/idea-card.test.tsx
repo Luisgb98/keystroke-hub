@@ -4,7 +4,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const updateIdeaStatus = vi.hoisted(() => vi.fn());
 const deleteIdea = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/content/actions", () => ({ updateIdeaStatus, deleteIdea }));
+const createIdea = vi.hoisted(() => vi.fn());
+const updateIdea = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/content/actions", () => ({
+  updateIdeaStatus,
+  deleteIdea,
+  createIdea,
+  updateIdea,
+}));
 
 const toastFn = vi.hoisted(() => vi.fn());
 const toastSuccess = vi.hoisted(() => vi.fn());
@@ -25,6 +32,8 @@ function makeIdea(overrides: Partial<Idea> = {}): Idea {
     status: "idea",
     tags: [],
     projectId: null,
+    releaseEventId: null,
+    releaseEventTrack: null,
     stageEnteredAt: new Date(),
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -182,5 +191,28 @@ describe("IdeaCard", () => {
     expect(
       screen.getByText(/Its script will be deleted too\./)
     ).toBeInTheDocument();
+  });
+
+  it("opens the editor prefilled when the pencil is clicked", async () => {
+    const user = userEvent.setup();
+    render(
+      <IdeaCard idea={makeIdea({ title: "Boss rush", format: "video" })} />
+    );
+
+    await user.click(screen.getByRole("button", { name: 'Edit "Boss rush"' }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("Edit idea")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Title")).toHaveValue("Boss rush");
+  });
+
+  it("shows a tags-incomplete counter until an idea carries the five-tag standard", () => {
+    const { rerender } = render(
+      <IdeaCard idea={makeIdea({ tags: ["speedrun", "glitch"] })} />
+    );
+    expect(screen.getByText("2/5")).toBeInTheDocument();
+
+    rerender(<IdeaCard idea={makeIdea({ tags: ["a", "b", "c", "d", "e"] })} />);
+    expect(screen.queryByText("5/5")).not.toBeInTheDocument();
   });
 });

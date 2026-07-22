@@ -32,7 +32,10 @@ There's no separate "create script" step. The script page always exists for
 any idea (an idea without one just shows an empty editor), and the first
 save is what inserts the row — `saveScript` (`lib/content/script-actions.ts`)
 is a single upsert keyed on `idea_id` (`insert ... onConflictDoUpdate`) for
-every save, first or subsequent.
+every save, first or subsequent. Since #71, the idea capture dialog
+(`IdeaEditor`) can also seed the script inline at creation time (a plain
+`insert` against the brand-new idea); the dedicated editor page below remains
+the surface for editing it afterwards.
 
 ## Route & data access
 

@@ -12,17 +12,19 @@ One table, `ideas` (`lib/db/schema.ts`), deliberately independent of
 `events` — an idea only ever _becomes_ content later; it doesn't share the
 calendar's `track` discriminator.
 
-| Column                      | Type                                               | Notes                                                       |
-| --------------------------- | -------------------------------------------------- | ----------------------------------------------------------- |
-| `id`                        | `uuid` PK, default random                          |                                                             |
-| `title`                     | `text` **not null**                                | the only required field                                     |
-| `notes`                     | `text` null                                        | free text                                                   |
-| `format`                    | enum `video \| stream \| either`, default `either` |                                                             |
-| `status`                    | enum, default `idea`                               | pipeline stage — see below                                  |
-| `tags`                      | `text[]` not null default `{}`                     | free-form, GIN-indexed for containment                      |
-| `project_id`                | `uuid` null                                        | forward-compat for #24 (Projects) — no UI yet               |
-| `stage_entered_at`          | `timestamptz` not null, default `now()`            | when `status` last changed — powers #16's board (see below) |
-| `created_at` / `updated_at` | `timestamptz` not null                             |                                                             |
+| Column                      | Type                                               | Notes                                                        |
+| --------------------------- | -------------------------------------------------- | ------------------------------------------------------------ |
+| `id`                        | `uuid` PK, default random                          |                                                              |
+| `title`                     | `text` **not null**                                | the only required field                                      |
+| `notes`                     | `text` null                                        | free text                                                    |
+| `format`                    | enum `video \| stream \| either`, default `either` |                                                              |
+| `status`                    | enum, default `idea`                               | pipeline stage — see below                                   |
+| `tags`                      | `text[]` not null default `{}`                     | free-form, GIN-indexed for containment                       |
+| `project_id`                | `uuid` null                                        | forward-compat for #24 (Projects) — no UI yet                |
+| `release_event_id`          | `uuid` null                                        | the idea's release on the calendar — see Release below (#71) |
+| `release_event_track`       | enum `track` null                                  | always `content` when set; composite FK + CHECK (#71)        |
+| `stage_entered_at`          | `timestamptz` not null, default `now()`            | when `status` last changed — powers #16's board (see below)  |
+| `created_at` / `updated_at` | `timestamptz` not null                             |                                                              |
 
 `format`/`status` are Postgres enums (`pgEnum`), matching the `track`/
 `connection_status` precedent in `docs/calendar.md` — adding a pipeline stage
@@ -30,7 +32,8 @@ later is a cheap `ALTER TYPE ... ADD VALUE` migration rather than a data
 rewrite. `edited` was added this way by #16. _Removing_ a value is the
 expensive direction — Postgres has no `DROP VALUE`, so #70 swapped the enum
 via a text round-trip (migration `0017`), remapping retired rows in the same
-step.
+step. #71 added the two `release_event_*` columns (migration `0018`); no
+backfill was needed since every existing idea is simply unscheduled.
 
 ## Pipeline vocabulary
 
@@ -49,15 +52,55 @@ statuses into `idea` (the closest surviving stage — mapping `outlined`
 forward to `scripted` would have falsely claimed a script exists), so no idea
 was lost from the grid or board.
 
-**Status is the only field editable after capture** — a plain `<select>` on
-`IdeaCard` and #16's board move menu both commit through the same
-`updateIdeaStatus` server function (no confirmation needed, since it's cheap
-to change back). There's no full edit-all-fields surface; editing
-title/notes/format/tags is deferred until a concrete need shows up.
+**Every field is editable after capture** (#71). The pencil on `IdeaCard`
+opens the shared `IdeaEditor` (`components/content/idea-editor.tsx`, also the
+capture surface) prefilled with the idea's title, notes, format, tags, and
+release date/time; `updateIdea` (`lib/content/actions.ts`) persists the whole
+form. The script keeps its own dedicated editor page (see docs/scripts.md), so
+the edit dialog links out to it rather than editing script inline.
 
-`updateIdeaStatus` also resets `stage_entered_at` to `now()`, but **only
+Status is still a separate, immediate commit: a plain `<select>` on `IdeaCard`
+and #16's board move menu both go through `updateIdeaStatus` (no confirmation,
+cheap to change back). It resets `stage_entered_at` to `now()`, but **only
 when the status actually changes** (re-selecting the current status, or a
 stale optimistic retry, must not reset the board's time-in-stage clock).
+`updateIdea` deliberately leaves `status`/`stage_entered_at` untouched.
+
+## Release date & the calendar (#71)
+
+An idea's release is a **content-track `events` row owned by the idea** —
+`release_event_id`/`release_event_track` point at it, with the same
+belt-and-braces composite-FK + content-only CHECK + `unique(release_event_id)`
+pattern as `streams` (`docs/content-streams.md`). The event is the **source of
+truth** for the release date/time, so this falls out for free:
+
+- The release shows on the content calendar the moment it's set — no calendar
+  code changed; it renders as any other content event (`Release: <title>`).
+- Dragging or deleting that event on the calendar keeps the idea in sync:
+  `ON DELETE SET NULL` unschedules the idea (nulls its pointer), and the
+  `idea_event_links` cascade removes the join row.
+- Google Calendar sync (#12) needs no new code — `createIdea`/`updateIdea`/
+  `deleteIdea` use the same `schedulePush(pushEvent*)` after-commit contract as
+  `lib/calendar/actions.ts`.
+
+The time defaults to **19:00** (`DEFAULT_RELEASE_TIME`, the channel's standard
+publish slot) when a date is set without one; the event is a nominal
+`RELEASE_EVENT_DURATION_MINUTES` (60 min) block. `updateIdea` derives the
+transition (none→set creates, set→changed rewrites, set→cleared deletes) by
+comparing the desired release against the idea's current `release_event_id`,
+re-read from the DB (not trusted from the client). Because Neon's HTTP driver
+has no transactions, the writes run sequentially, idea-first, so a later
+failure degrades to an unscheduled idea rather than a lost capture.
+
+## Tags & the five-tag publishing standard (#71)
+
+Five tags is the publishing standard (`PUBLISHING_TAG_STANDARD`,
+`lib/content/idea-schema.ts`). The `IdeaEditor` form shows a live `n/5` counter
+and copy that reads the idea as incomplete until it has exactly five; `IdeaCard`
+shows the same `n/5` hint whenever a saved idea's tag count isn't five. Capture
+and edit **may save with fewer** (quick capture stays quick), but the schema
+**rejects more than five** so the form drives toward the standard rather than
+sprawling.
 
 ## Tags
 
@@ -80,14 +123,16 @@ comma-separated text field, normalized by `normalizeTags`
   database connection (via `drizzle-orm/pg-core`'s `PgDialect.sqlToQuery`).
   Search is `ILIKE` on title; tag filtering is array containment (`@>`).
 - **Mutations**: `lib/content/actions.ts` — `createIdea` (form action via
-  `useActionState`, same shape as `lib/calendar/actions.ts`'s
-  `createEvent`), `updateIdeaStatus` (narrow, direct-args mutation — mirrors
-  `rescheduleEvent`'s precedent; shared by the list's inline `<select>` and
-  #16's board move menu), `deleteIdea` (hard delete, no soft-archive,
-  matching #11's event-delete precedent). Every action calls
-  `verifySession()` first; `updateIdeaStatus`/`deleteIdea` revalidate both
-  `/content/ideas` and `/content/board`, `createIdea` only the list (new
-  ideas always start at `idea`, which the board also renders).
+  `useActionState`, same shape as `lib/calendar/actions.ts`'s `createEvent`;
+  optionally saves a script and creates the release event), `updateIdea` (the
+  full edit-all-fields form action — #71), `updateIdeaStatus` (narrow,
+  direct-args mutation — mirrors `rescheduleEvent`'s precedent; shared by the
+  list's inline `<select>` and #16's board move menu), `deleteIdea` (hard
+  delete, no soft-archive, matching #11's event-delete precedent; also deletes
+  the idea's release event). Every action calls `verifySession()` first;
+  `createIdea`/`updateIdea`/`updateIdeaStatus`/`deleteIdea` revalidate
+  `/content/ideas` and `/content/board`, plus `/calendar` whenever the release
+  event changed.
 - **Validation**: `lib/content/idea-schema.ts` — one zod schema
   (`ideaCaptureSchema`) shared by the capture form and `createIdea`; title
   required/trimmed/max-length, everything else optional with defaults
@@ -97,16 +142,24 @@ comma-separated text field, normalized by `normalizeTags`
 
 Mobile-first, one-handed capture is the design center:
 
-- **Capture**: `IdeaCapture` (`components/content/idea-capture.tsx`) is a
-  self-contained floating "New idea" button (bottom-right thumb zone, above
-  the bottom nav) + `Dialog` form — no lifted dialog controller, same
-  self-contained pattern as `EventChip`/`EventBlock` in `docs/calendar.md`.
-  Title is auto-focused; format defaults to "Either" via a three-way
-  segmented control (mirrors `TrackPicker`'s visual language, but — unlike
-  track — always has a default selection since format is optional).
+- **Capture & edit**: `IdeaEditor` (`components/content/idea-editor.tsx`) is
+  the shared create/edit form (a `mode` prop, mirroring `EventEditor` — see
+  docs/calendar.md), rendered in a `Dialog` for both viewports. `IdeaCapture`
+  (`components/content/idea-capture.tsx`) is the thin floating "New idea"
+  button (bottom-right thumb zone, above the bottom nav) that opens it in
+  create mode; `IdeaCard`'s pencil opens it in edit mode. Title is
+  auto-focused; format defaults to "Either" via a three-way segmented control
+  (mirrors `TrackPicker`'s visual language, but — unlike track — always has a
+  default selection since format is optional). Create mode has an inline
+  Markdown script field; edit mode links out to the script page instead. The
+  release date/time use native `<input type="date">`/`type="time"` — now
+  theme-aware everywhere via the `color-scheme` token on `:root`/`.dark`
+  (`app/globals.css`), which is what keeps their picker popups (and the status
+  `<select>`'s option list) from rendering browser-default white in dark mode.
 - **List**: `IdeaCard` shows title, format icon + label, tag chips (mono
-  font per the keystroke identity), relative created time, and the inline
-  status `<select>`. Cards render in a responsive grid.
+  font per the keystroke identity) with an `n/5` incomplete hint, relative
+  created time, the inline status `<select>`, and edit/script/delete actions.
+  Cards render in a responsive grid.
 - **Filters**: `IdeaFilters` — debounced search plus horizontally-scrollable
   chip rows for format/status/tag. Holds a local optimistic copy of every
   filter (not just search text) so rapid successive chip clicks compose

@@ -205,6 +205,17 @@ export const ideas = pgTable(
     projectId: uuid("project_id").references(() => projects.id, {
       onDelete: "set null",
     }),
+    // The idea's release on the calendar (#71). Rather than a bare `release_at`
+    // column the calendar would have to learn to render, the release *is* a
+    // content-track `events` row owned by the idea — same pattern `streams`
+    // uses for its "when" (see docs/content-ideas.md). The event stays the
+    // source of truth for the date/time, so dragging or deleting it on the
+    // calendar keeps the idea in sync for free, and Google sync (#12) needs no
+    // new code. `onDelete: "set null"` on the composite FK below unschedules
+    // the idea when the event is deleted rather than destroying the idea; both
+    // columns are null for an unscheduled idea (the common case at capture).
+    releaseEventId: uuid("release_event_id"),
+    releaseEventTrack: trackEnum("release_event_track"),
     // When the idea last entered its current `status` — powers the board's
     // (#16) time-in-stage chip and oldest-first column sort. Set by
     // `updateIdeaStatus` only when the status actually changes (re-selecting
@@ -228,6 +239,21 @@ export const ideas = pgTable(
     index("ideas_tags_idx").using("gin", table.tags),
     index("ideas_stage_entered_at_idx").on(table.stageEnteredAt),
     index("ideas_project_id_idx").on(table.projectId),
+    // Same belt-and-braces composite-FK + content-only CHECK pattern as
+    // `streams` (see below): the release event can only ever be a content-track
+    // event, enforced at the DB level, and `unique(release_event_id)` keeps
+    // "one idea per release event" true. `onDelete: "set null"` unschedules the
+    // idea (nulling both columns) when the event is deleted.
+    unique("ideas_release_event_id_unique").on(table.releaseEventId),
+    foreignKey({
+      columns: [table.releaseEventId, table.releaseEventTrack],
+      foreignColumns: [events.id, events.track],
+      name: "ideas_release_event_id_event_track_fk",
+    }).onDelete("set null"),
+    check(
+      "ideas_release_event_track_content",
+      sql`${table.releaseEventTrack} is null or ${table.releaseEventTrack} = 'content'`
+    ),
   ]
 );
 

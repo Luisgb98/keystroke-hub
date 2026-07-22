@@ -93,6 +93,10 @@
 }
 
 :root {
+  /* Tells the browser to render native controls (date/time picker popovers,
+     scrollbars) in the matching scheme — without this, `<input type="date">`
+     pickers stay light even in dark mode (see docs/content-ideas.md, #71). */
+  color-scheme: light;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -148,6 +152,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);

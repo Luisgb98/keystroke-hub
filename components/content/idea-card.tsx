@@ -3,11 +3,12 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { Briefcase, ScrollText, Trash2 } from "lucide-react";
+import { Briefcase, Pencil, ScrollText, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { updateIdeaStatus } from "@/lib/content/actions";
 import { IDEA_FORMAT_LABEL } from "@/lib/content/idea-format";
+import { PUBLISHING_TAG_STANDARD } from "@/lib/content/idea-schema";
 import { IDEA_STATUSES, IDEA_STATUS_LABEL } from "@/lib/content/idea-status";
 import type { Idea } from "@/lib/db/schema";
 import type { ScheduledEventSummary } from "@/lib/data/idea-event-links";
@@ -17,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 import { DeleteIdeaDialog } from "./delete-idea-dialog";
+import { IdeaEditor } from "./idea-editor";
 import { IDEA_FORMAT_ICON } from "./idea-format-styles";
 import { IdeaScheduledEvents } from "./idea-scheduled-events";
 
@@ -31,9 +33,12 @@ interface IdeaCardProps {
 }
 
 /**
- * Status is the only field editable after capture (see docs/content-ideas.md
- * open question 2) — a plain `<select>` change commits immediately, no
- * confirmation needed since it's cheap to change back.
+ * Every field is editable after capture via the pencil (issue #71) — it opens
+ * the shared `IdeaEditor`. Status still commits inline through the same native
+ * `<select>` as `ImprovementStatusSelect`/`ProjectStatusSelect` (no
+ * confirmation; cheap to change back), whose option popup is now theme-aware
+ * via the `color-scheme` token (#71), sharing `updateIdeaStatus` with the
+ * board's move menu (see docs/content-ideas.md).
  */
 export function IdeaCard({
   idea,
@@ -42,8 +47,15 @@ export function IdeaCard({
   project,
 }: IdeaCardProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const Icon = IDEA_FORMAT_ICON[idea.format];
+
+  // The release is one of the linked events — the one the idea points at.
+  const releaseEvent = idea.releaseEventId
+    ? scheduledEvents.find((event) => event.id === idea.releaseEventId)
+    : undefined;
+  const tagsIncomplete = idea.tags.length !== PUBLISHING_TAG_STANDARD;
 
   function handleStatusChange(status: string) {
     startTransition(async () => {
@@ -72,6 +84,15 @@ export function IdeaCard({
             <span>{IDEA_FORMAT_LABEL[idea.format]}</span>
           </div>
           <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={`Edit "${idea.title}"`}
+              onClick={() => setEditOpen(true)}
+            >
+              <Pencil aria-hidden className="size-4" />
+            </Button>
             <Button
               type="button"
               variant="ghost"
@@ -106,14 +127,23 @@ export function IdeaCard({
           ) : null}
 
           {idea.tags.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               {idea.tags.map((tag) => (
                 <Badge key={tag} variant="secondary" className="font-mono">
                   {tag}
                 </Badge>
               ))}
+              {tagsIncomplete ? (
+                <span className="font-mono text-caption text-muted-foreground">
+                  {idea.tags.length}/{PUBLISHING_TAG_STANDARD}
+                </span>
+              ) : null}
             </div>
-          ) : null}
+          ) : (
+            <span className="font-mono text-caption text-muted-foreground">
+              No tags yet — the standard is {PUBLISHING_TAG_STANDARD}.
+            </span>
+          )}
 
           {project ? (
             <Link
@@ -153,6 +183,14 @@ export function IdeaCard({
           </div>
         </CardContent>
       </Card>
+
+      <IdeaEditor
+        mode="edit"
+        idea={idea}
+        releaseStartsAt={releaseEvent?.startsAt ?? null}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+      />
 
       <DeleteIdeaDialog
         idea={idea}

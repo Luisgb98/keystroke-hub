@@ -15,6 +15,8 @@ function makeIdea(overrides: Partial<Idea> = {}): Idea {
     status: "scripted",
     tags: [],
     projectId: null,
+    releaseEventId: null,
+    releaseEventTrack: null,
     stageEnteredAt: new Date(),
     createdAt: new Date(),
     updatedAt: new Date(),
