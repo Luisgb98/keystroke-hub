@@ -38,8 +38,8 @@ test.describe("idea capture", () => {
     await expect(dialog).not.toBeVisible({ timeout: 10000 });
     const card = page.locator(IDEA_CARD_SELECTOR, { hasText: title });
     await expect(card).toBeVisible();
-    await expect(card.getByLabel("Status", { exact: true })).toHaveValue(
-      "idea"
+    await expect(card.getByRole("combobox", { name: "Status" })).toContainText(
+      "Idea"
     );
   });
 
@@ -75,17 +75,20 @@ test.describe("idea capture", () => {
     await page.goto("/content/ideas");
 
     const card = page.locator(IDEA_CARD_SELECTOR, { hasText: title });
-    await card.getByLabel("Status", { exact: true }).selectOption("scripted");
-    await expect(card.getByLabel("Status", { exact: true })).toHaveValue(
-      "scripted"
+    // The status control is the themed shadcn `Select` (#72) — a combobox with
+    // a portalled option list, not a native `<select>`.
+    await card.getByRole("combobox", { name: "Status" }).click();
+    await page.getByRole("option", { name: "Scripted" }).click();
+    await expect(card.getByRole("combobox", { name: "Status" })).toContainText(
+      "Scripted"
     );
 
     await page.reload();
     await expect(
       page
         .locator(IDEA_CARD_SELECTOR, { hasText: title })
-        .getByLabel("Status", { exact: true })
-    ).toHaveValue("scripted");
+        .getByRole("combobox", { name: "Status" })
+    ).toContainText("Scripted");
   });
 
   test("delete requires confirmation; cancel keeps the idea", async ({
@@ -361,6 +364,104 @@ test.describe("idea release scheduling and editing", () => {
   });
 });
 
+test.describe("idea publish copy blocks", () => {
+  // Clipboard access is origin-scoped and off by default under automation.
+  test.use({ permissions: ["clipboard-read", "clipboard-write"] });
+  test.skip(skip, skipReason);
+  test.describe.configure({ mode: "serial" });
+
+  const PREFIX = "[e2e-idea-copy]";
+  const title = `${PREFIX} Publish ready`;
+  const notes = "First paragraph.\n\nSecond paragraph.";
+  const tags = ["speedrun", "glitch", "tutorial", "retro", "movement"];
+  const tagsText = tags.join(", ");
+
+  test.beforeAll(async () => {
+    await seedTestIdea({ title, notes, tags });
+  });
+
+  test.afterAll(async () => {
+    await clearTestIdeas(PREFIX);
+  });
+
+  async function readClipboard(page: import("@playwright/test").Page) {
+    return page.evaluate(() => navigator.clipboard.readText());
+  }
+
+  test("each copy button hands over its exact publish block, line breaks intact", async ({
+    page,
+  }) => {
+    await page.goto(`/content/ideas?q=${encodeURIComponent(PREFIX)}`);
+    const card = page.locator(IDEA_CARD_SELECTOR, { hasText: title });
+    await expect(card).toBeVisible();
+
+    // `exact` matters: "Copy Title" is a substring of "Copy Title + tags",
+    // and "Copy Tags" of nothing — Playwright's name match is substring by
+    // default, so pin each to its full accessible name.
+    await card.getByRole("button", { name: "Copy Title", exact: true }).click();
+    expect(await readClipboard(page)).toBe(title);
+
+    await card
+      .getByRole("button", { name: "Copy Title + tags", exact: true })
+      .click();
+    expect(await readClipboard(page)).toBe(`${title}\n\n${tagsText}`);
+
+    await card
+      .getByRole("button", { name: "Copy Description + tags", exact: true })
+      .click();
+    expect(await readClipboard(page)).toBe(`${notes}\n\n${tagsText}`);
+
+    await card.getByRole("button", { name: "Copy Tags", exact: true }).click();
+    expect(await readClipboard(page)).toBe(tagsText);
+  });
+});
+
+test.describe("uniform idea card dimensions", () => {
+  test.skip(skip, skipReason);
+  test.describe.configure({ mode: "serial" });
+
+  const PREFIX = "[e2e-idea-uniform]";
+  const shortTitle = `${PREFIX} Short one`;
+  const longTitle = `${PREFIX} Long one`;
+
+  test.beforeAll(async () => {
+    await seedTestIdea({ title: shortTitle, notes: "Tiny." });
+    await seedTestIdea({
+      title: longTitle,
+      notes: Array.from(
+        { length: 12 },
+        (_, i) =>
+          `Paragraph ${i + 1} with plenty of detail that would otherwise stretch this card well past its neighbour.`
+      ).join("\n\n"),
+      tags: ["a", "b", "c", "d", "e"],
+    });
+  });
+
+  test.afterAll(async () => {
+    await clearTestIdeas(PREFIX);
+  });
+
+  test("a long description does not make its card taller than a short one", async ({
+    page,
+  }) => {
+    // Filter to just this suite's two ideas so they share the same grid row —
+    // `auto-rows-fr` then equalizes their height, and equal height proves the
+    // description length never stretches the card.
+    await page.goto(`/content/ideas?q=${encodeURIComponent(PREFIX)}`);
+    const shortCard = page.locator(IDEA_CARD_SELECTOR, { hasText: shortTitle });
+    const longCard = page.locator(IDEA_CARD_SELECTOR, { hasText: longTitle });
+    await expect(shortCard).toBeVisible();
+    await expect(longCard).toBeVisible();
+
+    const shortBox = await shortCard.boundingBox();
+    const longBox = await longCard.boundingBox();
+    if (!shortBox || !longBox) throw new Error("cards were not laid out");
+
+    expect(Math.abs(shortBox.height - longBox.height)).toBeLessThan(1);
+    expect(Math.abs(shortBox.width - longBox.width)).toBeLessThan(1);
+  });
+});
+
 test.describe("idea capture mobile viewport", () => {
   test.use({ viewport: { width: 375, height: 812 } });
   test.skip(skip, skipReason);
@@ -388,5 +489,26 @@ test.describe("idea capture mobile viewport", () => {
     await expect(
       page.locator(IDEA_CARD_SELECTOR, { hasText: title })
     ).toBeVisible();
+  });
+
+  test("copy buttons are comfortable tap targets", async ({ page }) => {
+    const title = `${PREFIX} Copy targets`;
+    await seedTestIdea({
+      title,
+      notes: "Body",
+      tags: ["a", "b", "c", "d", "e"],
+    });
+    await page.goto(`/content/ideas?q=${encodeURIComponent(PREFIX)}`);
+
+    const card = page.locator(IDEA_CARD_SELECTOR, { hasText: title });
+    const copyButton = card.getByRole("button", {
+      name: "Copy Title",
+      exact: true,
+    });
+    await expect(copyButton).toBeVisible();
+
+    const box = await copyButton.boundingBox();
+    if (!box) throw new Error("copy button was not laid out");
+    expect(box.height).toBeGreaterThanOrEqual(36);
   });
 });

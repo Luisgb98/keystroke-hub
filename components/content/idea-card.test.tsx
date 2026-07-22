@@ -89,9 +89,44 @@ describe("IdeaCard", () => {
     expect(screen.queryByText("Cover the wrong warp")).not.toBeInTheDocument();
   });
 
+  // The themed shadcn `Select` (#72) is a button-based combobox with a
+  // portalled option list, not a native `<select>` — open the trigger, then
+  // click the option.
+  async function changeStatus(
+    user: ReturnType<typeof userEvent.setup>,
+    optionName: string
+  ) {
+    await user.click(screen.getByRole("combobox", { name: "Status" }));
+    await user.click(await screen.findByRole("option", { name: optionName }));
+  }
+
+  it("exposes the four publish copy blocks", () => {
+    render(<IdeaCard idea={makeIdea({ tags: ["a", "b", "c", "d", "e"] })} />);
+    for (const name of [
+      "Copy Title",
+      "Copy Title + tags",
+      "Copy Description + tags",
+      "Copy Tags",
+    ]) {
+      expect(screen.getByRole("button", { name })).toBeInTheDocument();
+    }
+  });
+
+  it("keeps Edit and Delete actions visible", () => {
+    render(<IdeaCard idea={makeIdea({ title: "Boss rush" })} />);
+    expect(
+      screen.getByRole("button", { name: 'Edit "Boss rush"' })
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: 'Delete "Boss rush"' })
+    ).toBeVisible();
+  });
+
   it("shows the idea's current status in the status control", () => {
     render(<IdeaCard idea={makeIdea({ status: "scripted" })} />);
-    expect(screen.getByLabelText("Status")).toHaveValue("scripted");
+    expect(screen.getByRole("combobox", { name: "Status" })).toHaveTextContent(
+      "Scripted"
+    );
   });
 
   it("changes status and calls updateIdeaStatus", async () => {
@@ -99,7 +134,7 @@ describe("IdeaCard", () => {
     const user = userEvent.setup();
     render(<IdeaCard idea={makeIdea({ id: "idea-42", status: "idea" })} />);
 
-    await user.selectOptions(screen.getByLabelText("Status"), "scripted");
+    await changeStatus(user, "Scripted");
 
     await waitFor(() =>
       expect(updateIdeaStatus).toHaveBeenCalledWith("idea-42", "scripted")
@@ -113,7 +148,7 @@ describe("IdeaCard", () => {
     const user = userEvent.setup();
     render(<IdeaCard idea={makeIdea()} />);
 
-    await user.selectOptions(screen.getByLabelText("Status"), "scripted");
+    await changeStatus(user, "Scripted");
 
     await waitFor(() =>
       expect(toastError).toHaveBeenCalledWith("That idea no longer exists.")
@@ -125,7 +160,7 @@ describe("IdeaCard", () => {
     const user = userEvent.setup();
     render(<IdeaCard idea={makeIdea({ status: "edited" })} />);
 
-    await user.selectOptions(screen.getByLabelText("Status"), "published");
+    await changeStatus(user, "Published");
 
     await waitFor(() =>
       expect(toastFn).toHaveBeenCalledWith(
@@ -139,7 +174,7 @@ describe("IdeaCard", () => {
     const user = userEvent.setup();
     render(<IdeaCard idea={makeIdea({ status: "edited" })} />);
 
-    await user.selectOptions(screen.getByLabelText("Status"), "published");
+    await changeStatus(user, "Published");
 
     await waitFor(() =>
       expect(updateIdeaStatus).toHaveBeenCalledWith(
