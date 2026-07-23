@@ -91,10 +91,11 @@ the "stream" idea format):
 - **List** (`/content/streams`): "Upcoming" first (soonest on top), then
   "Unscheduled", then "Past" (most recent first). `StreamCard` shows title, a
   date chip (or "Unscheduled"), a checklist progress badge (`3/5`), and a
-  notes indicator once a retro exists. `StreamCreate` is a self-contained
-  floating "New stream" button + dialog, same pattern as `IdeaCapture`.
-  `TemplateEditor` (a dialog reachable from the list header) edits the
-  default checklist.
+  notes indicator once a retro exists. `StreamCreate` owns the capture dialog
+  but registers a "New stream" action with the shared capture dock rather than
+  rendering its own floating button (same pattern as `IdeaCapture`, see
+  docs/inbox.md). `TemplateEditor` (a dialog reachable from the list header)
+  edits the default checklist.
 - **Detail** (`/content/streams/[id]`): `StreamDetailsForm` (title/notes),
   `StreamEventSection` (shows the linked event or an "Attach an event"
   action backed by `EventAttachPicker` — the inverse of `IdeaLinkPicker`),

@@ -2,3 +2,10 @@ allowBuilds:
   esbuild: true
   sharp: true
   unrs-resolver: true
+
+# Mirror Vercel's supply-chain policy so local resolution can't introduce a
+# freshly-published package that the deploy would then reject with
+# ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION. Value is in minutes (1 day). Because
+# the deploy builds later than any local install, a version old enough for us
+# is always old enough for Vercel.
+minimumReleaseAge: 1440

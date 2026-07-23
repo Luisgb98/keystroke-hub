@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { Inbox, Plus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { useDockAction } from "@/components/shell/dock-action-provider";
 
 import { useInboxCapture } from "./inbox-capture-provider";
 
@@ -14,36 +14,24 @@ interface CaptureDockProps {
 }
 
 /**
- * Routes that render their own bottom-right FAB (idea/stream creation). On
- * those, the global capture dock lifts a row higher so the two never overlap —
- * everywhere else it sits in the natural thumb zone just above the bottom nav.
- */
-const ROUTES_WITH_OWN_FAB = ["/content/ideas", "/content/streams"];
-
-/**
- * The app's signature affordance: a floating capture button in the bottom-right
- * thumb zone on every screen, with the inbox (and its untriaged count) sitting
- * just above it. Capture is two taps from anywhere — tap the button, type,
- * save. The container is pointer-events-transparent (only the two controls
- * catch clicks) so it never blocks content beneath it (see docs/inbox.md).
+ * The app's signature affordance: a floating dock in the bottom-right thumb
+ * zone on every screen, with the inbox (and its untriaged count) sitting just
+ * above a single primary action button. That primary button is the global
+ * quick-capture "+" by default; on screens that register their own action
+ * (ideas, streams) it becomes that page's action instead — the two are swapped,
+ * never stacked, so there's always exactly one obvious floating action and the
+ * corner never clutters (Issue #74). The container is pointer-events-transparent
+ * (only the controls catch clicks) so it never blocks content beneath it (see
+ * docs/inbox.md).
  */
 export function CaptureDock({ untriagedCount }: CaptureDockProps) {
   const { openCapture } = useInboxCapture();
-  const pathname = usePathname();
+  const pageAction = useDockAction();
   const hasEntries = untriagedCount > 0;
-  const lifted = ROUTES_WITH_OWN_FAB.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`)
-  );
+  const ActionIcon = pageAction?.icon;
 
   return (
-    <div
-      className={cn(
-        "pointer-events-none fixed right-4 z-30 flex flex-col items-end gap-2 md:right-6",
-        lifted
-          ? "bottom-[calc(4.5rem+env(safe-area-inset-bottom)+3.75rem)] md:bottom-20"
-          : "bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-6"
-      )}
-    >
+    <div className="pointer-events-none fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 flex flex-col items-end gap-2 md:right-6 md:bottom-6">
       <Link
         href="/inbox"
         aria-label={`Inbox${hasEntries ? `, ${untriagedCount} to triage` : ", empty"}`}
@@ -64,15 +52,26 @@ export function CaptureDock({ untriagedCount }: CaptureDockProps) {
         ) : null}
       </Link>
 
-      <Button
-        type="button"
-        size="icon-lg"
-        aria-label="Capture a thought"
-        className="pointer-events-auto size-12 rounded-full shadow-lg [&_svg]:size-6"
-        onClick={openCapture}
-      >
-        <Plus aria-hidden />
-      </Button>
+      {pageAction && ActionIcon ? (
+        <Button
+          type="button"
+          className="pointer-events-auto shadow-lg"
+          onClick={pageAction.onSelect}
+        >
+          <ActionIcon aria-hidden />
+          {pageAction.label}
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          size="icon-lg"
+          aria-label="Capture a thought"
+          className="pointer-events-auto size-12 rounded-full shadow-lg [&_svg]:size-6"
+          onClick={openCapture}
+        >
+          <Plus aria-hidden />
+        </Button>
+      )}
     </div>
   );
 }

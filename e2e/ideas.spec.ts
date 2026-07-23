@@ -491,6 +491,31 @@ test.describe("idea capture mobile viewport", () => {
     ).toBeVisible();
   });
 
+  test("shows a single primary floating action with no overlapping controls", async ({
+    page,
+  }) => {
+    await page.goto("/content/ideas");
+
+    // The page action replaces the global capture "+" by design (Issue #74) —
+    // they are swapped, never stacked. So on a content screen there is exactly
+    // one primary FAB ("New idea") and no separate "Capture a thought" button.
+    const newIdea = page.getByRole("button", { name: "New idea" });
+    await expect(newIdea).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Capture a thought" })
+    ).toHaveCount(0);
+
+    // The Inbox pill sits above the primary action without touching it.
+    const inbox = page.getByRole("link", { name: /Inbox/ });
+    await expect(inbox).toBeVisible();
+    const inboxBox = await inbox.boundingBox();
+    const actionBox = await newIdea.boundingBox();
+    expect(inboxBox).not.toBeNull();
+    expect(actionBox).not.toBeNull();
+    // Inbox is fully above the action — bottom edge does not reach its top.
+    expect(inboxBox!.y + inboxBox!.height).toBeLessThanOrEqual(actionBox!.y);
+  });
+
   test("copy buttons are comfortable tap targets", async ({ page }) => {
     const title = `${PREFIX} Copy targets`;
     await seedTestIdea({

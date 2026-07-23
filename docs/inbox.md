@@ -92,11 +92,22 @@ happens in the prefilled triage form, keeping the inbox dumb.
   via `requestOpenCapture()` — a decoupled trigger with no shared context.
 - **`capture-dialog.tsx`** — just an autofocused textarea + Save. ⌘/Ctrl+Enter
   submits; a `sonner` toast confirms; the field clears and the dialog closes.
-- **`capture-dock.tsx`** — the floating capture button in the bottom-right
-  thumb zone (above the mobile bottom nav), with an inbox link + count badge
-  sitting just above it. Present on every screen, so both capture and the
-  live count are always one glance/tap away — including on mobile, where the
-  sidebar isn't visible.
+- **`capture-dock.tsx`** — the floating dock in the bottom-right thumb zone
+  (above the mobile bottom nav): an inbox link + count badge sitting just above
+  a single primary action button. Present on every screen, so both capture and
+  the live count are always one glance/tap away — including on mobile, where the
+  sidebar isn't visible. The primary button is the global quick-capture "+" by
+  default; on screens that register their own action it becomes that page's
+  action instead (see the next bullet).
+- **`components/shell/dock-action-provider.tsx`** — the mechanism behind that
+  swap. A page mounts a client component that calls `useRegisterDockAction`;
+  the dock reads the active action via `useDockAction` and renders it in place
+  of the capture "+". This is how `IdeaCapture` ("New idea") and `StreamCreate`
+  ("New stream") supply their primary action without rendering a second
+  floating button (Issue #74) — the two are **swapped, never stacked**, so
+  there's always exactly one primary FAB and the corner never clutters. On
+  those two screens quick-capture stays reachable by design (not by stacking):
+  the Inbox pill → `/inbox`, and "Capture a thought" in the command palette.
 - **`entry-card.tsx`** — body + relative timestamp, a Triage menu (four
   destinations) and a discard action (with an `alert-dialog` confirm).
 - **`triage-dialog.tsx`** — the destination-specific step, prefilled; a focused
