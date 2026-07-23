@@ -145,9 +145,11 @@ Mobile-first, one-handed capture is the design center:
 - **Capture & edit**: `IdeaEditor` (`components/content/idea-editor.tsx`) is
   the shared create/edit form (a `mode` prop, mirroring `EventEditor` — see
   docs/calendar.md), rendered in a `Dialog` for both viewports. `IdeaCapture`
-  (`components/content/idea-capture.tsx`) is the thin floating "New idea"
-  button (bottom-right thumb zone, above the bottom nav) that opens it in
-  create mode; `IdeaCard`'s pencil opens it in edit mode. Title is
+  (`components/content/idea-capture.tsx`) owns the create-mode dialog but no
+  longer renders its own floating button — it registers a "New idea" action
+  with the shared capture dock (`useRegisterDockAction`, see docs/inbox.md),
+  which renders the single bottom-right FAB in the thumb zone; `IdeaCard`'s
+  pencil opens the editor in edit mode. Title is
   auto-focused; format defaults to "Either" via a three-way segmented control
   (mirrors `TrackPicker`'s visual language, but — unlike track — always has a
   default selection since format is optional). Create mode has an inline
