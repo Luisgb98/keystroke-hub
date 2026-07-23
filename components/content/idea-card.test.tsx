@@ -46,6 +46,12 @@ describe("IdeaCard", () => {
     vi.clearAllMocks();
   });
 
+  it("links the title to the idea's detail page", () => {
+    render(<IdeaCard idea={makeIdea({ id: "idea-9", title: "Boss rush" })} />);
+    const link = screen.getByRole("link", { name: "Boss rush" });
+    expect(link).toHaveAttribute("href", "/content/ideas/idea-9");
+  });
+
   it("links the script action to the idea's script page", () => {
     render(<IdeaCard idea={makeIdea({ id: "idea-9", title: "Boss rush" })} />);
     const link = screen.getByRole("link", {
