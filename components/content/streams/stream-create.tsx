@@ -5,6 +5,7 @@ import { Plus, Radio } from "lucide-react";
 import { toast } from "sonner";
 
 import { createStream } from "@/lib/content/stream-actions";
+import { useRegisterDockAction } from "@/components/shell/dock-action-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,14 +30,17 @@ const EMPTY_VALUES = {
 };
 
 /**
- * Self-contained floating "New stream" button + capture dialog — same
- * pattern as `IdeaCapture`. Title is the only required field; planning a
- * date is opt-in and, when on, creates a content-track event with a fixed 2h
- * duration rather than a second end-time picker (see docs/content-streams.md).
+ * The "New stream" primary action — same pattern as `IdeaCapture`: it owns the
+ * capture dialog but registers its action with the shared capture dock rather
+ * than rendering its own floating button (see docs/inbox.md and Issue #74).
+ * Title is the only required field; planning a date is opt-in and, when on,
+ * creates a content-track event with a fixed 2h duration rather than a second
+ * end-time picker (see docs/content-streams.md).
  */
 export function StreamCreate() {
   const titleId = useId();
   const [open, setOpen] = useState(false);
+  useRegisterDockAction("New stream", Plus, () => setOpen(true));
   const [values, setValues] = useState(EMPTY_VALUES);
   const [state, formAction, pending] = useActionState(createStream, undefined);
   const [capturedTitle, setCapturedTitle] = useState("");
@@ -74,14 +78,6 @@ export function StreamCreate() {
 
   return (
     <>
-      <Button
-        className="fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom)+0.75rem)] z-30 shadow-lg md:right-6 md:bottom-6"
-        onClick={() => setOpen(true)}
-      >
-        <Plus aria-hidden />
-        New stream
-      </Button>
-
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-md">
           <form action={formAction} className="flex flex-col gap-4" noValidate>

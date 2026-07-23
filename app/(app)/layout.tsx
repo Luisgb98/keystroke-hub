@@ -4,6 +4,7 @@ import { CommandPaletteProvider } from "@/components/command-palette/command-pal
 import { CaptureDock } from "@/components/inbox/capture-dock";
 import { InboxCaptureProvider } from "@/components/inbox/inbox-capture-provider";
 import { BottomNav } from "@/components/shell/bottom-nav";
+import { DockActionProvider } from "@/components/shell/dock-action-provider";
 import { Sidebar } from "@/components/shell/sidebar";
 import { verifySession } from "@/lib/auth/session";
 import { getUntriagedCount } from "@/lib/inbox/queries";
@@ -35,14 +36,16 @@ export default async function AppShellLayout({
   return (
     <InboxCaptureProvider>
       <CommandPaletteProvider>
-        <div className="flex min-h-full flex-1">
-          <Sidebar untriagedCount={untriagedCount} />
-          <main className="flex min-h-full min-w-0 flex-1 flex-col pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
-            {children}
-          </main>
-          <BottomNav />
-        </div>
-        <CaptureDock untriagedCount={untriagedCount} />
+        <DockActionProvider>
+          <div className="flex min-h-full flex-1">
+            <Sidebar untriagedCount={untriagedCount} />
+            <main className="flex min-h-full min-w-0 flex-1 flex-col pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
+              {children}
+            </main>
+            <BottomNav />
+          </div>
+          <CaptureDock untriagedCount={untriagedCount} />
+        </DockActionProvider>
       </CommandPaletteProvider>
     </InboxCaptureProvider>
   );
