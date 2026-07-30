@@ -31,7 +31,7 @@ export function MonthView({ days, anchorMonth, events, now }: MonthViewProps) {
   const { events: liveEvents, reschedule } = useEventReschedule(events);
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-border">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border">
       <div className="grid grid-cols-7 border-b border-border">
         {WEEKDAY_LABELS.map((label) => (
           <div
@@ -42,7 +42,13 @@ export function MonthView({ days, anchorMonth, events, now }: MonthViewProps) {
           </div>
         ))}
       </div>
-      <div className="grid flex-1 grid-cols-7 grid-rows-6 overflow-y-auto">
+      {/* The only scrollport in this view — the weekday header above stays
+          pinned, and on a short window the 6 rows of `min-h-20` cells scroll in
+          here rather than growing the page (issue #87). */}
+      <div
+        data-slot="calendar-scroll"
+        className="grid min-h-0 flex-1 grid-cols-7 grid-rows-6 overflow-y-auto"
+      >
         {days.map((day) => {
           const dayEvents = liveEvents
             .filter((event) => eventOverlapsDay(event, day))
