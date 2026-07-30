@@ -7,6 +7,14 @@ import type { ReactNode } from "react";
 import { isNavItemActive } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
+/**
+ * The bottom-nav row's shared item shell. Exported so every occupant of that
+ * row (nav links, the palette search button, sign-out) renders one geometry
+ * and one focus treatment instead of drifting copies.
+ */
+export const BOTTOM_NAV_ITEM_CLASSES =
+  "flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-caption font-medium text-muted-foreground transition-colors duration-motion-fast ease-motion-standard";
+
 interface NavLinkProps {
   href: string;
   label: string;
@@ -25,10 +33,7 @@ export function NavLink({ href, label, icon, variant, badge }: NavLinkProps) {
       <Link
         href={href}
         aria-current={active ? "page" : undefined}
-        className={cn(
-          "flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-caption font-medium text-muted-foreground transition-colors duration-motion-fast ease-motion-standard",
-          active && "text-foreground"
-        )}
+        className={cn(BOTTOM_NAV_ITEM_CLASSES, active && "text-foreground")}
       >
         <span
           className={cn(

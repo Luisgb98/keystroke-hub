@@ -209,22 +209,26 @@ export function IdeaEditor({
                 const Icon = IDEA_FORMAT_ICON[format];
                 const selected = values.format === format;
                 return (
-                  <button
+                  // Shared button system for geometry, focus ring and press
+                  // feedback; the checked state overrides only the surface, so
+                  // a picked format stays content-track colored (docs/design-system.md).
+                  <Button
                     key={format}
                     type="button"
                     role="radio"
                     aria-checked={selected}
+                    variant="outline"
                     onClick={() => setValues((v) => ({ ...v, format }))}
                     className={cn(
-                      "flex h-11 items-center justify-center gap-1.5 rounded-lg border text-sm font-medium transition-all",
+                      "h-11 w-full",
                       selected
-                        ? "border-track-content-border bg-track-content text-track-content-foreground"
-                        : "border-border bg-background text-muted-foreground hover:bg-muted"
+                        ? "border-track-content-border bg-track-content text-track-content-foreground hover:bg-track-content hover:text-track-content-foreground dark:bg-track-content dark:hover:bg-track-content"
+                        : "text-muted-foreground"
                     )}
                   >
                     <Icon aria-hidden className="size-4 shrink-0" />
                     {IDEA_FORMAT_LABEL[format]}
-                  </button>
+                  </Button>
                 );
               })}
             </div>
