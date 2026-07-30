@@ -34,9 +34,14 @@ export default async function AppShellLayout({
   return (
     <InboxCaptureProvider>
       <CommandPaletteProvider>
-        <div className="flex min-h-full flex-1">
+        {/* The shell is viewport-locked so the sidebar can never stretch or
+            scroll away: `<main>` is the app's only vertical scrollport
+            (issue #87, see docs/calendar.md#scroll-contract). Deliberately
+            scoped here rather than on `body` — `/login` and `/styleguide`
+            live outside this layout and still rely on body scroll. */}
+        <div className="flex h-dvh overflow-hidden">
           <Sidebar untriagedCount={untriagedCount} />
-          <main className="flex min-h-full min-w-0 flex-1 flex-col pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
+          <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
             {children}
           </main>
           <BottomNav untriagedCount={untriagedCount} />
