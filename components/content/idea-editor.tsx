@@ -353,9 +353,10 @@ export function IdeaEditor({
             </div>
           ) : idea ? (
             <Button
-              type="button"
               variant="outline"
               className="justify-start"
+              nativeButton={false}
+              role="link"
               render={<Link href={`/content/ideas/${idea.id}/script`} />}
             >
               <ScrollText aria-hidden className="size-4" />
