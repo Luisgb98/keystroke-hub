@@ -70,19 +70,36 @@ test.describe("content pipeline board", () => {
     await expect(column(page, "Recorded").getByText(title)).toBeVisible();
   });
 
-  test("parking an idea moves it to the parked column, and un-parking reverses it", async ({
-    page,
-  }) => {
-    const title = `${PREFIX} Park me`;
-    await seedTestIdea({ title, status: "outlined" });
+  test("shows exactly the five pipeline columns", async ({ page }) => {
     await page.goto("/content/board");
 
-    await moveCard(page, title, "Parked");
-    await expect(column(page, "Parked").getByText(title)).toBeVisible();
+    await expect(page.locator('[data-slot="stage-column"]')).toHaveCount(5);
+    for (const label of [
+      "Idea",
+      "Scripted",
+      "Recorded",
+      "Edited",
+      "Published",
+    ]) {
+      await expect(column(page, label)).toBeVisible();
+    }
+    for (const removed of ["Spark", "Outlined", "Parked"]) {
+      await expect(column(page, removed)).toHaveCount(0);
+    }
+  });
 
-    await moveCard(page, title, "Outlined");
-    await expect(column(page, "Outlined").getByText(title)).toBeVisible();
-    await expect(column(page, "Parked").getByText(title)).toHaveCount(0);
+  test("a new idea starts in the Idea column and moves forward through the pipeline", async ({
+    page,
+  }) => {
+    const title = `${PREFIX} Fresh idea`;
+    await seedTestIdea({ title });
+    await page.goto("/content/board");
+
+    await expect(column(page, "Idea").getByText(title)).toBeVisible();
+
+    await moveCard(page, title, "Scripted");
+    await expect(column(page, "Scripted").getByText(title)).toBeVisible();
+    await expect(column(page, "Idea").getByText(title)).toHaveCount(0);
   });
 });
 

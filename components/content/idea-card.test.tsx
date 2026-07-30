@@ -4,7 +4,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const updateIdeaStatus = vi.hoisted(() => vi.fn());
 const deleteIdea = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/content/actions", () => ({ updateIdeaStatus, deleteIdea }));
+const createIdea = vi.hoisted(() => vi.fn());
+const updateIdea = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/content/actions", () => ({
+  updateIdeaStatus,
+  deleteIdea,
+  createIdea,
+  updateIdea,
+}));
 
 const toastFn = vi.hoisted(() => vi.fn());
 const toastSuccess = vi.hoisted(() => vi.fn());
@@ -22,9 +29,11 @@ function makeIdea(overrides: Partial<Idea> = {}): Idea {
     title: "Speedrun any% commentary",
     notes: null,
     format: "either",
-    status: "spark",
+    status: "idea",
     tags: [],
     projectId: null,
+    releaseEventId: null,
+    releaseEventTrack: null,
     stageEnteredAt: new Date(),
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -35,6 +44,12 @@ function makeIdea(overrides: Partial<Idea> = {}): Idea {
 describe("IdeaCard", () => {
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("links the title to the idea's detail page", () => {
+    render(<IdeaCard idea={makeIdea({ id: "idea-9", title: "Boss rush" })} />);
+    const link = screen.getByRole("link", { name: "Boss rush" });
+    expect(link).toHaveAttribute("href", "/content/ideas/idea-9");
   });
 
   it("links the script action to the idea's script page", () => {
@@ -80,20 +95,55 @@ describe("IdeaCard", () => {
     expect(screen.queryByText("Cover the wrong warp")).not.toBeInTheDocument();
   });
 
+  // The themed shadcn `Select` (#72) is a button-based combobox with a
+  // portalled option list, not a native `<select>` — open the trigger, then
+  // click the option.
+  async function changeStatus(
+    user: ReturnType<typeof userEvent.setup>,
+    optionName: string
+  ) {
+    await user.click(screen.getByRole("combobox", { name: "Status" }));
+    await user.click(await screen.findByRole("option", { name: optionName }));
+  }
+
+  it("exposes the four publish copy blocks", () => {
+    render(<IdeaCard idea={makeIdea({ tags: ["a", "b", "c", "d", "e"] })} />);
+    for (const name of [
+      "Copy Title",
+      "Copy Title + tags",
+      "Copy Description + tags",
+      "Copy Tags",
+    ]) {
+      expect(screen.getByRole("button", { name })).toBeInTheDocument();
+    }
+  });
+
+  it("keeps Edit and Delete actions visible", () => {
+    render(<IdeaCard idea={makeIdea({ title: "Boss rush" })} />);
+    expect(
+      screen.getByRole("button", { name: 'Edit "Boss rush"' })
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: 'Delete "Boss rush"' })
+    ).toBeVisible();
+  });
+
   it("shows the idea's current status in the status control", () => {
-    render(<IdeaCard idea={makeIdea({ status: "outlined" })} />);
-    expect(screen.getByLabelText("Status")).toHaveValue("outlined");
+    render(<IdeaCard idea={makeIdea({ status: "scripted" })} />);
+    expect(screen.getByRole("combobox", { name: "Status" })).toHaveTextContent(
+      "Scripted"
+    );
   });
 
   it("changes status and calls updateIdeaStatus", async () => {
     updateIdeaStatus.mockResolvedValue({});
     const user = userEvent.setup();
-    render(<IdeaCard idea={makeIdea({ id: "idea-42", status: "spark" })} />);
+    render(<IdeaCard idea={makeIdea({ id: "idea-42", status: "idea" })} />);
 
-    await user.selectOptions(screen.getByLabelText("Status"), "outlined");
+    await changeStatus(user, "Scripted");
 
     await waitFor(() =>
-      expect(updateIdeaStatus).toHaveBeenCalledWith("idea-42", "outlined")
+      expect(updateIdeaStatus).toHaveBeenCalledWith("idea-42", "scripted")
     );
   });
 
@@ -104,7 +154,7 @@ describe("IdeaCard", () => {
     const user = userEvent.setup();
     render(<IdeaCard idea={makeIdea()} />);
 
-    await user.selectOptions(screen.getByLabelText("Status"), "parked");
+    await changeStatus(user, "Scripted");
 
     await waitFor(() =>
       expect(toastError).toHaveBeenCalledWith("That idea no longer exists.")
@@ -116,7 +166,7 @@ describe("IdeaCard", () => {
     const user = userEvent.setup();
     render(<IdeaCard idea={makeIdea({ status: "edited" })} />);
 
-    await user.selectOptions(screen.getByLabelText("Status"), "published");
+    await changeStatus(user, "Published");
 
     await waitFor(() =>
       expect(toastFn).toHaveBeenCalledWith(
@@ -130,7 +180,7 @@ describe("IdeaCard", () => {
     const user = userEvent.setup();
     render(<IdeaCard idea={makeIdea({ status: "edited" })} />);
 
-    await user.selectOptions(screen.getByLabelText("Status"), "published");
+    await changeStatus(user, "Published");
 
     await waitFor(() =>
       expect(updateIdeaStatus).toHaveBeenCalledWith(
@@ -182,5 +232,28 @@ describe("IdeaCard", () => {
     expect(
       screen.getByText(/Its script will be deleted too\./)
     ).toBeInTheDocument();
+  });
+
+  it("opens the editor prefilled when the pencil is clicked", async () => {
+    const user = userEvent.setup();
+    render(
+      <IdeaCard idea={makeIdea({ title: "Boss rush", format: "video" })} />
+    );
+
+    await user.click(screen.getByRole("button", { name: 'Edit "Boss rush"' }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("Edit idea")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Title")).toHaveValue("Boss rush");
+  });
+
+  it("shows a tags-incomplete counter until an idea carries the five-tag standard", () => {
+    const { rerender } = render(
+      <IdeaCard idea={makeIdea({ tags: ["speedrun", "glitch"] })} />
+    );
+    expect(screen.getByText("2/5")).toBeInTheDocument();
+
+    rerender(<IdeaCard idea={makeIdea({ tags: ["a", "b", "c", "d", "e"] })} />);
+    expect(screen.queryByText("5/5")).not.toBeInTheDocument();
   });
 });

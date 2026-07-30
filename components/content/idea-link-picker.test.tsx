@@ -19,12 +19,12 @@ import type { LinkableIdea } from "@/lib/data/idea-event-links";
 import { IdeaLinkPicker } from "./idea-link-picker";
 
 const ideas: LinkableIdea[] = [
-  { id: "idea-1", title: "Boss rush", format: "video", status: "spark" },
+  { id: "idea-1", title: "Boss rush", format: "video", status: "idea" },
   {
     id: "idea-2",
     title: "Glitch tutorial",
     format: "stream",
-    status: "outlined",
+    status: "scripted",
   },
 ];
 

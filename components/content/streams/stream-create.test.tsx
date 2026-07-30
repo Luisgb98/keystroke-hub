@@ -1,19 +1,48 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import {
+  DockActionProvider,
+  useDockAction,
+} from "@/components/shell/dock-action-provider";
 
 const createStream = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/content/stream-actions", () => ({ createStream }));
 
 import { StreamCreate } from "./stream-create";
 
+/** Surfaces the dock action StreamCreate registers so tests can trigger it. */
+function DockActionSurface() {
+  const action = useDockAction();
+  if (!action) return null;
+  const Icon = action.icon;
+  return (
+    <button type="button" onClick={action.onSelect}>
+      <Icon aria-hidden />
+      {action.label}
+    </button>
+  );
+}
+
+/** StreamCreate has no button of its own — it registers with the shared dock. */
+function renderWithDock(ui: ReactNode) {
+  return render(
+    <DockActionProvider>
+      {ui}
+      <DockActionSurface />
+    </DockActionProvider>
+  );
+}
+
 describe("StreamCreate", () => {
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  it("renders a floating 'New stream' button, closed by default", () => {
-    render(<StreamCreate />);
+  it("registers a 'New stream' dock action, dialog closed by default", () => {
+    renderWithDock(<StreamCreate />);
     expect(
       screen.getByRole("button", { name: "New stream" })
     ).toBeInTheDocument();
@@ -22,7 +51,7 @@ describe("StreamCreate", () => {
 
   it("opens the capture dialog with the topic auto-focused", async () => {
     const user = userEvent.setup();
-    render(<StreamCreate />);
+    renderWithDock(<StreamCreate />);
     await user.click(screen.getByRole("button", { name: "New stream" }));
 
     const dialog = screen.getByRole("dialog", { name: "New stream" });
@@ -32,7 +61,7 @@ describe("StreamCreate", () => {
 
   it("hides the date/time fields until 'Plan a date' is switched on", async () => {
     const user = userEvent.setup();
-    render(<StreamCreate />);
+    renderWithDock(<StreamCreate />);
     await user.click(screen.getByRole("button", { name: "New stream" }));
 
     expect(screen.queryByLabelText("Date")).not.toBeInTheDocument();
@@ -44,7 +73,7 @@ describe("StreamCreate", () => {
 
   it("hides the start time field when All day is on", async () => {
     const user = userEvent.setup();
-    render(<StreamCreate />);
+    renderWithDock(<StreamCreate />);
     await user.click(screen.getByRole("button", { name: "New stream" }));
     await user.click(screen.getByRole("switch", { name: "Plan a date" }));
     await user.click(screen.getByRole("switch", { name: "All day" }));
@@ -55,7 +84,7 @@ describe("StreamCreate", () => {
   it("submits a title-only, unplanned capture", async () => {
     createStream.mockResolvedValue({ success: true });
     const user = userEvent.setup();
-    render(<StreamCreate />);
+    renderWithDock(<StreamCreate />);
     await user.click(screen.getByRole("button", { name: "New stream" }));
 
     await user.type(screen.getByLabelText("Topic"), "Boss rush stream");
@@ -70,7 +99,7 @@ describe("StreamCreate", () => {
   it("submits planned date/time fields when planning a date", async () => {
     createStream.mockResolvedValue({ success: true });
     const user = userEvent.setup();
-    render(<StreamCreate />);
+    renderWithDock(<StreamCreate />);
     await user.click(screen.getByRole("button", { name: "New stream" }));
     await user.type(screen.getByLabelText("Topic"), "Boss rush stream");
     await user.click(screen.getByRole("switch", { name: "Plan a date" }));
@@ -86,7 +115,7 @@ describe("StreamCreate", () => {
   it("closes and resets after a successful capture", async () => {
     createStream.mockResolvedValue({ success: true });
     const user = userEvent.setup();
-    render(<StreamCreate />);
+    renderWithDock(<StreamCreate />);
     await user.click(screen.getByRole("button", { name: "New stream" }));
     await user.type(screen.getByLabelText("Topic"), "Boss rush stream");
     await user.click(screen.getByRole("button", { name: "Save" }));
@@ -102,7 +131,7 @@ describe("StreamCreate", () => {
       fieldErrors: { title: ["Title is required"] },
     });
     const user = userEvent.setup();
-    render(<StreamCreate />);
+    renderWithDock(<StreamCreate />);
     await user.click(screen.getByRole("button", { name: "New stream" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
 

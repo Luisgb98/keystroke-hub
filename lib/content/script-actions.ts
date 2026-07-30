@@ -57,6 +57,7 @@ export async function saveScript(
     .returning({ updatedAt: scripts.updatedAt });
 
   revalidatePath(`/content/ideas/${parsed.data.ideaId}/script`);
+  revalidatePath(`/content/ideas/${parsed.data.ideaId}`);
   revalidatePath("/content/ideas");
   revalidatePath("/content/board");
 

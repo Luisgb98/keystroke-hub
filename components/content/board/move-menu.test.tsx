@@ -19,12 +19,10 @@ describe("MoveMenu", () => {
       screen.getByRole("button", { name: 'Move "Speedrun commentary"' })
     );
 
-    expect(await screen.findByText("Recorded")).toBeInTheDocument();
-    expect(screen.getByText("Spark")).toBeInTheDocument();
-    expect(screen.getByText("Outlined")).toBeInTheDocument();
+    expect(await screen.findByText("Idea")).toBeInTheDocument();
+    expect(screen.getByText("Recorded")).toBeInTheDocument();
     expect(screen.getByText("Edited")).toBeInTheDocument();
     expect(screen.getByText("Published")).toBeInTheDocument();
-    expect(screen.getByText("Parked")).toBeInTheDocument();
     expect(screen.queryByText("Scripted")).not.toBeInTheDocument();
   });
 
@@ -42,9 +40,9 @@ describe("MoveMenu", () => {
     await user.click(
       screen.getByRole("button", { name: 'Move "Speedrun commentary"' })
     );
-    await user.click(await screen.findByText("Parked"));
+    await user.click(await screen.findByText("Recorded"));
 
-    expect(onMove).toHaveBeenCalledWith("parked");
+    expect(onMove).toHaveBeenCalledWith("recorded");
   });
 
   it("has no next-stage emphasis after the final stage", async () => {
@@ -52,7 +50,7 @@ describe("MoveMenu", () => {
     render(
       <MoveMenu
         ideaTitle="Speedrun commentary"
-        currentStatus="parked"
+        currentStatus="published"
         onMove={vi.fn()}
       />
     );
@@ -62,7 +60,7 @@ describe("MoveMenu", () => {
     );
 
     // Every stage is offered, just none visually emphasized as "next".
-    expect(await screen.findByText("Spark")).toBeInTheDocument();
-    expect(screen.getByText("Published")).toBeInTheDocument();
+    expect(await screen.findByText("Idea")).toBeInTheDocument();
+    expect(screen.getByText("Edited")).toBeInTheDocument();
   });
 });

@@ -62,21 +62,21 @@ describe("getLinkedIdeaSummariesForEvents", () => {
         eventId: "evt-1",
         ideaId: "idea-1",
         title: "A",
-        status: "spark",
+        status: "idea",
         scriptContent: "# hi",
       },
       {
         eventId: "evt-1",
         ideaId: "idea-2",
         title: "B",
-        status: "outlined",
+        status: "scripted",
         scriptContent: "",
       },
       {
         eventId: "evt-2",
         ideaId: "idea-1",
         title: "A",
-        status: "spark",
+        status: "idea",
         scriptContent: null,
       },
     ]);
@@ -84,11 +84,11 @@ describe("getLinkedIdeaSummariesForEvents", () => {
     const result = await getLinkedIdeaSummariesForEvents(["evt-1", "evt-2"]);
 
     expect(result.get("evt-1")).toEqual([
-      { id: "idea-1", title: "A", status: "spark", hasScript: true },
-      { id: "idea-2", title: "B", status: "outlined", hasScript: false },
+      { id: "idea-1", title: "A", status: "idea", hasScript: true },
+      { id: "idea-2", title: "B", status: "scripted", hasScript: false },
     ]);
     expect(result.get("evt-2")).toEqual([
-      { id: "idea-1", title: "A", status: "spark", hasScript: false },
+      { id: "idea-1", title: "A", status: "idea", hasScript: false },
     ]);
   });
 });
@@ -153,7 +153,7 @@ describe("searchLinkableIdeas", () => {
         id: "idea-2",
         title: "Glitch tutorial",
         format: "video",
-        status: "spark",
+        status: "idea",
       },
     ]);
 
@@ -164,7 +164,7 @@ describe("searchLinkableIdeas", () => {
         id: "idea-2",
         title: "Glitch tutorial",
         format: "video",
-        status: "spark",
+        status: "idea",
       },
     ]);
   });

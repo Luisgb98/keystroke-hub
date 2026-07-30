@@ -72,10 +72,11 @@ export function BoardCard({
         ) : null}
         <div className="flex items-center gap-1.5">
           <Button
-            type="button"
             variant="ghost"
             size="icon-sm"
             aria-label={`${hasScript ? "Open" : "Write"} script for "${idea.title}"`}
+            nativeButton={false}
+            role="link"
             render={<Link href={`/content/ideas/${idea.id}/script`} />}
           >
             <ScrollText

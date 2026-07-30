@@ -32,9 +32,9 @@ describe("buildIdeaFilterCondition", () => {
   });
 
   it("maps `status` to an equality check", () => {
-    const { sql, params } = render({ status: "outlined" });
+    const { sql, params } = render({ status: "scripted" });
     expect(sql).toContain('"status" = $1');
-    expect(params).toEqual(["outlined"]);
+    expect(params).toEqual(["scripted"]);
   });
 
   it("maps `tag` to an array containment check", () => {
@@ -47,10 +47,10 @@ describe("buildIdeaFilterCondition", () => {
     const { sql, params } = render({
       q: "glitch",
       format: "video",
-      status: "spark",
+      status: "idea",
       tag: "speedrun",
     });
     expect(sql).toContain(" and ");
-    expect(params).toEqual(["%glitch%", "video", "spark", '{"speedrun"}']);
+    expect(params).toEqual(["%glitch%", "video", "idea", '{"speedrun"}']);
   });
 });

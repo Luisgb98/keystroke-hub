@@ -28,8 +28,8 @@ export function IdeaEmptyState({ hasActiveFilters }: IdeaEmptyStateProps) {
         Capture your first idea
       </p>
       <p className="max-w-sm text-small text-muted-foreground">
-        Every video and stream idea starts as a spark. Tap &ldquo;New
-        idea&rdquo; the moment one hits.
+        Every video and stream idea starts here. Tap &ldquo;New idea&rdquo; the
+        moment one hits.
       </p>
     </div>
   );

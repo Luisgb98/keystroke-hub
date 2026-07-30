@@ -93,10 +93,11 @@ export function EventLinkedIdeas({
                 </Badge>
               </Link>
               <Button
-                type="button"
                 variant="ghost"
                 size="icon-sm"
                 aria-label={`${idea.hasScript ? "Open" : "Write"} script for "${idea.title}"`}
+                nativeButton={false}
+                role="link"
                 render={<Link href={`/content/ideas/${idea.id}/script`} />}
               >
                 <ScrollText
