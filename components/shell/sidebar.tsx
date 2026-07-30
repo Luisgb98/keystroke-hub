@@ -18,8 +18,13 @@ interface SidebarProps {
 }
 
 export function Sidebar({ untriagedCount }: SidebarProps) {
+  // The shell caps this to the viewport height (issue #87), so on an absurdly
+  // short window the nav would outgrow it. `overflow-y-auto` keeps the
+  // theme/settings footer reachable there instead of clipping it — on any
+  // normal window there is nothing to overflow, so the sidebar still can't
+  // scroll or change size.
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-r border-border md:flex">
+    <aside className="hidden w-64 shrink-0 flex-col overflow-y-auto border-r border-border md:flex">
       <div className="flex items-center justify-between px-4 py-4">
         <Link href="/" className="flex items-baseline gap-1.5">
           <span className="font-heading text-h3 font-semibold">Keystroke</span>

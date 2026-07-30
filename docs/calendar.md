@@ -53,6 +53,53 @@ Every event-rendering component (`components/calendar/`) uses only the track
 tokens and pairs color with an icon (`Briefcase`/`Clapperboard`) and a label
 (`track-styles.ts`) — color is never the only signal.
 
+## Scroll contract
+
+Issue #87: on the calendar page the **only** thing that scrolls is the grid.
+The sidebar and the calendar header never move, and the sidebar never changes
+size. Three layers cooperate, and each one is load-bearing:
+
+1. **The app shell is viewport-locked.** `app/(app)/layout.tsx` renders
+   `div.h-dvh.overflow-hidden` and makes `<main>` the app's only vertical
+   scrollport (`overflow-y-auto min-h-0`). That height-caps the sidebar so it
+   can never stretch with tall content. This is deliberately scoped to the app
+   shell rather than `body`: `/login` (self-sufficient `min-h-dvh`) and
+   `/styleguide` render **outside** this layout and still rely on body scroll —
+   the styleguide's section nav is `sticky top-0` against it, and a global
+   `overflow-hidden` would make that page unscrollable.
+2. **The calendar page opts out of `<main>`'s scrolling.** Its wrapper is
+   `min-h-0 flex-1 overflow-hidden`, so the heading and `CalendarHeader` stay
+   pinned and the remaining height goes to the view.
+3. **Each view owns its scrollport.** Day, week (both the phone agenda list and
+   the desktop time grid) and month each mark theirs `data-slot="calendar-scroll"`.
+   The weekday header, the all-day row and the month's weekday labels sit
+   _outside_ it so they stay pinned.
+
+The trap in all of this is flexbox's `min-height: auto`: a flex item's
+automatic minimum size is its content, so without `min-h-0` (or a non-`visible`
+`overflow`) on **every** item in the chain, the views silently stretch to their
+content and the page starts scrolling again. That's why `min-h-0` appears on
+the shell's `<main>`, the page wrapper, each view root and each scrollport, and
+why `components/calendar/scroll-contract.test.tsx` asserts the structure
+directly rather than trusting the pixels.
+
+Two consequences worth knowing:
+
+- **Sticky headers inside `<main>`** (e.g. `components/content/script/script-editor.tsx`)
+  now stick to `<main>`'s scrollport rather than the body's — same visual
+  result, different containing scroller.
+- **The sidebar keeps `overflow-y-auto`.** On a window shorter than the nav
+  itself the cap would otherwise clip the theme/settings footer; on any normal
+  window there is nothing to overflow, so the sidebar still can't scroll.
+
+`e2e/calendar-scroll.spec.ts` covers all of it — page-has-no-scroll, the
+sidebar's bounding box before/after a wheel, the empty grid still filling the
+viewport, month view on a short window, the phone agenda list with the bottom
+nav staying tappable, plus non-regression checks for long shell pages and the
+styleguide's body scroll. It needs no `DATABASE_URL`: the empty 24-hour grid is
+a fixed 96rem tall (`HOURS_IN_DAY × HOUR_HEIGHT_REM`), so it overflows any
+viewport on its own.
+
 ## Resilience to a missing database
 
 The calendar page always renders its shell (heading, view switcher,

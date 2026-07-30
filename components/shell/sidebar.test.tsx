@@ -56,4 +56,22 @@ describe("Sidebar", () => {
     expect(badge).not.toBeNull();
     expect(badge).toHaveTextContent("4");
   });
+
+  // Issue #87: the shell caps the sidebar at the viewport height, so it must
+  // never claim height of its own — and it scrolls its own contents rather than
+  // clipping the theme/settings footer on a very short window.
+  it("takes no height of its own and keeps its footer reachable", () => {
+    usePathname.mockReturnValue("/");
+    const { container } = render(<Sidebar untriagedCount={0} />);
+
+    const aside = container.querySelector("aside") as HTMLElement;
+    expect(aside.className).toContain("overflow-y-auto");
+    const heightClasses = aside.className
+      .split(" ")
+      .filter((token) => /^(min-|max-)?h-/.test(token));
+    expect(heightClasses).toEqual([]);
+    // The footer that would be the first thing clipped.
+    expect(screen.getByText("Theme")).toBeInTheDocument();
+    expect(screen.getByLabelText("Settings")).toBeInTheDocument();
+  });
 });

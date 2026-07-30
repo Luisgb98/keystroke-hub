@@ -25,8 +25,13 @@ export function WeekView({ days, events, now }: WeekViewProps) {
 
   return (
     <>
-      {/* Phone: stacked agenda-style list — a 7-column grid is unreadable this narrow. */}
-      <div className="flex flex-1 flex-col gap-4 overflow-y-auto md:hidden">
+      {/* Phone: stacked agenda-style list — a 7-column grid is unreadable this
+          narrow. It is also the phone scrollport for this view (issue #87, see
+          docs/calendar.md#scroll-contract). */}
+      <div
+        data-slot="calendar-scroll"
+        className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto md:hidden"
+      >
         {days.map((day) => {
           const dayEvents = liveEvents
             .filter((event) => eventOverlapsDay(event, day))
@@ -60,7 +65,7 @@ export function WeekView({ days, events, now }: WeekViewProps) {
       </div>
 
       {/* Desktop/tablet: classic 7-column time grid. */}
-      <div className="hidden flex-1 flex-col overflow-hidden rounded-2xl border border-border md:flex">
+      <div className="hidden min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border md:flex">
         <div className="flex border-b border-border">
           <div className="w-12 shrink-0 sm:w-14" />
           <div className="grid flex-1 grid-cols-7">
@@ -88,7 +93,12 @@ export function WeekView({ days, events, now }: WeekViewProps) {
           </div>
         </div>
         <AllDayRow days={days} events={allDayEvents} />
-        <div className="flex flex-1 overflow-y-auto">
+        {/* The only scrollport in this view — the weekday header and all-day
+            row above stay pinned (issue #87). */}
+        <div
+          data-slot="calendar-scroll"
+          className="flex min-h-0 flex-1 overflow-y-auto"
+        >
           <TimeGutter />
           <div className="grid flex-1 grid-cols-7">
             {days.map((day) => (
