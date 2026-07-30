@@ -15,13 +15,29 @@ const skipReason =
 const PREFIX = "[e2e-inbox]";
 const ENTRY_SELECTOR = '[data-slot="inbox-entry"]';
 
-/** Captures a thought via the global floating capture button — the two-tap flow. */
-async function capture(page: Page, body: string) {
-  await page.getByRole("button", { name: "Capture a thought" }).click();
-  const dialog = page.getByRole("dialog");
+/** Fills and submits the capture dialog, whichever surface opened it. */
+async function fillCapture(page: Page, body: string) {
+  const dialog = page.getByRole("dialog", { name: "Capture a thought" });
   await dialog.getByLabel("What's on your mind?").fill(body);
   await dialog.getByRole("button", { name: "Capture" }).click();
   await expect(dialog).not.toBeVisible({ timeout: 10000 });
+}
+
+/**
+ * Captures a thought from any page via the palette's "Capture a thought"
+ * action — the from-anywhere flow since #85 retired the floating dock.
+ */
+async function capture(page: Page, body: string) {
+  const palette = page.getByRole("dialog", { name: "Command palette" });
+  // Retry the press: the shortcut is bound by a client effect, so on a freshly
+  // loaded page the first one can land before hydration (same guard as
+  // e2e/command-palette.spec.ts).
+  await expect(async () => {
+    await page.keyboard.press("Control+f");
+    await expect(palette).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 20000 });
+  await palette.getByRole("option", { name: "Capture a thought" }).click();
+  await fillCapture(page, body);
 }
 
 test.describe("quick-capture inbox", () => {
@@ -120,17 +136,46 @@ test.describe("quick-capture inbox", () => {
     const body = `${PREFIX} palette capture works`;
     await page.goto("/");
 
-    await page.keyboard.press("Control+k");
-    const palette = page.getByRole("dialog", { name: "Command palette" });
-    await expect(palette).toBeVisible();
-    await palette.getByRole("option", { name: "Capture a thought" }).click();
-
-    const capture = page.getByRole("dialog");
-    await capture.getByLabel("What's on your mind?").fill(body);
-    await capture.getByRole("button", { name: "Capture" }).click();
+    // `capture` is the palette flow: shortcut → "Capture a thought" action.
+    await capture(page, body);
 
     await page.goto("/inbox");
     await expect(page.locator(ENTRY_SELECTOR, { hasText: body })).toBeVisible();
+  });
+
+  test("captures from the inbox page's own capture button (#85)", async ({
+    page,
+  }) => {
+    const body = `${PREFIX} inbox page capture button`;
+    await page.goto("/inbox");
+
+    await page.getByRole("button", { name: "Capture a thought" }).click();
+    await fillCapture(page, body);
+
+    await expect(page.locator(ENTRY_SELECTOR, { hasText: body })).toBeVisible({
+      timeout: 10000,
+    });
+  });
+
+  test("the retired floating dock is gone from every page (#85)", async ({
+    page,
+  }) => {
+    await page.goto("/calendar");
+
+    // No floating capture "+": off the inbox page, capture lives in the
+    // palette only, so there's no capture control on /calendar at all.
+    await expect(
+      page.getByRole("button", { name: "Capture a thought" })
+    ).toHaveCount(0);
+
+    // And exactly one Inbox link — the nav's, not a floating pill on top of it.
+    const inboxLinks = page.getByRole("link", { name: /Inbox/ });
+    await expect(inboxLinks).toHaveCount(1);
+    await expect(
+      page
+        .getByRole("navigation", { name: "Primary" })
+        .getByRole("link", { name: /Inbox/ })
+    ).toBeVisible();
   });
 });
 
@@ -146,16 +191,49 @@ test.describe("quick-capture inbox mobile viewport", () => {
     await clearTestInboxEntries(MOBILE_PREFIX);
   });
 
-  test("the floating capture button is reachable one-handed", async ({
+  test("capture is reachable one-handed: bottom-nav Search → palette action", async ({
     page,
   }) => {
-    const body = `${MOBILE_PREFIX} one-handed capture`;
+    // Unique per run: this describe isn't serial, so two copies (a retry, or a
+    // `--repeat-each` run) can overlap, and each one's prefix cleanup would
+    // otherwise delete the other's entry mid-test.
+    const body = `${MOBILE_PREFIX} one-handed capture ${Date.now()}`;
     await page.goto("/calendar");
-    await capture(page, body);
 
-    await page.goto("/inbox");
+    const bottomNav = page.getByRole("navigation", { name: "Primary" });
+    await bottomNav.getByRole("button", { name: "Search" }).click();
+    const palette = page.getByRole("dialog", { name: "Command palette" });
+    await expect(palette).toBeVisible();
+    await palette.getByRole("option", { name: "Capture a thought" }).click();
+    await fillCapture(page, body);
+
+    // The bottom nav's Inbox tab — mobile's only persistent inbox entry point
+    // since the dock went away — shows the fresh count and reaches the list.
+    await expect(bottomNav.locator('[data-slot="inbox-count"]')).toBeVisible({
+      timeout: 10000,
+    });
+    await bottomNav.getByRole("link", { name: /Inbox/ }).click();
+    await expect(page).toHaveURL(/\/inbox$/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Inbox" })
+    ).toBeVisible();
+
+    // The list is asserted after a reload: a client-side nav can be served from
+    // the router cache, which may hold a payload prefetched before the capture.
+    await page.reload();
     await expect(page.locator(ENTRY_SELECTOR, { hasText: body })).toBeVisible({
       timeout: 10000,
     });
+  });
+
+  test("no floating dock remains at a mobile viewport (#85)", async ({
+    page,
+  }) => {
+    await page.goto("/calendar");
+
+    await expect(
+      page.getByRole("button", { name: "Capture a thought" })
+    ).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /Inbox/ })).toHaveCount(1);
   });
 });

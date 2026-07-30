@@ -472,7 +472,7 @@ test.describe("idea capture mobile viewport", () => {
     await clearTestIdeas(PREFIX);
   });
 
-  test("the floating 'New idea' button opens the dialog for one-handed capture", async ({
+  test("the header's 'New idea' button opens the dialog for one-handed capture", async ({
     page,
   }) => {
     const title = `${PREFIX} Mobile capture`;
@@ -491,29 +491,31 @@ test.describe("idea capture mobile viewport", () => {
     ).toBeVisible();
   });
 
-  test("shows a single primary floating action with no overlapping controls", async ({
+  test("the primary action sits in the page header, with no floating dock left (#85)", async ({
     page,
   }) => {
     await page.goto("/content/ideas");
 
-    // The page action replaces the global capture "+" by design (Issue #74) —
-    // they are swapped, never stacked. So on a content screen there is exactly
-    // one primary FAB ("New idea") and no separate "Capture a thought" button.
+    // "New idea" is an inline header button now, not a bottom-right FAB: it
+    // sits beside the heading, in the top half of the screen.
     const newIdea = page.getByRole("button", { name: "New idea" });
     await expect(newIdea).toBeVisible();
+    const heading = page.getByRole("heading", { level: 1, name: "Ideas" });
+    const actionBox = await newIdea.boundingBox();
+    const headingBox = await heading.boundingBox();
+    expect(actionBox).not.toBeNull();
+    expect(headingBox).not.toBeNull();
+    const viewport = page.viewportSize();
+    expect(actionBox!.y).toBeLessThan(viewport!.height / 2);
+    // Roughly on the heading's row, rather than floating far below it.
+    expect(Math.abs(actionBox!.y - headingBox!.y)).toBeLessThan(80);
+
+    // Nothing floats in the corner any more: no capture "+", and the only
+    // Inbox link is the nav's.
     await expect(
       page.getByRole("button", { name: "Capture a thought" })
     ).toHaveCount(0);
-
-    // The Inbox pill sits above the primary action without touching it.
-    const inbox = page.getByRole("link", { name: /Inbox/ });
-    await expect(inbox).toBeVisible();
-    const inboxBox = await inbox.boundingBox();
-    const actionBox = await newIdea.boundingBox();
-    expect(inboxBox).not.toBeNull();
-    expect(actionBox).not.toBeNull();
-    // Inbox is fully above the action — bottom edge does not reach its top.
-    expect(inboxBox!.y + inboxBox!.height).toBeLessThanOrEqual(actionBox!.y);
+    await expect(page.getByRole("link", { name: /Inbox/ })).toHaveCount(1);
   });
 
   test("copy buttons are comfortable tap targets", async ({ page }) => {

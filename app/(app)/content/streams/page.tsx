@@ -35,14 +35,17 @@ export default async function StreamsPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-4 px-4 py-6 sm:px-10 sm:py-8">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-col gap-1">
           <h1 className="font-heading text-h1 font-semibold">Streams</h1>
           <p className="text-small text-muted-foreground">
             Plan the topic, prep the checklist, go live calmly.
           </p>
         </div>
-        <TemplateEditor items={templateItems} />
+        <div className="flex items-center gap-2">
+          <TemplateEditor items={templateItems} />
+          <StreamCreate />
+        </div>
       </div>
 
       {isEmpty ? (
@@ -91,8 +94,6 @@ export default async function StreamsPage() {
           ) : null}
         </>
       )}
-
-      <StreamCreate />
     </div>
   );
 }

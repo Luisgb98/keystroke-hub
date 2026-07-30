@@ -32,46 +32,59 @@ describe("CommandPaletteProvider", () => {
     expect(screen.getByTestId("palette-open")).toHaveTextContent("false");
   });
 
-  it("opens on Cmd-K, and a second press closes it (toggle)", () => {
+  it("opens on Cmd-F, and a second press closes it (toggle)", () => {
     render(
       <CommandPaletteProvider>
         <Consumer />
       </CommandPaletteProvider>
     );
 
-    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    fireEvent.keyDown(window, { key: "f", metaKey: true });
     expect(screen.getByTestId("consumer-open")).toHaveTextContent("true");
 
-    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    fireEvent.keyDown(window, { key: "f", metaKey: true });
     expect(screen.getByTestId("consumer-open")).toHaveTextContent("false");
   });
 
-  it("opens on Ctrl-K too", () => {
+  it("opens on Ctrl-F too", () => {
     render(
       <CommandPaletteProvider>
         <Consumer />
       </CommandPaletteProvider>
     );
 
-    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "f", ctrlKey: true });
     expect(screen.getByTestId("consumer-open")).toHaveTextContent("true");
   });
 
-  it("ignores a plain 'k' or a modifier with a different key", () => {
+  it("ignores a plain 'f' or a modifier with a different key", () => {
     render(
       <CommandPaletteProvider>
         <Consumer />
       </CommandPaletteProvider>
     );
 
-    fireEvent.keyDown(window, { key: "k" });
+    fireEvent.keyDown(window, { key: "f" });
     expect(screen.getByTestId("consumer-open")).toHaveTextContent("false");
 
     fireEvent.keyDown(window, { key: "j", metaKey: true });
     expect(screen.getByTestId("consumer-open")).toHaveTextContent("false");
   });
 
-  it("calls preventDefault on the triggering keydown, beating a browser's own Ctrl-K binding", () => {
+  it("no longer answers to the old Cmd/Ctrl-K binding (#85)", () => {
+    render(
+      <CommandPaletteProvider>
+        <Consumer />
+      </CommandPaletteProvider>
+    );
+
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+
+    expect(screen.getByTestId("consumer-open")).toHaveTextContent("false");
+  });
+
+  it("calls preventDefault on the triggering keydown, so browser find-in-page never opens", () => {
     render(
       <CommandPaletteProvider>
         <Consumer />
@@ -79,7 +92,7 @@ describe("CommandPaletteProvider", () => {
     );
 
     const event = new KeyboardEvent("keydown", {
-      key: "k",
+      key: "f",
       metaKey: true,
       cancelable: true,
     });

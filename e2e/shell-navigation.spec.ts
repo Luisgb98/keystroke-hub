@@ -81,3 +81,73 @@ test.describe("responsive nav contract", () => {
     });
   });
 });
+
+// Issue #85 removed the bottom-right floating dock (inbox pill + capture "+"),
+// which was mobile's only persistent inbox entry point — so the bottom nav
+// carries an Inbox tab now. Neither check needs a database.
+test.describe("floating dock removal", () => {
+  const NARROW = { width: 375, height: 812 };
+
+  test.describe("desktop viewport", () => {
+    test.use({ viewport: { width: 1280, height: 800 } });
+
+    test("no floating capture button, and one Inbox link — the sidebar's", async ({
+      page,
+    }) => {
+      await page.goto("/");
+      await expect(
+        page.getByRole("button", { name: "Capture a thought" })
+      ).toHaveCount(0);
+      await expect(page.getByRole("link", { name: /Inbox/ })).toHaveCount(1);
+      await expect(
+        page
+          .getByRole("navigation", { name: "Primary" })
+          .getByRole("link", { name: /Inbox/ })
+      ).toBeVisible();
+    });
+  });
+
+  test.describe("mobile viewport", () => {
+    test.use({ viewport: NARROW });
+
+    test("no floating dock, and the bottom nav reaches the inbox", async ({
+      page,
+    }) => {
+      await page.goto("/");
+      await expect(
+        page.getByRole("button", { name: "Capture a thought" })
+      ).toHaveCount(0);
+
+      const inbox = page
+        .getByRole("navigation", { name: "Primary" })
+        .getByRole("link", { name: /Inbox/ });
+      await expect(inbox).toHaveCount(1);
+      await inbox.click();
+
+      await expect(page).toHaveURL(/\/inbox$/);
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Inbox" })
+      ).toBeVisible();
+      await expect(inbox).toHaveAttribute("aria-current", "page");
+    });
+
+    test("the 9-tab bottom nav still fits without horizontal overflow", async ({
+      page,
+    }) => {
+      await page.goto("/");
+      const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }));
+      expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+
+      // Every tab keeps a comfortable tap target height, and none spills out
+      // of the viewport now that Inbox joined the row.
+      const nav = page.getByRole("navigation", { name: "Primary" });
+      const navBox = await nav.boundingBox();
+      expect(navBox).not.toBeNull();
+      expect(navBox!.width).toBeLessThanOrEqual(NARROW.width);
+      expect(navBox!.height).toBeGreaterThanOrEqual(44);
+    });
+  });
+});

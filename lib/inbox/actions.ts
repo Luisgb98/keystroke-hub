@@ -33,7 +33,7 @@ export interface InboxMutationResult {
 
 /**
  * Revalidates every surface that shows the inbox or its count. `revalidatePath`
- * on the `(app)` layout refreshes the capture-dock/sidebar count badge across
+ * on the `(app)` layout refreshes the sidebar/bottom-nav count badge across
  * every screen at once (the count is read in that layout — see docs/inbox.md),
  * while the explicit `/inbox` keeps the list itself fresh.
  */

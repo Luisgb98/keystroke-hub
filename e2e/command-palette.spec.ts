@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { clearTestIdeas, seedTestIdea } from "./support/ideas-db";
 import { clearTestProjects } from "./support/projects-db";
@@ -13,16 +13,32 @@ const skipReason =
   "checks. Set it locally (see .env.example) or on a Vercel preview to " +
   "exercise this.";
 
+const PALETTE = { name: "Command palette" } as const;
+
+/**
+ * Opens the palette with its shortcut, retrying the press. The Cmd/Ctrl-F
+ * binding is attached by a client effect, so on a freshly loaded page the very
+ * first press can land before hydration — and a lost press looks exactly like
+ * a broken shortcut. The loop self-heals if a press does register late: it
+ * simply presses again from whatever state it finds.
+ */
+async function openWithShortcut(page: Page) {
+  const dialog = page.getByRole("dialog", PALETTE);
+  await expect(async () => {
+    await page.keyboard.press("Control+f");
+    await expect(dialog).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 20000 });
+  return dialog;
+}
+
 test.describe("command palette navigation", () => {
-  test("Ctrl/Cmd-K opens the palette; typing narrows the list and Enter navigates", async ({
+  test("Ctrl/Cmd-F opens the palette; typing narrows the list and Enter navigates", async ({
     page,
   }) => {
     await page.goto("/");
-    const dialog = page.getByRole("dialog", { name: "Command palette" });
-    await expect(dialog).not.toBeVisible();
+    await expect(page.getByRole("dialog", PALETTE)).not.toBeVisible();
 
-    await page.keyboard.press("Control+k");
-    await expect(dialog).toBeVisible();
+    const dialog = await openWithShortcut(page);
 
     await page.keyboard.type("Journal");
     await expect(
@@ -38,21 +54,38 @@ test.describe("command palette navigation", () => {
     await expect(dialog).not.toBeVisible();
   });
 
-  test("a second Ctrl-K press toggles the palette closed", async ({ page }) => {
+  test("a second Ctrl-F press toggles the palette closed", async ({ page }) => {
     await page.goto("/");
-    const dialog = page.getByRole("dialog", { name: "Command palette" });
+    const dialog = await openWithShortcut(page);
 
-    await page.keyboard.press("Control+k");
-    await expect(dialog).toBeVisible();
-
-    await page.keyboard.press("Control+k");
+    await page.keyboard.press("Control+f");
     await expect(dialog).not.toBeVisible();
+  });
+
+  test("Ctrl-K no longer opens the palette (#85)", async ({ page }) => {
+    await page.goto("/");
+
+    // Open-then-close with the real shortcut first: that proves the listener is
+    // attached, so the Ctrl-K press below is a genuine no-op rather than a
+    // press that merely arrived before hydration.
+    const dialog = await openWithShortcut(page);
+    await page.keyboard.press("Escape");
+    await expect(dialog).not.toBeVisible();
+
+    await page.keyboard.press("Control+k");
+    await expect(page.getByRole("dialog", PALETTE)).not.toBeVisible();
+  });
+
+  test("the sidebar chip advertises the new shortcut", async ({ page }) => {
+    await page.goto("/");
+    await expect(
+      page.getByRole("button", { name: "Search" }).getByText(/Ctrl\s*F|⌘F/)
+    ).toBeVisible();
   });
 
   test("empty query shows the Navigate group immediately", async ({ page }) => {
     await page.goto("/");
-    await page.keyboard.press("Control+k");
-    const dialog = page.getByRole("dialog", { name: "Command palette" });
+    const dialog = await openWithShortcut(page);
 
     await expect(dialog.getByText("Navigate")).toBeVisible();
     await expect(
@@ -80,8 +113,7 @@ test.describe("command palette navigation", () => {
 
   test("a query with no matches shows the empty state", async ({ page }) => {
     await page.goto("/");
-    await page.keyboard.press("Control+k");
-    const dialog = page.getByRole("dialog", { name: "Command palette" });
+    const dialog = await openWithShortcut(page);
 
     await page.keyboard.type("zzz-no-such-destination-zzz");
     await expect(
@@ -102,7 +134,7 @@ test.describe("command palette mobile viewport", () => {
       .getByRole("button", { name: "Search" });
     await trigger.click();
 
-    const dialog = page.getByRole("dialog", { name: "Command palette" });
+    const dialog = page.getByRole("dialog", PALETTE);
     await expect(dialog).toBeVisible();
 
     await page.keyboard.type("Calendar");
@@ -134,8 +166,7 @@ test.describe("command palette content search", () => {
     await seedTestIdea({ title: ideaTitle });
 
     await page.goto("/");
-    await page.keyboard.press("Control+k");
-    const dialog = page.getByRole("dialog", { name: "Command palette" });
+    const dialog = await openWithShortcut(page);
 
     await page.keyboard.type(token);
 
