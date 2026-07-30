@@ -39,6 +39,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -51,6 +52,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TimePicker } from "@/components/ui/time-picker";
 import {
   Tooltip,
   TooltipContent,
@@ -124,6 +126,24 @@ export function ComponentsGallery() {
               <SelectItem value="content">Content</SelectItem>
             </SelectContent>
           </Select>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="styleguide-date">Date</Label>
+              <DatePicker
+                id="styleguide-date"
+                defaultValue="2026-07-30"
+                triggerLabel="Open styleguide calendar"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="styleguide-time">Time</Label>
+              <TimePicker
+                id="styleguide-time"
+                defaultValue="19:00"
+                triggerLabel="Choose styleguide time"
+              />
+            </div>
+          </div>
         </CardContent>
       </Card>
 

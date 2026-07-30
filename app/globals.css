@@ -93,9 +93,10 @@
 }
 
 :root {
-  /* Tells the browser to render native controls (date/time picker popovers,
-     scrollbars) in the matching scheme — without this, `<input type="date">`
-     pickers stay light even in dark mode (see docs/content-ideas.md, #71). */
+  /* Tells the browser to render the remaining native chrome — scrollbars,
+     autofill, form-control focus rings — in the matching scheme. Date and time
+     popovers no longer rely on this (they're `DatePicker`/`TimePicker` now,
+     #86), but scrollbars in dark mode still do. */
   color-scheme: light;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);

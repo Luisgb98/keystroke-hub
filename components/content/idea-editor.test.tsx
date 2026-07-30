@@ -62,6 +62,32 @@ describe("IdeaEditor — create mode", () => {
     expect(formData.get("releaseTime")).toBe("19:00");
   });
 
+  it("picking the release date in the calendar enables the time and submits both", async () => {
+    createIdea.mockResolvedValue({ success: true });
+    const user = userEvent.setup();
+    render(<IdeaEditor mode="create" open onOpenChange={vi.fn()} />);
+
+    expect(screen.getByLabelText("Release time")).toBeDisabled();
+
+    await user.click(
+      screen.getByRole("button", { name: "Open publish day calendar" })
+    );
+    await user.click(
+      await screen.findByRole("button", { name: "Saturday, August 1st, 2026" })
+    );
+
+    expect(screen.getByLabelText("Release date")).toHaveValue("2026-08-01");
+    expect(screen.getByLabelText("Release time")).toBeEnabled();
+
+    await user.type(screen.getByLabelText("Title"), "Glitch tutorial");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(createIdea).toHaveBeenCalledTimes(1));
+    const [, formData] = createIdea.mock.calls[0] as [unknown, FormData];
+    expect(formData.get("releaseDate")).toBe("2026-08-01");
+    expect(formData.get("releaseTime")).toBe("19:00");
+  });
+
   it("tracks the tag count against the five-tag standard", async () => {
     const user = userEvent.setup();
     render(<IdeaEditor mode="create" open onOpenChange={vi.fn()} />);

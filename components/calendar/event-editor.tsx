@@ -24,10 +24,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { TimePicker } from "@/components/ui/time-picker";
 
 import { DeleteEventDialog } from "./delete-event-dialog";
 import { TRACK_ICON, TRACK_LABEL, TRACK_SURFACE_CLASSES } from "./track-styles";
@@ -238,48 +240,46 @@ export function EventEditor({
             <div className="grid grid-cols-2 gap-2">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="event-start-date">Start</Label>
-                <Input
+                <DatePicker
                   id="event-start-date"
                   name="startDate"
-                  type="date"
+                  triggerLabel="Open starting day calendar"
                   value={values.startDate}
-                  onChange={(e) =>
-                    setValues((v) => ({ ...v, startDate: e.target.value }))
+                  onChange={(startDate) =>
+                    setValues((v) => ({ ...v, startDate }))
                   }
                 />
                 {!values.allDay ? (
-                  <Input
+                  <TimePicker
                     name="startTime"
-                    type="time"
                     aria-label="Start time"
+                    triggerLabel="Choose starting time"
                     required
                     value={values.startTime}
-                    onChange={(e) =>
-                      setValues((v) => ({ ...v, startTime: e.target.value }))
+                    onChange={(startTime) =>
+                      setValues((v) => ({ ...v, startTime }))
                     }
                   />
                 ) : null}
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="event-end-date">End</Label>
-                <Input
+                <DatePicker
                   id="event-end-date"
                   name="endDate"
-                  type="date"
+                  triggerLabel="Open ending day calendar"
                   value={values.endDate}
-                  onChange={(e) =>
-                    setValues((v) => ({ ...v, endDate: e.target.value }))
-                  }
+                  onChange={(endDate) => setValues((v) => ({ ...v, endDate }))}
                 />
                 {!values.allDay ? (
-                  <Input
+                  <TimePicker
                     name="endTime"
-                    type="time"
                     aria-label="End time"
+                    triggerLabel="Choose ending time"
                     required
                     value={values.endTime}
-                    onChange={(e) =>
-                      setValues((v) => ({ ...v, endTime: e.target.value }))
+                    onChange={(endTime) =>
+                      setValues((v) => ({ ...v, endTime }))
                     }
                   />
                 ) : null}

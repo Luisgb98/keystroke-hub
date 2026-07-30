@@ -12,6 +12,7 @@ import {
 } from "@/lib/meetings/meeting-type";
 import { MarkdownContent } from "@/components/shared/markdown-content";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -68,12 +69,12 @@ export function MeetingNoteDetailsForm({
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="flex flex-col gap-2">
           <Label htmlFor="meeting-detail-date">Date</Label>
-          <Input
+          <DatePicker
             id="meeting-detail-date"
-            type="date"
             name="date"
+            triggerLabel="Open meeting day calendar"
             defaultValue={meetingNote.date}
-            className="w-auto"
+            className="sm:w-44"
           />
         </div>
         <div className="flex flex-1 flex-col gap-2">

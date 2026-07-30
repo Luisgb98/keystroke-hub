@@ -28,9 +28,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { TimePicker } from "@/components/ui/time-picker";
 
 import { IDEA_FORMAT_ICON } from "./idea-format-styles";
 
@@ -307,24 +309,24 @@ export function IdeaEditor({
               ) : null}
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <Input
+              <DatePicker
                 id="idea-release-date"
                 name="releaseDate"
-                type="date"
+                triggerLabel="Open publish day calendar"
                 value={values.releaseDate}
-                onChange={(e) =>
-                  setValues((v) => ({ ...v, releaseDate: e.target.value }))
+                onChange={(releaseDate) =>
+                  setValues((v) => ({ ...v, releaseDate }))
                 }
                 aria-invalid={fieldErrors.releaseDate ? true : undefined}
               />
-              <Input
+              <TimePicker
                 name="releaseTime"
-                type="time"
                 aria-label="Release time"
+                triggerLabel="Choose publish time"
                 disabled={!values.releaseDate}
                 value={values.releaseTime}
-                onChange={(e) =>
-                  setValues((v) => ({ ...v, releaseTime: e.target.value }))
+                onChange={(releaseTime) =>
+                  setValues((v) => ({ ...v, releaseTime }))
                 }
                 aria-invalid={fieldErrors.releaseTime ? true : undefined}
               />

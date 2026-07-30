@@ -37,6 +37,14 @@ target.setDate(target.getDate() + 60);
 const targetParam = formatDateParam(target);
 const targetLongLabel = longDateLabel(target);
 
+// A second day in the *same month* as `target`, so the calendar popover shows
+// it without paging — the ±3 pivot keeps it inside 1..28 whatever `target` is.
+const moved = new Date(target);
+moved.setDate(
+  target.getDate() >= 15 ? target.getDate() - 3 : target.getDate() + 3
+);
+const movedParam = formatDateParam(moved);
+
 // Week view renders every event twice in the DOM — once as an `EventChip` in
 // the mobile agenda list, once as an `EventBlock` in the desktop time grid —
 // toggling which is visible via CSS breakpoints rather than conditional
@@ -141,6 +149,69 @@ test.describe("event management", () => {
     ).toHaveCount(0);
   });
 
+  test("editing start/end through the date and time pickers moves the event", async ({
+    page,
+  }) => {
+    const title = `${PREFIX} Repickable event`;
+    await page.goto(`/calendar?view=week&date=${targetParam}`);
+
+    await page
+      .getByRole("button", {
+        name: `Add event at 13:00 on ${targetLongLabel}`,
+      })
+      .click();
+    let dialog = page.getByRole("dialog", { name: "New event" });
+    await dialog.getByRole("radio", { name: /work/i }).click();
+    await dialog.getByLabel("Title").fill(title);
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 10000 });
+
+    await page.locator(EVENT_BLOCK_SELECTOR, { hasText: title }).click();
+    dialog = page.getByRole("dialog", { name: "Edit event" });
+    await expect(dialog.getByLabel("Start", { exact: true })).toHaveValue(
+      targetParam
+    );
+
+    // Move the day from the calendar popover. `td[data-day]` carries the plain
+    // `yyyy-MM-dd` react-day-picker renders, so this doesn't depend on the
+    // locale-formatted aria-label.
+    await dialog
+      .getByRole("button", { name: "Open starting day calendar" })
+      .click();
+    await page.locator(`td[data-day="${movedParam}"] button`).click();
+    // The day tapped, not the one before it — a UTC round trip would drift.
+    await expect(dialog.getByLabel("Start", { exact: true })).toHaveValue(
+      movedParam
+    );
+
+    await dialog.getByRole("button", { name: "Choose starting time" }).click();
+    await page.getByRole("option", { name: "16:00" }).click();
+
+    await dialog
+      .getByRole("button", { name: "Open ending day calendar" })
+      .click();
+    await page.locator(`td[data-day="${movedParam}"] button`).click();
+    await dialog.getByRole("button", { name: "Choose ending time" }).click();
+    await page.getByRole("option", { name: "17:00" }).click();
+
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 10000 });
+
+    // Reopen from the moved day: the stored event round-trips to exactly the
+    // values that were picked.
+    await page.goto(`/calendar?view=week&date=${movedParam}`);
+    await page.locator(EVENT_BLOCK_SELECTOR, { hasText: title }).click();
+    dialog = page.getByRole("dialog", { name: "Edit event" });
+    await expect(dialog.getByLabel("Start", { exact: true })).toHaveValue(
+      movedParam
+    );
+    await expect(dialog.getByLabel("Start time")).toHaveValue("16:00");
+    await expect(dialog.getByLabel("End", { exact: true })).toHaveValue(
+      movedParam
+    );
+    await expect(dialog.getByLabel("End time")).toHaveValue("17:00");
+  });
+
   test("delete requires confirmation; cancel keeps the event", async ({
     page,
   }) => {
@@ -215,5 +286,39 @@ test.describe("event management mobile viewport", () => {
     await expect(
       page.locator(EVENT_BLOCK_SELECTOR, { hasText: title })
     ).toBeVisible();
+  });
+
+  test("the date picker popover fits the screen with tappable days", async ({
+    page,
+  }) => {
+    await page.goto(`/calendar?view=day&date=${todayParam}`);
+
+    await page.getByRole("button", { name: "New event" }).click();
+    const dialog = page.getByRole("dialog", { name: "New event" });
+    await dialog
+      .getByRole("button", { name: "Open starting day calendar" })
+      .click();
+
+    const popover = page.locator('[data-slot="popover-content"]');
+    await expect(popover).toBeVisible();
+
+    const box = await popover.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(375);
+
+    const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+
+    // Days are a comfortable tap target on touch, not the compact desktop cell.
+    const dayBox = await page
+      .locator("td[data-day] button")
+      .first()
+      .boundingBox();
+    expect(dayBox!.height).toBeGreaterThanOrEqual(32);
+    expect(dayBox!.width).toBeGreaterThanOrEqual(32);
   });
 });
