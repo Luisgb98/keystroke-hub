@@ -66,8 +66,10 @@ export function WeekRatingPicker({ weekStart, rating }: WeekRatingPickerProps) {
             onClick={() => handleSelect(step.value)}
             className={cn(
               "flex flex-1 flex-col items-center gap-1 rounded-lg border border-border px-1 py-2.5 text-caption transition-colors disabled:opacity-50",
+              // Solid fill for the same reason as `MoodPicker` — a primary tint
+              // now reads as the destructive treatment (see components/ui/button.tsx).
               selected
-                ? "border-primary bg-primary/10 text-primary"
+                ? "border-primary bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-muted"
             )}
           >

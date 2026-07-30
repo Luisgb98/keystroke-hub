@@ -186,4 +186,31 @@ describe("IdeaEditor — edit mode", () => {
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
     expect(toastSuccess).toHaveBeenCalledWith("Idea updated");
   });
+
+  it("renders the format radios on the shared button system", () => {
+    // #84's button pass: they used to hand-roll geometry, hover and focus.
+    // They keep their radio semantics but inherit the Button treatment.
+    render(<IdeaEditor mode="create" open onOpenChange={vi.fn()} />);
+    const video = screen.getByRole("radio", { name: "Video" });
+
+    expect(video).toHaveAttribute("data-slot", "button");
+    expect(video).toHaveClass("focus-visible:ring-ring/50");
+  });
+
+  it("keeps the checked format content-track colored, not accent colored", () => {
+    // A picked format belongs to the content track; it must not borrow
+    // --primary and start reading as the dialog's default action.
+    render(<IdeaEditor mode="create" open onOpenChange={vi.fn()} />);
+    const video = screen.getByRole("radio", { name: "Video" });
+    const either = screen.getByRole("radio", { name: "Either" });
+
+    expect(either).toHaveAttribute("aria-checked", "true");
+    expect(either).toHaveClass(
+      "bg-track-content",
+      "text-track-content-foreground",
+      "border-track-content-border"
+    );
+    expect(either.className).not.toMatch(/(^|\s)bg-primary(\s|$)/);
+    expect(video.className).not.toContain("bg-track-content");
+  });
 });

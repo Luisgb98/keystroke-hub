@@ -75,4 +75,15 @@ describe("WeekRatingPicker", () => {
       )
     );
   });
+
+  it("marks the selected step with a solid accent fill, not a primary tint", () => {
+    // Same rule as MoodPicker — a primary tint now reads as destructive
+    // (see docs/design-system.md, #84).
+    render(<WeekRatingPicker weekStart="2026-07-06" rating={3} />);
+    const selected = screen.getByRole("radio", { name: "Steady" });
+
+    expect(selected).toHaveClass("bg-primary", "text-primary-foreground");
+    expect(selected.className).not.toContain("bg-primary/10");
+    expect(selected.className).not.toMatch(/(^|\s)text-primary(\s|$)/);
+  });
 });

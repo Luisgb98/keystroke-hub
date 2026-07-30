@@ -4,6 +4,8 @@ import { useSyncExternalStore } from "react";
 import { Search } from "lucide-react";
 
 import { useCommandPalette } from "@/components/command-palette/command-palette-provider";
+import { BOTTOM_NAV_ITEM_CLASSES } from "@/components/shell/nav-link";
+import { Button } from "@/components/ui/button";
 
 function subscribeNever() {
   return () => {};
@@ -25,22 +27,28 @@ export function PaletteTriggerChip() {
   const modifierLabel = useModifierKeyLabel();
 
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
+      size="lg"
       onClick={() => setOpen(true)}
       aria-label="Search"
-      className="flex h-9 w-full min-w-0 items-center gap-2 rounded-lg border border-input bg-input/30 px-3 text-small text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      className="w-full min-w-0 justify-start gap-2 px-3 font-normal text-muted-foreground hover:text-foreground"
     >
       <Search aria-hidden className="size-4 shrink-0" />
       <span className="flex-1 truncate text-left">Search</span>
       <kbd className="inline-flex shrink-0 items-center gap-0.5 rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-caption">
         {`${modifierLabel}K`}
       </kbd>
-    </button>
+    </Button>
   );
 }
 
-/** Bottom-nav search button — mirrors `NavLink`'s "bottom" variant and `SignOutButton`'s bottom form (see docs/command-palette.md). */
+/**
+ * Bottom-nav search button — sits in the same row as `NavLink`'s "bottom"
+ * variant and `SignOutButton`'s bottom form, so it shares `NavLink`'s exported
+ * item classes rather than restating them (see docs/command-palette.md).
+ */
 export function PaletteSearchButton() {
   const { setOpen } = useCommandPalette();
 
@@ -48,7 +56,7 @@ export function PaletteSearchButton() {
     <button
       type="button"
       onClick={() => setOpen(true)}
-      className="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-caption font-medium text-muted-foreground transition-colors duration-motion-fast ease-motion-standard"
+      className={BOTTOM_NAV_ITEM_CLASSES}
     >
       <span className="flex items-center justify-center rounded-lg px-3 py-1">
         <Search aria-hidden className="size-5" />
