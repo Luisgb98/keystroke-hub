@@ -83,6 +83,34 @@ describe("StreamCreate", () => {
     expect(formData.get("date")).toBe("2026-08-01");
   });
 
+  it("submits a date and time chosen from the pickers", async () => {
+    createStream.mockResolvedValue({ success: true });
+    const user = userEvent.setup();
+    render(<StreamCreate />);
+    await user.click(screen.getByRole("button", { name: "New stream" }));
+    await user.type(screen.getByLabelText("Topic"), "Boss rush stream");
+    await user.click(screen.getByRole("switch", { name: "Plan a date" }));
+
+    await user.click(
+      screen.getByRole("button", { name: "Open stream day calendar" })
+    );
+    await user.click(
+      await screen.findByRole("button", { name: "Saturday, August 1st, 2026" })
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Choose stream starting time" })
+    );
+    await user.click(await screen.findByRole("option", { name: "20:00" }));
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(createStream).toHaveBeenCalledTimes(1));
+    const [, formData] = createStream.mock.calls[0] as [unknown, FormData];
+    expect(formData.get("date")).toBe("2026-08-01");
+    expect(formData.get("time")).toBe("20:00");
+  });
+
   it("closes and resets after a successful capture", async () => {
     createStream.mockResolvedValue({ success: true });
     const user = userEvent.setup();

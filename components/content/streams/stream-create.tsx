@@ -14,10 +14,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { TimePicker } from "@/components/ui/time-picker";
 
 const EMPTY_VALUES = {
   title: "",
@@ -159,28 +161,24 @@ export function StreamCreate() {
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-2">
                     <Label htmlFor="stream-date">Date</Label>
-                    <Input
+                    <DatePicker
                       id="stream-date"
                       name="date"
-                      type="date"
+                      triggerLabel="Open stream day calendar"
                       value={values.date}
-                      onChange={(e) =>
-                        setValues((v) => ({ ...v, date: e.target.value }))
-                      }
+                      onChange={(date) => setValues((v) => ({ ...v, date }))}
                       aria-invalid={fieldErrors.date ? true : undefined}
                     />
                   </div>
                   {!values.allDay ? (
                     <div className="flex flex-col gap-2">
                       <Label htmlFor="stream-time">Start time</Label>
-                      <Input
+                      <TimePicker
                         id="stream-time"
                         name="time"
-                        type="time"
+                        triggerLabel="Choose stream starting time"
                         value={values.time}
-                        onChange={(e) =>
-                          setValues((v) => ({ ...v, time: e.target.value }))
-                        }
+                        onChange={(time) => setValues((v) => ({ ...v, time }))}
                         aria-invalid={fieldErrors.time ? true : undefined}
                       />
                     </div>

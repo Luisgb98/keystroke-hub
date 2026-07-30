@@ -153,10 +153,11 @@ Mobile-first, one-handed capture is the design center:
   (mirrors `TrackPicker`'s visual language, but — unlike track — always has a
   default selection since format is optional). Create mode has an inline
   Markdown script field; edit mode links out to the script page instead. The
-  release date/time use native `<input type="date">`/`type="time"` — now
-  theme-aware everywhere via the `color-scheme` token on `:root`/`.dark`
-  (`app/globals.css`), which is what keeps their picker popups (and the status
-  `<select>`'s option list) from rendering browser-default white in dark mode.
+  release date/time use the shared `DatePicker`/`TimePicker` (#86) — typed
+  `yyyy-MM-dd`/`HH:mm` fields with a themed calendar/time popover, replacing the
+  native `<input type="date">`/`type="time"` whose popups rendered as
+  OS-default white surfaces. The release time stays disabled until a release
+  date is set, and Clear empties both.
 - **List**: `IdeaCard` shows title, format icon + label, tag chips (mono
   font per the keystroke identity) with an `n/5` incomplete hint, the four
   publish copy blocks (below), relative created time, the inline status
