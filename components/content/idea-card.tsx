@@ -86,10 +86,14 @@ export function IdeaCard({
               <Pencil aria-hidden className="size-4" />
             </Button>
             <Button
-              type="button"
               variant="ghost"
               size="icon"
               aria-label={`${hasScript ? "Open" : "Write"} script for "${idea.title}"`}
+              // Styled as a button but it navigates: tell Base UI the rendered
+              // element isn't a <button> (silences its dev warning) and keep the
+              // anchor's link role rather than the `role="button"` it would add.
+              nativeButton={false}
+              role="link"
               render={<Link href={`/content/ideas/${idea.id}/script`} />}
             >
               <ScrollText
