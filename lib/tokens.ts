@@ -9,14 +9,18 @@ export const semanticColorTokens: ColorToken[] = [
   { name: "Foreground", cssVar: "foreground", description: "Default text" },
   { name: "Card", cssVar: "card", description: "Card surface" },
   { name: "Popover", cssVar: "popover", description: "Popover / menu surface" },
-  { name: "Primary", cssVar: "primary", description: "Primary actions" },
+  {
+    name: "Primary",
+    cssVar: "primary",
+    description: "Brand accent (#a8454b) — primary actions",
+  },
   { name: "Secondary", cssVar: "secondary", description: "Secondary actions" },
   { name: "Muted", cssVar: "muted", description: "Muted surface" },
   { name: "Accent", cssVar: "accent", description: "Accent surface" },
   {
     name: "Destructive",
     cssVar: "destructive",
-    description: "Destructive actions",
+    description: "Destructive actions — higher-chroma red, never a solid fill",
   },
   {
     name: "Success",
@@ -24,7 +28,11 @@ export const semanticColorTokens: ColorToken[] = [
     description: "Positive/open state (e.g. an open GitHub issue)",
   },
   { name: "Border", cssVar: "border", description: "Default border" },
-  { name: "Ring", cssVar: "ring", description: "Focus ring" },
+  {
+    name: "Ring",
+    cssVar: "ring",
+    description: "Focus ring — derived from the accent",
+  },
 ];
 
 export const trackColorTokens: {

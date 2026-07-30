@@ -15,6 +15,58 @@ Tailwind via `@theme inline`, so every token is also a utility class
 Never hardcode a color. If a component needs a color that isn't a token yet,
 add the token first.
 
+Every token ships **inside the sRGB gamut**, so what the CSS declares is what
+the browser paints — no silent gamut-mapping between the value in
+`globals.css` and the pixel. `app/globals.css.test.ts` guards this, along with
+the hue families and the WCAG AA contrast of each changed pair.
+
+## The accent, and the three reds
+
+The brand accent is **`#a8454b`** — `oklch(0.524 0.131 19.1)`, a muted brick
+red. Dark mode lifts the same hue to `oklch(0.72 0.14 19.1)`; `#a8454b` is too
+dark to read on a dark surface. `--sidebar-primary` and the focus rings
+(`--ring`, `--sidebar-ring`) are derived from it, so buttons, badges, links,
+the sidebar active bar, the mobile bottom-nav dot, the inbox count badge and
+every focus halo all come from one decision.
+
+That leaves three reds in the palette, kept apart on purpose:
+
+| Token             | Light                     | Role                                           |
+| ----------------- | ------------------------- | ---------------------------------------------- |
+| `--primary`       | `oklch(0.524 0.131 19.1)` | The accent. Muted, low chroma.                 |
+| `--destructive`   | `oklch(0.577 0.215 29)`   | Alarm. ~1.6× the chroma, hue shifted +10.      |
+| `--track-content` | `oklch(0.94 0.028 19.1)`  | Content-track surface. Accent hue, tint level. |
+
+Two rules keep them legible as different things:
+
+1. **Destructive is never a solid fill.** It stays a tint with colored text
+   (`bg-destructive/10 text-destructive`) while `default` is a solid
+   `bg-primary`. The difference is structural, not just chromatic, so "delete"
+   can't be mistaken for the default action.
+2. **Nothing else uses a primary tint.** Because `bg-primary/10 text-primary`
+   now looks like the destructive treatment, selected states use a _solid_
+   accent fill instead — see `MoodPicker` and `WeekRatingPicker`.
+
+The content track sits at the accent's hue but well below its chroma, so
+chips and hovers stay subordinate to buttons. The work track stays blue
+(~250–255): the two tracks must never converge.
+
+## Buttons
+
+`components/ui/button.tsx` is the single button system — six variants
+(`default`, `outline`, `secondary`, `ghost`, `destructive`, `link`), each with
+a deliberate hover, pressed and focus state. Don't hand-roll a `<button>` with
+its own surface classes; reach for `Button` and override only what's genuinely
+different (see the format radios in `components/content/idea-editor.tsx`,
+which keep the shared geometry and focus ring but take a track-colored checked
+state).
+
+Filled variants move toward `--foreground` on hover and press
+(`color-mix(in oklch, var(--primary), var(--foreground) 14%)`) rather than
+stepping down in alpha. An alpha step lightens a solid accent against the page
+and reads as _disabled_; mixing toward the foreground darkens in light mode and
+lightens in dark mode, so the button deepens under the cursor in both themes.
+
 ## Dual-track colors
 
 Keystroke Hub renders two strictly separate worlds — **work** and

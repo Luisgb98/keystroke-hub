@@ -5,10 +5,13 @@ import { useEffect, useRef, useState } from "react";
 export function TokenSwatch({
   name,
   cssVar,
+  description,
   scope,
 }: {
   name: string;
   cssVar: string;
+  /** What the token is for — the design decision, not a restatement of the name. */
+  description?: string;
   /** Force-preview a theme regardless of the active one, by scoping under `.dark`. */
   scope?: "light" | "dark";
 }) {
@@ -37,6 +40,11 @@ export function TokenSwatch({
             --{cssVar}
             {resolved ? ` · ${resolved}` : ""}
           </span>
+          {description ? (
+            <span className="mt-0.5 text-caption text-muted-foreground">
+              {description}
+            </span>
+          ) : null}
         </div>
       </div>
     </div>

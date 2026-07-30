@@ -43,7 +43,11 @@ export default async function StyleguidePage() {
         <section id="colors" className="scroll-mt-20">
           <h2 className="font-heading text-h2 font-semibold">Colors</h2>
           <p className="mt-1 text-small text-muted-foreground">
-            Semantic tokens, resolved live from the active theme.
+            Semantic tokens, resolved live from the active theme. The accent is{" "}
+            <span className="font-mono text-foreground">#a8454b</span>; the
+            focus ring and the content track are derived from it, and{" "}
+            <span className="font-mono text-foreground">--destructive</span> is
+            held apart from both by chroma and hue.
           </p>
           <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
             {semanticColorTokens.map((token) => (
@@ -51,6 +55,7 @@ export default async function StyleguidePage() {
                 key={token.cssVar}
                 name={token.name}
                 cssVar={token.cssVar}
+                description={token.description}
               />
             ))}
           </div>
