@@ -31,11 +31,11 @@ export function useCommandPalette(): CommandPaletteContextValue {
 }
 
 /**
- * Owns the palette's open state and the global Cmd/Ctrl-K listener —
- * `preventDefault` fires before a browser's own Ctrl-K binding (e.g.
- * Chrome's address bar focus) can act (see docs/command-palette.md).
- * Mounted inside the auth-gated shell layout only — the palette must not
- * exist on `/login`.
+ * Owns the palette's open state and the global Cmd/Ctrl-F listener —
+ * `preventDefault` fires first, so the browser's own find-in-page never opens:
+ * inside the app, "search" means the palette, deliberately (Issue #85 moved
+ * the shortcut off Cmd/Ctrl-K, see docs/command-palette.md). Mounted inside
+ * the auth-gated shell layout only — the palette must not exist on `/login`.
  */
 export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -43,7 +43,7 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (!(event.metaKey || event.ctrlKey)) return;
-      if (event.key.toLowerCase() !== "k") return;
+      if (event.key.toLowerCase() !== "f") return;
       event.preventDefault();
       setOpen((current) => !current);
     }

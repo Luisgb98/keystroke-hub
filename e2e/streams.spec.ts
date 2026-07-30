@@ -178,7 +178,7 @@ test.describe("stream session planner mobile viewport", () => {
     await clearTestStreams(MOBILE_PREFIX);
   });
 
-  test("the floating 'New stream' button opens the dialog for one-handed capture", async ({
+  test("the header's 'New stream' button opens the dialog for one-handed capture", async ({
     page,
   }) => {
     const title = `${MOBILE_PREFIX} Mobile capture`;

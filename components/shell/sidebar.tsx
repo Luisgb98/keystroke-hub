@@ -3,6 +3,10 @@ import { Inbox, Settings } from "lucide-react";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { PaletteTriggerChip } from "@/components/command-palette/palette-trigger";
+import {
+  InboxCountBadge,
+  inboxCountLabel,
+} from "@/components/shell/inbox-count-badge";
 import { NavLink } from "@/components/shell/nav-link";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -42,16 +46,8 @@ export function Sidebar({ untriagedCount }: SidebarProps) {
           label="Inbox"
           icon={<Inbox aria-hidden className="size-5" />}
           variant="sidebar"
-          badge={
-            untriagedCount > 0 ? (
-              <span
-                data-slot="inbox-count"
-                className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-caption font-semibold text-primary-foreground tabular-nums"
-              >
-                {untriagedCount}
-              </span>
-            ) : undefined
-          }
+          badge={<InboxCountBadge count={untriagedCount} className="ml-auto" />}
+          badgeLabel={inboxCountLabel(untriagedCount)}
         />
       </nav>
 

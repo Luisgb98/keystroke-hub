@@ -6,7 +6,7 @@ vi.mock("@/components/command-palette/command-palette-provider", () => ({
   useCommandPalette: () => ({ open: false, setOpen }),
 }));
 
-import { BOTTOM_NAV_ITEM_CLASSES } from "@/components/shell/nav-link";
+import { BOTTOM_NAV_ITEM_CLASSES } from "@/components/shell/bottom-nav-styles";
 
 import { PaletteSearchButton, PaletteTriggerChip } from "./palette-trigger";
 
@@ -21,9 +21,14 @@ describe("PaletteTriggerChip", () => {
     expect(setOpen).toHaveBeenCalledWith(true);
   });
 
-  it("shows a Ctrl K hint by default (non-Mac user agent in jsdom)", () => {
+  it("shows a Ctrl F hint by default (non-Mac user agent in jsdom)", () => {
     render(<PaletteTriggerChip />);
-    expect(screen.getByText("CtrlK")).toBeInTheDocument();
+    expect(screen.getByText("CtrlF")).toBeInTheDocument();
+  });
+
+  it("no longer advertises the retired Ctrl K shortcut (#85)", () => {
+    render(<PaletteTriggerChip />);
+    expect(screen.queryByText("CtrlK")).not.toBeInTheDocument();
   });
 
   it("renders on the shared button system rather than a one-off surface", () => {

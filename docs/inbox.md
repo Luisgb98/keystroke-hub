@@ -5,9 +5,12 @@ when there's no time to file it properly. A thought lands in a universal
 inbox first — no category, no title, no required choice — and is triaged
 later into wherever it belongs.
 
-The inbox lives at `/inbox` inside the authenticated shell, but its defining
-surface is the **floating capture button**, present on every screen so a
-thought can be filed from anywhere in two taps.
+The inbox lives at `/inbox` inside the authenticated shell. Capture itself is
+shell-wide: the dialog is mounted once in the `(app)` layout, so a thought can
+be filed from anywhere — the command palette's **Capture a thought** action
+(Ctrl/Cmd-F, then pick it) on any screen, or the Inbox page's own capture
+button. Issue #85 retired the floating bottom-right dock that used to own that
+job; the count now lives on the Inbox nav link, on both viewports.
 
 ## Why it's deliberately track-neutral
 
@@ -87,40 +90,35 @@ happens in the prefilled triage form, keeping the inbox dumb.
 
 - **`components/inbox/inbox-capture-provider.tsx`** — owns the single, app-wide
   capture dialog (mounted in the `(app)` layout, never on `/login`). Exposes
-  `openCapture()` for the dock and also opens on a global
-  `keystroke:open-capture` window event, which the command palette dispatches
-  via `requestOpenCapture()` — a decoupled trigger with no shared context.
+  `openCapture()` to client descendants and also opens on a global
+  `keystroke:open-capture` window event, dispatched via `requestOpenCapture()`
+  — a decoupled trigger with no shared context, used by both the command
+  palette's action and `inbox-capture-button.tsx`.
 - **`capture-dialog.tsx`** — just an autofocused textarea + Save. ⌘/Ctrl+Enter
   submits; a `sonner` toast confirms; the field clears and the dialog closes.
-- **`capture-dock.tsx`** — the floating dock in the bottom-right thumb zone
-  (above the mobile bottom nav): an inbox link + count badge sitting just above
-  a single primary action button. Present on every screen, so both capture and
-  the live count are always one glance/tap away — including on mobile, where the
-  sidebar isn't visible. The primary button is the global quick-capture "+" by
-  default; on screens that register their own action it becomes that page's
-  action instead (see the next bullet).
-- **`components/shell/dock-action-provider.tsx`** — the mechanism behind that
-  swap. A page mounts a client component that calls `useRegisterDockAction`;
-  the dock reads the active action via `useDockAction` and renders it in place
-  of the capture "+". This is how `IdeaCapture` ("New idea") and `StreamCreate`
-  ("New stream") supply their primary action without rendering a second
-  floating button (Issue #74) — the two are **swapped, never stacked**, so
-  there's always exactly one primary FAB and the corner never clutters. On
-  those two screens quick-capture stays reachable by design (not by stacking):
-  the Inbox pill → `/inbox`, and "Capture a thought" in the command palette.
+- **`inbox-capture-button.tsx`** — the Inbox page's own capture button. `/inbox`
+  is a server component, so this thin client button just calls
+  `requestOpenCapture()` rather than owning a dialog.
 - **`entry-card.tsx`** — body + relative timestamp, a Triage menu (four
   destinations) and a discard action (with an `alert-dialog` confirm).
 - **`triage-dialog.tsx`** — the destination-specific step, prefilled; a focused
   subset of the destination's own form, not the whole thing.
-- **Sidebar** carries a duplicate Inbox link + badge on desktop; the command
-  palette lists **Inbox** (Navigate) and **Capture a thought** (Actions).
+- **Nav** carries the Inbox link and its count on both viewports: the sidebar
+  on desktop, the bottom nav on mobile, both rendering the shared
+  `components/shell/inbox-count-badge.tsx`. The badge is `aria-hidden` and the
+  link is named via `NavLink`'s `badgeLabel` ("Inbox, 3 to triage"), because the
+  bottom variant sits the pill on the tab icon — _before_ the label in DOM
+  order — which would otherwise be announced as "3Inbox". The command palette
+  lists **Inbox** (Navigate) and **Capture a thought** (Actions).
 
-### Nav placement (open question resolved)
+### Nav placement (revised by #85)
 
-The mobile bottom nav is already dense, so the inbox is **not** a sixth tab.
-The floating capture button is the mobile entry point for both capture and the
-count; desktop additionally gets the sidebar link. This matches the plan's
-recommendation.
+Originally the inbox stayed out of the dense mobile bottom nav and rode the
+floating dock instead. #85 removed that dock — it didn't fit the app's design
+and got in the way on every page — which left mobile with no persistent inbox
+entry point, since the sidebar is `hidden md:flex`. So the bottom nav gained an
+Inbox tab (count badge included) after all, and capture-from-anywhere moved to
+the command palette action, with a dedicated button on the Inbox page itself.
 
 ## Tests
 
@@ -132,12 +130,20 @@ recommendation.
   already-triaged guards, discard). Components: capture dialog (autofocus,
   ⌘+Enter, clears/closes on success, validation error), entry card (four
   destinations, prefilled triage dialog, discard confirm), triage dialog
-  (prefill, payload shape, error), capture dock (count badge, opens capture).
+  (prefill, payload shape, error), inbox capture button (dispatches the
+  open-capture event, owns no dialog), inbox count badge (renders the count,
+  silent at zero, `aria-hidden`), bottom nav (Inbox tab present, active on
+  `/inbox`, count in the link's accessible name).
 - **e2e (`e2e/inbox.spec.ts`, Playwright, `chromium` + a `test.use`-scoped
   mobile-viewport describe — so the file is in the `mobile-chrome`
   `testIgnore` in `playwright.config.ts`):** capture from a non-inbox page in
   two taps → entry visible + badge increments; triage into a content idea and
   onto today's log (prefill verified, entry gone, record exists at the
-  destination); discard with confirm; capture via the command palette. Skipped
+  destination); discard with confirm; capture via the command palette; capture
+  via the Inbox page button; the dock is absent on desktop and mobile (no
+  floating capture button, exactly one Inbox link); and, at a mobile viewport,
+  one-handed capture through bottom-nav Search → the palette action, then the
+  bottom nav's Inbox tab showing the fresh count and reaching the list. Skipped
   without `DATABASE_URL`, same guard as every other DB-backed spec
-  (`docs/database.md`).
+  (`docs/database.md`). The dock-absent and bottom-nav-Inbox checks that need
+  no database live in `e2e/shell-navigation.spec.ts`.

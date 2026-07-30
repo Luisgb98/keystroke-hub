@@ -1,6 +1,11 @@
 import { LogOut } from "lucide-react";
 
 import { logout } from "@/lib/auth/actions";
+import {
+  BOTTOM_NAV_ICON_CLASSES,
+  BOTTOM_NAV_ITEM_CLASSES,
+  BOTTOM_NAV_LABEL_CLASSES,
+} from "@/components/shell/bottom-nav-styles";
 import { Button } from "@/components/ui/button";
 
 interface SignOutButtonProps {
@@ -12,16 +17,11 @@ export function SignOutButton({ variant }: SignOutButtonProps) {
   if (variant === "bottom") {
     return (
       <form action={logout} className="flex min-w-0 flex-1">
-        <button
-          type="submit"
-          className="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-caption font-medium text-muted-foreground transition-colors duration-motion-fast ease-motion-standard"
-        >
-          <span className="flex items-center justify-center rounded-lg px-3 py-1">
+        <button type="submit" className={BOTTOM_NAV_ITEM_CLASSES}>
+          <span className={BOTTOM_NAV_ICON_CLASSES}>
             <LogOut aria-hidden className="size-5" />
           </span>
-          <span className="text-center leading-tight text-balance">
-            Sign out
-          </span>
+          <span className={BOTTOM_NAV_LABEL_CLASSES}>Sign out</span>
         </button>
       </form>
     );
