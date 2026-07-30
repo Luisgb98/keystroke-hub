@@ -132,6 +132,32 @@ these are for micro-interactions (hover, open/close), not scene transitions.
 All three durations collapse to `0ms` under `prefers-reduced-motion: reduce`
 — never bypass this by hardcoding a duration outside the tokens.
 
+## Dates & times
+
+No native `<input type="date">`/`type="time"` anywhere (#86) — their popovers
+are unthemed, OS-dependent white surfaces. Use `DatePicker` and `TimePicker`
+(`components/ui/`) instead:
+
+- Both are a typed field plus a themed popover (a `Calendar` for days, a list
+  of times on a 30-minute grid). Typing is never restricted to what the popover
+  offers, so keyboard entry stays as fast as the native control was.
+- The visible input carries `name`, so inside a `<form action>` it serializes
+  exactly the `yyyy-MM-dd` / `HH:mm` string the zod schemas already expect —
+  no hidden mirror field.
+- Controlled (`value`/`onChange`) and uncontrolled (`defaultValue`) both work.
+- Convert with the exported `parseDateValue`/`formatDateValue`, never
+  `new Date("yyyy-MM-dd")` or `toISOString()` — those go through UTC and shift
+  the day west of Greenwich.
+- `triggerLabel` names the popover button and must be unique on the page. It
+  must also not _contain_ the field's own label as a substring: Playwright's
+  `getByLabel` matches substrings, so an "Open release date calendar" trigger
+  beside a "Release date" field makes every `getByLabel("Release date")` in the
+  e2e suite ambiguous. Reword the trigger ("Open publish day calendar") rather
+  than adding `exact: true` to the specs.
+
+The `color-scheme` declarations in `app/globals.css` stay — they still theme
+native scrollbars and autofill.
+
 ## Dark / light mode
 
 Handled by `next-themes` (`ThemeProvider` in `app/layout.tsx`), class-based
