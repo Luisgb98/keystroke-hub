@@ -66,6 +66,31 @@ describe("GithubIssueChip", () => {
     expect(screen.getByText("State unknown")).toHaveClass("sr-only");
   });
 
+  it("gives the three states distinct, non-alarming colors", () => {
+    // The accent is a red now, so a `text-primary` check would read as a
+    // failure. The states form an attention ramp instead: green (open),
+    // full-strength neutral (closed), muted (unknown) — see #84.
+    const iconFor = (state: "open" | "closed" | null) => {
+      const { container, unmount } = render(
+        <GithubIssueChip link={link({ state })} />
+      );
+      const className = container.querySelector("svg")!.getAttribute("class");
+      unmount();
+      return className ?? "";
+    };
+
+    expect(iconFor("open")).toContain("text-success");
+    expect(iconFor("closed")).toContain("text-foreground");
+    expect(iconFor(null)).toContain("text-muted-foreground");
+
+    // Never the accent (red = error) and never destructive.
+    for (const state of ["open", "closed", null] as const) {
+      expect(iconFor(state), `${state}`).not.toMatch(
+        /(^|\s)text-(primary|destructive)(\s|$)/
+      );
+    }
+  });
+
   it("refreshes the link on demand", async () => {
     refreshGithubIssueLink.mockResolvedValue({});
     const user = userEvent.setup();
