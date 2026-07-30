@@ -72,8 +72,11 @@ export function MoodPicker({ logDate, mood }: MoodPickerProps) {
             onClick={() => handleSelect(step.value)}
             className={cn(
               "flex flex-1 flex-col items-center gap-1 rounded-lg border border-border px-1 py-2 text-caption transition-colors disabled:opacity-50",
+              // Solid fill, not a primary tint: under the red accent a tinted
+              // `bg-primary/10 text-primary` step is near-indistinguishable
+              // from the destructive button treatment (see components/ui/button.tsx).
               selected
-                ? "border-primary bg-primary/10 text-primary"
+                ? "border-primary bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-muted"
             )}
           >
