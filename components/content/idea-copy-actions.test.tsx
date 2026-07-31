@@ -84,7 +84,7 @@ describe("IdeaCopyActions", () => {
 
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     expect(writeText.mock.calls[0][0]).toBe(
-      "Glitch tutorial\n\nspeedrun, glitch, tutorial, retro, any%"
+      "Glitch tutorial\n\n#speedrun #glitch #tutorial #retro #any%"
     );
   });
 
@@ -100,7 +100,7 @@ describe("IdeaCopyActions", () => {
 
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     expect(writeText.mock.calls[0][0]).toBe(
-      "First paragraph.\n\nSecond paragraph.\n\nspeedrun, glitch, tutorial, retro, any%"
+      "First paragraph.\n\nSecond paragraph.\n\n#speedrun #glitch #tutorial #retro #any%"
     );
   });
 
@@ -114,7 +114,7 @@ describe("IdeaCopyActions", () => {
 
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     expect(writeText.mock.calls[0][0]).toBe(
-      "speedrun, glitch, tutorial, retro, any%"
+      "#speedrun #glitch #tutorial #retro #any%"
     );
   });
 
