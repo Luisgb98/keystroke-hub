@@ -13,6 +13,27 @@ const skipReason =
 
 const IDEA_CARD_SELECTOR = '[data-slot="idea-card"]';
 
+/**
+ * A realistic 400-plus-line Markdown script — the paste that used to stretch
+ * the capture dialog to thousands of pixels (#93).
+ */
+const LONG_SCRIPT = [
+  "# Cold open",
+  "",
+  "Hook them in the first five seconds.",
+  "",
+  "## The run",
+  "",
+  ...Array.from(
+    { length: 400 },
+    (_, i) => `- Beat ${i + 1}: what happens on screen, and the line over it.`
+  ),
+  "",
+  "## Outro",
+  "",
+  "Ask for the subscribe.",
+].join("\n");
+
 test.describe("idea capture", () => {
   test.skip(skip, skipReason);
   test.describe.configure({ mode: "serial" });
@@ -113,6 +134,130 @@ test.describe("idea capture", () => {
       .getByRole("button", { name: "Delete" })
       .click();
     await expect(card).toHaveCount(0);
+  });
+});
+
+// #93: the capture dialog is a capture surface, not the script editor. A
+// pasted script has to fit inside it without pushing every other field off
+// screen — and still reach the database untouched.
+test.describe("idea capture with a pasted script", () => {
+  test.skip(skip, skipReason);
+  test.describe.configure({ mode: "serial" });
+
+  const PREFIX = "[e2e-idea-script]";
+
+  test.afterEach(async () => {
+    await clearTestIdeas(PREFIX);
+  });
+
+  test("a 400-line paste leaves the dialog compact and lands byte-identical", async ({
+    page,
+  }) => {
+    // Capture writes the idea and then a ~22KB script row — two sequential
+    // round trips to a remote Neon dev DB, well past the budget the
+    // short-input captures in this file need.
+    test.slow();
+    const title = `${PREFIX} Pasted script`;
+    await page.goto("/content/ideas");
+
+    await page.getByRole("button", { name: "New idea" }).click();
+    const dialog = page.getByRole("dialog", { name: "New idea" });
+    await dialog.getByLabel("Title").fill(title);
+
+    // The dialog caps at 90dvh whatever happens, so its own box proves
+    // nothing — what matters is that its *content* doesn't balloon.
+    const contentHeightBefore = await dialog.evaluate((el) => el.scrollHeight);
+
+    const script = dialog.getByLabel("Script (optional)");
+    await script.fill(LONG_SCRIPT);
+
+    const contentHeightAfter = await dialog.evaluate((el) => el.scrollHeight);
+    expect(contentHeightAfter - contentHeightBefore).toBeLessThan(160);
+
+    // The script area took the growth and scrolls inside itself instead.
+    const box = await script.boundingBox();
+    if (!box) throw new Error("the script field was not laid out");
+    expect(box.height).toBeLessThanOrEqual(170);
+    const [scrollHeight, clientHeight] = await script.evaluate((el) => [
+      el.scrollHeight,
+      el.clientHeight,
+    ]);
+    expect(scrollHeight).toBeGreaterThan(clientHeight);
+
+    // The size indicator stands in for the text you can no longer see.
+    await expect(dialog.getByText(/^[\d,]+ words$/)).toBeVisible();
+
+    // Every other field is still there and usable.
+    await expect(dialog.getByLabel("Title")).toHaveValue(title);
+    await dialog.getByLabel("Tags").fill("speedrun, glitch");
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 30000 });
+
+    // Byte-identical on the other side: same newlines, no trimming.
+    const card = page.locator(IDEA_CARD_SELECTOR, { hasText: title });
+    await card.getByRole("link", { name: /script for/ }).click();
+    await expect(page.getByLabel("Script", { exact: true })).toHaveValue(
+      LONG_SCRIPT
+    );
+  });
+
+  test("expanding gives the pasted script more room without hiding the rest", async ({
+    page,
+  }) => {
+    await page.goto("/content/ideas");
+    await page.getByRole("button", { name: "New idea" }).click();
+    const dialog = page.getByRole("dialog", { name: "New idea" });
+
+    const script = dialog.getByLabel("Script (optional)");
+    // A short script needs no expand control — it's already fully visible.
+    await script.fill("# Intro\n\nTwo lines.");
+    await expect(dialog.getByRole("button", { name: "Expand" })).toHaveCount(0);
+
+    await script.fill(LONG_SCRIPT);
+    const collapsed = (await script.boundingBox())!.height;
+    await dialog.getByRole("button", { name: "Expand" }).click();
+    const expanded = (await script.boundingBox())!.height;
+    expect(expanded).toBeGreaterThan(collapsed);
+
+    // Still inside the dialog, and the submit action is still reachable.
+    const dialogBox = (await dialog.boundingBox())!;
+    expect(expanded).toBeLessThan(dialogBox.height);
+    await expect(dialog.getByRole("button", { name: "Save" })).toBeVisible();
+
+    await dialog.getByRole("button", { name: "Collapse" }).click();
+    expect((await script.boundingBox())!.height).toBeCloseTo(collapsed, 0);
+  });
+
+  test("a script over the 200,000-character cap is rejected at the field itself", async ({
+    page,
+  }) => {
+    // 200KB over the wire before the schema can reject it.
+    test.slow();
+    const title = `${PREFIX} Over cap`;
+    await page.goto("/content/ideas");
+
+    await page.getByRole("button", { name: "New idea" }).click();
+    const dialog = page.getByRole("dialog", { name: "New idea" });
+    await dialog.getByLabel("Title").fill(title);
+    await dialog.getByLabel("Script (optional)").fill("a".repeat(200_001));
+    await dialog.getByRole("button", { name: "Save" }).click();
+
+    // Before #93 the server rejected this and the dialog said only "Check the
+    // highlighted fields" — with nothing highlighted.
+    await expect(
+      dialog.getByText(
+        "That script is too long — keep it under 200,000 characters."
+      )
+    ).toBeVisible({ timeout: 30000 });
+    await expect(dialog.getByLabel("Script (optional)")).toHaveAttribute(
+      "aria-invalid",
+      "true"
+    );
+    await expect(dialog).toBeVisible();
+
+    // Nothing was captured.
+    await page.goto(`/content/ideas?q=${encodeURIComponent(PREFIX)}`);
+    await expect(page.locator(IDEA_CARD_SELECTOR)).toHaveCount(0);
   });
 });
 
@@ -486,6 +631,10 @@ test.describe("uniform idea card dimensions", () => {
 test.describe("idea capture mobile viewport", () => {
   test.use({ viewport: { width: 375, height: 812 } });
   test.skip(skip, skipReason);
+  // These share one title prefix, and the `afterEach` clears the whole prefix
+  // — so they can't run against the DB at the same time. Same reason the
+  // capture and filter describes above are serial.
+  test.describe.configure({ mode: "serial" });
 
   const PREFIX = "[e2e-idea-mobile]";
 
@@ -537,6 +686,45 @@ test.describe("idea capture mobile viewport", () => {
       page.getByRole("button", { name: "Capture a thought" })
     ).toHaveCount(0);
     await expect(page.getByRole("link", { name: /Inbox/ })).toHaveCount(1);
+  });
+
+  // #93: on a 812px-tall screen the dialog only has 90dvh to work with, so a
+  // pasted script must take its cap and leave the rest of the form usable.
+  test("a pasted script stays capped and doesn't squeeze the other fields", async ({
+    page,
+  }) => {
+    // See the desktop paste test: the ~22KB script row makes this save slower
+    // than the short-input captures around it.
+    test.slow();
+    const title = `${PREFIX} Pasted script`;
+    await page.goto("/content/ideas");
+
+    await page.getByRole("button", { name: "New idea" }).click();
+    const dialog = page.getByRole("dialog", { name: "New idea" });
+    await dialog.getByLabel("Title").fill(title);
+
+    const script = dialog.getByLabel("Script (optional)");
+    await script.fill(LONG_SCRIPT);
+
+    const viewport = page.viewportSize()!;
+    const dialogBox = (await dialog.boundingBox())!;
+    expect(dialogBox.height).toBeLessThanOrEqual(viewport.height * 0.9 + 1);
+
+    const scriptBox = (await script.boundingBox())!;
+    expect(scriptBox.height).toBeLessThanOrEqual(170);
+    // A quarter of the dialog at most — the title, format, tags and release
+    // rows keep the rest.
+    expect(scriptBox.height).toBeLessThan(dialogBox.height / 3);
+
+    // Touch-scrolling inside the script must not chain out to the dialog's
+    // own `overflow-y-auto` body.
+    await expect(script).toHaveCSS("overscroll-behavior-y", "contain");
+
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 30000 });
+    await expect(
+      page.locator(IDEA_CARD_SELECTOR, { hasText: title })
+    ).toBeVisible();
   });
 
   test("copy buttons are comfortable tap targets", async ({ page }) => {

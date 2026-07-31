@@ -2,7 +2,13 @@
 
 import { useActionState, useEffect, useId, useState } from "react";
 import Link from "next/link";
-import { Clapperboard, ScrollText, X } from "lucide-react";
+import {
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Clapperboard,
+  ScrollText,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { createIdea, updateIdea } from "@/lib/content/actions";
@@ -17,6 +23,10 @@ import {
   PUBLISHING_TAG_STANDARD,
 } from "@/lib/content/idea-schema";
 import { DEFAULT_RELEASE_TIME } from "@/lib/content/release";
+import {
+  formatScriptSize,
+  scriptOverflowsCollapsed,
+} from "@/lib/content/script-stats";
 import type { Idea } from "@/lib/db/schema";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -120,6 +130,7 @@ export function IdeaEditor({
     initialValues(mode, idea, releaseStartsAt)
   );
   const [capturedTitle, setCapturedTitle] = useState("");
+  const [scriptExpanded, setScriptExpanded] = useState(false);
 
   // Recompute field values on each open (the instance stays mounted, only
   // `open` toggles) and detect a successful submit — the same "adjust state
@@ -127,7 +138,10 @@ export function IdeaEditor({
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
-    if (open) setValues(initialValues(mode, idea, releaseStartsAt));
+    if (open) {
+      setValues(initialValues(mode, idea, releaseStartsAt));
+      setScriptExpanded(false);
+    }
   }
 
   const [prevState, setPrevState] = useState(state);
@@ -136,6 +150,10 @@ export function IdeaEditor({
     if (state?.success) {
       setCapturedTitle(values.title);
       onOpenChange(false);
+    } else if (state?.fieldErrors?.script) {
+      // An over-cap paste has to be both visible and reachable to trim, so a
+      // rejected script opens the field up (#93).
+      setScriptExpanded(true);
     }
   }
 
@@ -160,6 +178,10 @@ export function IdeaEditor({
   }, [state]);
 
   const fieldErrors = state?.fieldErrors ?? {};
+  const scriptError = fieldErrors.script?.[0];
+  // Only worth offering "Expand" once there's more script than the collapsed
+  // field can show — otherwise it's a control that does nothing.
+  const scriptTooTall = scriptOverflowsCollapsed(values.script);
   const tagCount = normalizeTags(values.tags).length;
   const tagsComplete = tagCount === PUBLISHING_TAG_STANDARD;
   const tagsOver = tagCount > PUBLISHING_TAG_STANDARD;
@@ -243,15 +265,25 @@ export function IdeaEditor({
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="idea-description">Description</Label>
+            {/* Capped like the script field below: `field-sizing-content` would
+                otherwise let a pasted description stretch the dialog off-screen
+                (#93). */}
             <Textarea
               id="idea-description"
               name="description"
               value={values.description}
               placeholder="The description you'll publish with the video"
+              className="max-h-32 resize-none overflow-y-auto overscroll-contain"
               onChange={(e) =>
                 setValues((v) => ({ ...v, description: e.target.value }))
               }
+              aria-invalid={fieldErrors.description ? true : undefined}
             />
+            {fieldErrors.description ? (
+              <p role="alert" className="text-small text-destructive">
+                {fieldErrors.description[0]}
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-2">
@@ -346,17 +378,65 @@ export function IdeaEditor({
 
           {mode === "create" ? (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="idea-script">Script (optional)</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="idea-script">Script (optional)</Label>
+                <div className="flex items-center gap-3">
+                  {/* Same counter idiom as Tags above: the dialog never shows
+                      the whole script, so this is how you know the paste
+                      landed. */}
+                  <span
+                    data-slot="script-counter"
+                    aria-live="polite"
+                    className={cn(
+                      "font-mono text-caption",
+                      scriptError ? "text-destructive" : "text-muted-foreground"
+                    )}
+                  >
+                    {formatScriptSize(values.script)}
+                  </span>
+                  {scriptTooTall ? (
+                    <button
+                      type="button"
+                      onClick={() => setScriptExpanded((expanded) => !expanded)}
+                      aria-expanded={scriptExpanded}
+                      aria-controls="idea-script"
+                      className="flex items-center gap-1 text-caption text-muted-foreground hover:text-foreground"
+                    >
+                      {scriptExpanded ? (
+                        <ChevronsDownUp aria-hidden className="size-3.5" />
+                      ) : (
+                        <ChevronsUpDown aria-hidden className="size-3.5" />
+                      )}
+                      {scriptExpanded ? "Collapse" : "Expand"}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+              {/* Capture surface, not the editing surface (that's the script
+                  page): the field grows to a cap and then scrolls internally,
+                  so pasting a thousand-line Markdown script leaves the dialog
+                  exactly as tall as it was. `overscroll-contain` keeps a touch
+                  scroll inside the script from chaining to the dialog's own
+                  `overflow-y-auto` body. */}
               <Textarea
                 id="idea-script"
                 name="script"
-                rows={4}
-                placeholder="Write the Markdown script now, or add it later."
+                placeholder="Paste or write the Markdown script — or add it later."
+                className={cn(
+                  "resize-none overflow-y-auto overscroll-contain font-mono leading-relaxed",
+                  scriptExpanded ? "max-h-[45dvh]" : "max-h-40"
+                )}
                 value={values.script}
                 onChange={(e) =>
                   setValues((v) => ({ ...v, script: e.target.value }))
                 }
+                aria-invalid={scriptError ? true : undefined}
               />
+              {scriptError ? (
+                <p role="alert" className="text-small text-destructive">
+                  {scriptError}
+                </p>
+              ) : null}
             </div>
           ) : idea ? (
             <Button
