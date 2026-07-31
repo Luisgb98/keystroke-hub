@@ -153,6 +153,20 @@ Mobile-first, one-handed capture is the design center:
   (mirrors `TrackPicker`'s visual language, but — unlike track — always has a
   default selection since format is optional). Create mode has an inline
   Markdown script field; edit mode links out to the script page instead. The
+  script field is a **capture** surface, not the editing surface (#93): the
+  shared `Textarea` is `field-sizing-content` with no ceiling, so pasting a
+  finished `.md` used to stretch the dialog to thousands of pixels. The call
+  site caps it (`max-h-40`, `max-h-[45dvh]` once expanded) and lets it scroll
+  inside itself, with `overscroll-contain` so a touch scroll doesn't chain out
+  to the dialog's own `overflow-y-auto` body. Because the text is no longer all
+  visible, a mono word counter beside the label (the same idiom as the tag
+  counter) reports what landed, and an Expand/Collapse toggle appears once the
+  script outgrows the collapsed field (`lib/content/script-stats.ts` decides,
+  from an estimate of wrapped lines). The Description textarea is capped the
+  same way. Both render their own field errors now — the script's 200,000-char
+  cap and the description's 4,000-char cap used to reject server-side while the
+  dialog showed only the generic form error; a rejected script also
+  auto-expands so the offending text can be trimmed. The
   release date/time use the shared `DatePicker`/`TimePicker` (#86) — typed
   `yyyy-MM-dd`/`HH:mm` fields with a themed calendar/time popover, replacing the
   native `<input type="date">`/`type="time"` whose popups rendered as

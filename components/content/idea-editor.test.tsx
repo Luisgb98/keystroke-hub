@@ -41,6 +41,8 @@ describe("IdeaEditor — create mode", () => {
 
     expect(screen.getByText("New idea")).toBeInTheDocument();
     expect(screen.getByLabelText("Release time")).toHaveValue("19:00");
+    // #93 reworked the field's chrome (counter, cap, expand) but kept it
+    // inline and labelled — capture with a ready script stays one dialog.
     expect(screen.getByLabelText("Script (optional)")).toBeInTheDocument();
   });
 
@@ -121,6 +123,182 @@ describe("IdeaEditor — create mode", () => {
     expect(screen.getByText("3/5")).toBeInTheDocument();
     await user.type(screen.getByLabelText("Tags"), ", d, e, f");
     expect(screen.getByText("6/5")).toBeInTheDocument();
+  });
+});
+
+// #93: the dialog is a capture surface, not the script editor. Pasting a full
+// Markdown script must leave it exactly as tall as it was — the field caps and
+// scrolls internally, and a counter stands in for the text you can't see.
+// jsdom measures nothing, so these assert the classes and state that produce
+// the cap; the real height check lives in e2e/ideas.spec.ts.
+describe("IdeaEditor — capture script field", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  /** A script well past the collapsed field's height, with the newlines that must survive the round trip. */
+  const LONG_SCRIPT = [
+    "# Cold open",
+    "",
+    "Hook them in the first five seconds.",
+    "",
+    "## Beat one",
+    "",
+    ...Array.from({ length: 40 }, (_, i) => `- Line ${i + 1} of the outline`),
+    "",
+    "## Outro",
+    "",
+    "Ask for the subscribe.",
+  ].join("\n");
+
+  function scriptField() {
+    return screen.getByLabelText("Script (optional)");
+  }
+
+  it("caps its height and scrolls internally instead of growing with the paste", () => {
+    render(<IdeaEditor mode="create" open onOpenChange={vi.fn()} />);
+
+    // The shared Textarea is `field-sizing-content` with no ceiling; the cap
+    // is applied here at the call site, not in the primitive.
+    expect(scriptField()).toHaveClass(
+      "max-h-40",
+      "overflow-y-auto",
+      "overscroll-contain",
+      "resize-none"
+    );
+  });
+
+  it("renders the script in a monospace style fitting Markdown", () => {
+    render(<IdeaEditor mode="create" open onOpenChange={vi.fn()} />);
+
+    expect(scriptField()).toHaveClass("font-mono");
+  });
+
+  it("reports the script's size so a long paste is visible without scrolling it", async () => {
+    const user = userEvent.setup();
+    render(<IdeaEditor mode="create" open onOpenChange={vi.fn()} />);
+
+    const counter = screen.getByText("0 words");
+    expect(counter).toHaveAttribute("aria-live", "polite");
+
+    await user.click(scriptField());
+    await user.paste(LONG_SCRIPT);
+
+    expect(screen.getByText("259 words")).toBeInTheDocument();
+    expect(screen.queryByText("0 words")).not.toBeInTheDocument();
+  });
+
+  it("offers Expand only once the script outgrows the collapsed field, and toggles the cap", async () => {
+    const user = userEvent.setup();
+    render(<IdeaEditor mode="create" open onOpenChange={vi.fn()} />);
+
+    expect(
+      screen.queryByRole("button", { name: /Expand/ })
+    ).not.toBeInTheDocument();
+
+    await user.click(scriptField());
+    await user.paste("# Intro\n\nTwo lines only.");
+    expect(
+      screen.queryByRole("button", { name: /Expand/ })
+    ).not.toBeInTheDocument();
+
+    await user.clear(scriptField());
+    await user.click(scriptField());
+    await user.paste(LONG_SCRIPT);
+
+    const expand = screen.getByRole("button", { name: /Expand/ });
+    expect(expand).toHaveAttribute("aria-expanded", "false");
+    expect(expand).toHaveAttribute("aria-controls", "idea-script");
+
+    await user.click(expand);
+    expect(scriptField()).toHaveClass("max-h-[45dvh]");
+    expect(scriptField()).not.toHaveClass("max-h-40");
+
+    const collapse = screen.getByRole("button", { name: /Collapse/ });
+    expect(collapse).toHaveAttribute("aria-expanded", "true");
+    await user.click(collapse);
+    expect(scriptField()).toHaveClass("max-h-40");
+  });
+
+  it("submits the pasted script byte-identical — no trimming, no reflowing", async () => {
+    createIdea.mockResolvedValue({ success: true });
+    const user = userEvent.setup();
+    render(<IdeaEditor mode="create" open onOpenChange={vi.fn()} />);
+
+    await user.type(screen.getByLabelText("Title"), "Glitch tutorial");
+    await user.click(scriptField());
+    await user.paste(LONG_SCRIPT);
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(createIdea).toHaveBeenCalledTimes(1));
+    const [, formData] = createIdea.mock.calls[0] as [unknown, FormData];
+    expect(formData.get("script")).toBe(LONG_SCRIPT);
+  });
+
+  it("surfaces an over-cap script rejection at the field itself, and opens it up", async () => {
+    const message =
+      "That script is too long — keep it under 200,000 characters.";
+    createIdea.mockResolvedValue({
+      error: "Check the highlighted fields.",
+      fieldErrors: { script: [message] },
+    });
+    const user = userEvent.setup();
+    render(<IdeaEditor mode="create" open onOpenChange={vi.fn()} />);
+
+    await user.type(screen.getByLabelText("Title"), "Glitch tutorial");
+    await user.click(scriptField());
+    await user.paste(LONG_SCRIPT);
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    // Before #93 the only feedback was the generic form-level error.
+    const error = await screen.findByText(message);
+    expect(error).toHaveAttribute("role", "alert");
+    expect(scriptField()).toHaveAttribute("aria-invalid", "true");
+    // The offending text has to be reachable to trim it down.
+    expect(scriptField()).toHaveClass("max-h-[45dvh]");
+    expect(
+      screen.getByRole("button", { name: /Collapse/ })
+    ).toBeInTheDocument();
+  });
+
+  it("caps the Description the same way and renders its own error", async () => {
+    const message = "Keep the description under 4000 characters";
+    createIdea.mockResolvedValue({
+      error: "Check the highlighted fields.",
+      fieldErrors: { description: [message] },
+    });
+    const user = userEvent.setup();
+    render(<IdeaEditor mode="create" open onOpenChange={vi.fn()} />);
+
+    const description = screen.getByLabelText("Description");
+    expect(description).toHaveClass(
+      "max-h-32",
+      "overflow-y-auto",
+      "overscroll-contain"
+    );
+
+    await user.type(screen.getByLabelText("Title"), "Glitch tutorial");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText(message)).toHaveAttribute("role", "alert");
+    expect(description).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("starts collapsed again the next time the dialog opens", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <IdeaEditor mode="create" open onOpenChange={vi.fn()} />
+    );
+
+    await user.click(scriptField());
+    await user.paste(LONG_SCRIPT);
+    await user.click(screen.getByRole("button", { name: /Expand/ }));
+    expect(scriptField()).toHaveClass("max-h-[45dvh]");
+
+    rerender(<IdeaEditor mode="create" open={false} onOpenChange={vi.fn()} />);
+    rerender(<IdeaEditor mode="create" open onOpenChange={vi.fn()} />);
+
+    expect(scriptField()).toHaveValue("");
+    expect(scriptField()).toHaveClass("max-h-40");
+    expect(screen.getByText("0 words")).toBeInTheDocument();
   });
 });
 
