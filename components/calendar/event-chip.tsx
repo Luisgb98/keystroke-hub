@@ -5,12 +5,12 @@ import { AlertTriangle } from "lucide-react";
 import type { CSSProperties } from "react";
 
 import { cn } from "@/lib/utils";
+import { usePointerDrag } from "@/hooks/use-pointer-drag";
 import { moveEventByDays, type TimeShift } from "@/lib/calendar/drag";
 import type { CalendarEvent } from "@/lib/calendar/types";
 
 import { EventEditor } from "./event-editor";
 import { TRACK_ICON, TRACK_LABEL, TRACK_SURFACE_CLASSES } from "./track-styles";
-import { useEventDrag } from "./use-event-drag";
 
 interface EventChipProps {
   event: CalendarEvent;
@@ -46,9 +46,9 @@ export function EventChip({ event, className, onReschedule }: EventChipProps) {
     return Math.round(dy / height) * 7 + Math.round(dx / width);
   }
 
-  const drag = useEventDrag({
+  const drag = usePointerDrag({
     disabled: !onReschedule,
-    onDragMove: (delta) => setGestureDelta(delta),
+    onDragMove: ({ dx, dy }) => setGestureDelta({ dx, dy }),
     onDragEnd: ({ dx, dy }) => {
       setGestureDelta(null);
       onReschedule?.(moveEventByDays(event, deltaDaysFrom(dx, dy)));

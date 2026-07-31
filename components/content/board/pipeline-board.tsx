@@ -1,15 +1,18 @@
 "use client";
 
-import { useOptimistic, useState, useTransition } from "react";
+import { useOptimistic, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { cn } from "@/lib/utils";
 import { updateIdeaStatus } from "@/lib/content/actions";
 import { groupIdeasByStatus } from "@/lib/content/board";
 import { IDEA_STATUSES, type IdeaStatus } from "@/lib/content/idea-status";
 import type { Idea } from "@/lib/db/schema";
 
+import { BoardDragPreview } from "./board-drag-preview";
 import { PublishChecklistDialog } from "./publish-checklist-dialog";
 import { StageColumn } from "./stage-column";
+import { useBoardDrag } from "./use-board-drag";
 
 interface PipelineBoardProps {
   ideas: Idea[];
@@ -30,6 +33,10 @@ interface MoveAction {
  * revalidated `ideas` prop reverts the optimistic state on its own (React's
  * built-in rollback), and a toast surfaces the error (see
  * docs/content-ideas.md).
+ *
+ * Cards move two ways, both landing in `handleMove`: dragging one into
+ * another column (#89, via `useBoardDrag`) or the `MoveMenu` on the card —
+ * kept as the keyboard/screen-reader path, which no pointer gesture replaces.
  */
 export function PipelineBoard({
   ideas,
@@ -48,6 +55,7 @@ export function PipelineBoard({
   // nudge toast's "Open checklist" action can open the same dialog a chip
   // tap would (see docs/content-ideas.md).
   const [checklistIdea, setChecklistIdea] = useState<Idea | null>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
 
   function handleMove(idea: Idea, status: IdeaStatus) {
     startTransition(async () => {
@@ -72,12 +80,18 @@ export function PipelineBoard({
     });
   }
 
+  const drag = useBoardDrag({ boardRef, onDrop: handleMove });
   const grouped = groupIdeasByStatus(optimisticIdeas);
 
   return (
     <div
+      ref={boardRef}
       data-slot="pipeline-board"
-      className="flex flex-1 [scroll-snap-type:x_mandatory] gap-3 overflow-x-auto pb-4"
+      className={cn(
+        "flex flex-1 snap-x snap-mandatory gap-3 overflow-x-auto pb-4",
+        // A mouse drag would otherwise select card text on its way across.
+        drag.draggingIdea && "select-none"
+      )}
     >
       {IDEA_STATUSES.map((status) => (
         <StageColumn
@@ -88,8 +102,15 @@ export function PipelineBoard({
           ideaIdsWithScripts={ideaIdsWithScripts}
           checklistProgress={checklistProgress}
           onOpenChecklist={setChecklistIdea}
+          isDropTarget={drag.dropTarget === status}
+          draggingIdeaId={drag.draggingIdea?.id ?? null}
+          onCardDragStart={drag.startDrag}
         />
       ))}
+
+      {drag.draggingIdea && drag.point ? (
+        <BoardDragPreview idea={drag.draggingIdea} point={drag.point} />
+      ) : null}
 
       {checklistIdea ? (
         <PublishChecklistDialog

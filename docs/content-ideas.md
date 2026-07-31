@@ -256,9 +256,17 @@ stage, so the pipeline's shape (and what's stuck where) is visible at a
 glance. Cross-linked with the ideas list via header links on both routes.
 
 - **Layout**: `PipelineBoard` renders a horizontally-scrolling, snap-scrolled
-  (`scroll-snap-type: x mandatory`) row of `StageColumn`s — fixed-width
-  (~85vw mobile, 20rem desktop) so the phone-usable acceptance criterion
-  needs no JS. Exactly five columns, one per pipeline stage.
+  (`snap-x snap-mandatory`) row of `StageColumn`s — fixed-width (~85vw mobile,
+  20rem desktop) so the phone-usable acceptance criterion needs no JS. Exactly
+  five columns, one per pipeline stage. Each column is a shelf with its own
+  muted surface, a rail in the content-track colour beside the stage name
+  (solid `--primary` on **Published**, so the end of the line reads
+  differently), and a mono count chip; cards sit inside as `bg-card` tiles with
+  a content-track left edge, and the column body is its own vertical
+  scrollport. Buttons everywhere on the page — card actions, checklist chip,
+  the checklist dialog, the header's "Ideas list" link — come from
+  `components/ui/button.tsx`, never hand-rolled surfaces (#89, see
+  docs/design-system.md).
 - **Sorting**: each column sorts oldest-in-stage first (by
   `stage_entered_at`) — the card that's been stuck longest surfaces first,
   the signal the board exists to expose. `groupIdeasByStatus`
@@ -266,13 +274,14 @@ glance. Cross-linked with the ideas list via header links on both routes.
   outside `lib/data/ideas.ts` deliberately (that module is `server-only`,
   and `PipelineBoard` — a Client Component — needs to re-run the grouping
   client-side after every optimistic move).
-- **Moving cards**: a `MoveMenu` dropdown on each `BoardCard` lists every
-  _other_ stage (next stage visually emphasized), not just drag-and-drop's
-  adjacent-column model — the acceptance criterion is "items can be moved
-  between stages," not drag-and-drop, which is the worst interaction on a
-  mobile-first board (fights scroll, needs long-press, inaccessible by
-  default). One tap + one tap, identical across touch/mouse/keyboard/screen
-  reader, zero new dependencies.
+- **Moving cards — two paths, one commit**: dragging a card into another
+  column (#89, below) or the `MoveMenu` dropdown on each `BoardCard`, which
+  lists every _other_ stage (next stage emphasized in the content-track
+  colour). Both call the same `handleMove`, so optimism, rollback and the
+  publish nudge are shared rather than reimplemented per path. The menu is not
+  a legacy leftover: it is the only path that works from the keyboard or with
+  a screen reader, and the only one that can reach a stage that isn't on
+  screen — a drag can only target a visible column.
 - **Optimistic updates**: `PipelineBoard` uses `useOptimistic` so a move
   jumps the card to the target column instantly, before the server round
   trip resolves; a failed `updateIdeaStatus` surfaces a `sonner` toast, and
@@ -283,6 +292,50 @@ glance. Cross-linked with the ideas list via header links on both routes.
   timestamp in the `title` attribute.
 - **No manual ordering, no status-history table**: both deliberately out of
   scope for v1 — see the plan comment on issue #16 for the reasoning.
+
+### Drag & drop (issue #89)
+
+Cards are dragged between columns with the pointer, on the app's **one drag
+idiom**: `hooks/use-pointer-drag.ts`, the state machine extracted from the
+calendar's drag-to-reschedule (#13, see docs/calendar.md) rather than a new
+dependency. Mouse/pen engage past a 5px threshold; touch needs a ~350ms
+long-press, and a swipe that moves before that timer fires is treated as a
+scroll — which is what lets a finger both pan the board and lift a card. No
+drag-and-drop library is involved: `@dnd-kit` has had no release since
+December 2024 (failing the latest-stable-deps rule), and a sortable library
+would be overkill for a board with no within-column ordering.
+
+- **Layering**: `lib/content/board-drag.ts` is pure and unit-tested —
+  `resolveDropColumn` (pointer position → the column box under it, or `null`)
+  and `resolveDropMove` (adds "…and it isn't where the card came from", the
+  board's counterpart to the calendar's `isNoopShift`). DOM reading lives in
+  `useBoardDrag` (`measureColumns`), the gesture in `usePointerDrag`. Same
+  split as the calendar: geometry out of the hook, math independently testable.
+- **Column-level targeting**: the drop indicator highlights the whole target
+  column (`data-drop-target`), never a slot between cards — columns auto-sort
+  oldest-in-stage first, so there is nothing to aim at within one. The whole
+  column box counts, header and empty-state placeholder included, which is why
+  an empty column is a valid target. A drop outside every column is a no-op,
+  not a snap to the nearest one.
+- **One gesture at a time**: the hook lives in `PipelineBoard` (via
+  `useBoardDrag`), not in each card — only one card can be airborne, and the
+  hit-test needs the board element anyway. Cards hand their idea to
+  `startDrag` on pointerdown, and skip it when the press landed on one of
+  their own controls (script link, checklist chip, move menu).
+- **No layout during a drag**: the lifted card stays in place as a dimmed
+  placeholder and a `BoardDragPreview` ghost follows the pointer, portalled
+  into `document.body`. Translating the real card would be clipped twice over
+  (the column is a vertical scrollport, the board a horizontal one) and would
+  put layout work on every pointer move.
+- **Scroll vs. drag on touch**: once a drag engages, `usePointerDrag` blocks
+  `touchmove` (non-passive) so the board can't pan under the finger.
+  `touch-action: none` can't do that job — it is latched at touchstart, so it
+  would have to kill swipe-to-scroll from a card as well.
+- **Cancel & failure**: `Escape` or `pointercancel` abandons the drag with the
+  card untouched; a rejected `updateIdeaStatus` follows the same
+  optimistic-rollback + error-toast path a menu move does. Dropping on
+  **Published** is likewise identical to picking Published from the menu,
+  publish-checklist nudge included.
 
 ## Publish checklist (issue #20)
 
@@ -371,6 +424,19 @@ view, delete routes back to the list), and the board's
 `pipeline-board`/`stage-column`/`board-card`/`move-menu`/`checklist-chip`/
 `publish-checklist-dialog` components.
 
+#89 adds, for drag & drop: `lib/content/board-drag`'s pure drop resolution
+(containment, edges, misses, no-op drops, zero-area columns), `measureColumns`'
+DOM read, and — driven through `PipelineBoard` with stubbed column geometry,
+since jsdom lays nothing out — a full drag committing the move, the drop
+indicator and floating preview, empty-column drops, no-op drops (own column,
+off-board), `Escape`/`pointercancel` cancellation, the publish nudge on a drop
+onto Published, error-toast-and-revert on a failed drop, the touch long-press
+lift, and a pre-engage swipe scrolling instead of lifting. `BoardCard` and
+`StageColumn` cover the grip affordance, the controls that must not start a
+drag, and the drop-target/airborne states. The shared gesture itself is tested
+in `hooks/use-pointer-drag.test.tsx` (thresholds, long-press, cancels,
+click-after-drag suppression, touch-scroll blocking, unmount cleanup).
+
 e2e (`e2e/ideas.spec.ts`, `e2e/board.spec.ts`, and
 `e2e/publish-checklist.spec.ts`, real DB via `e2e/support/ideas-db.ts` with
 `[e2e-*]`-prefixed rows and per-suite cleanup, skipped where `DATABASE_URL`
@@ -388,7 +454,13 @@ is unset):
 - **Board**: seeded ideas render in their matching column, moving a card via
   the move menu updates its column and survives a reload, parking/un-parking
   round-trips correctly, and a mobile-viewport check that columns scroll
-  horizontally and the move flow works one-handed. `board.spec.ts` is
+  horizontally and the move flow works one-handed. #89 adds: a mouse drag
+  between columns persisting across a reload, a drag onto an empty column, a
+  drag onto Published raising the nudge, `Escape` mid-drag leaving the card
+  put, drag and menu both working on the same card, and — on the mobile
+  viewport — a long-press lift + drop (synthesized touch pointer events, the
+  `drag-reschedule.spec.ts` recipe) plus a pre-engage swipe that scrolls the
+  columns instead of lifting a card. `board.spec.ts` is
   excluded from the `mobile-chrome` Playwright project (`playwright.config.ts`)
   since it seeds/clears real rows and already covers its own mobile
   viewport via `test.use` — the same precedent as the calendar suites.

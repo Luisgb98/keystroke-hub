@@ -194,15 +194,20 @@ also unify mouse, touch, and pen in one code path.
   shift for month/all-day chips, which have no time-of-day axis),
   `resizeEvent` (one edge, floored at a 15-minute minimum duration), and
   `isNoopShift` (a drop back at the origin is not a mutation).
-- **`components/calendar/use-event-drag.ts`** — a DOM/geometry-agnostic
-  pointer gesture state machine (`idle → pressed → dragging → committing`).
-  Mouse/pen engage past a 5px movement threshold; touch requires a ~350ms
-  long-press first (so a scroll swipe isn't mistaken for a lift) and cancels
-  the pending timer if the touch moves like a scroll before it fires.
-  `Escape`/`pointercancel` abort without committing. It reports raw pixel
-  deltas only — callers convert those to day/minute offsets using
-  `drag.ts`, which keeps the conversion independently testable and lets
-  component tests inject geometry instead of depending on real layout.
+- **`hooks/use-pointer-drag.ts`** — a DOM/geometry-agnostic pointer gesture
+  state machine (`idle → pressed → dragging → committing`). Mouse/pen engage
+  past a 5px movement threshold; touch requires a ~350ms long-press first (so a
+  scroll swipe isn't mistaken for a lift) and cancels the pending timer if the
+  touch moves like a scroll before it fires; once engaged it blocks `touchmove`
+  so the surface underneath can't pan away. `Escape`/`pointercancel` abort
+  without committing. It reports raw pixel deltas plus the live pointer
+  position — callers convert those to day/minute offsets using `drag.ts` (or,
+  on the content board, to a target column using `lib/content/board-drag.ts`),
+  which keeps the conversion independently testable and lets component tests
+  inject geometry instead of depending on real layout. It lives in `hooks/`
+  rather than under `components/calendar/` because the content board's card
+  drag & drop (#89) runs on the same machine — one drag idiom, no library (see
+  docs/content-ideas.md).
 - **`components/calendar/use-event-reschedule.ts`** — shared by every view:
   wraps the new `rescheduleEvent` Server Function in React's `useOptimistic`
   so a drag/resize applies instantly in the UI. Unlike #11's mutations

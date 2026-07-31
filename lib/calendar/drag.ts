@@ -6,10 +6,6 @@ import type { CalendarEvent } from "./types";
 export const DRAG_SNAP_MINUTES = 15;
 /** An event can never be resized shorter than one snap step. */
 export const MIN_EVENT_DURATION_MINUTES = DRAG_SNAP_MINUTES;
-/** Pointer movement (px) below this is a click/tap, not a drag. */
-export const DRAG_THRESHOLD_PX = 5;
-/** Touch hold time before a drag engages, so a scroll swipe isn't mistaken for a lift. */
-export const LONG_PRESS_MS = 350;
 
 export interface TimeShift {
   startsAt: Date;
