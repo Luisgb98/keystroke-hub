@@ -518,8 +518,12 @@ test.describe("idea publish copy blocks", () => {
   const PREFIX = "[e2e-idea-copy]";
   const title = `${PREFIX} Publish ready`;
   const description = "First paragraph.\n\nSecond paragraph.";
-  const tags = ["speedrun", "glitch", "tutorial", "retro", "movement"];
-  const tagsText = tags.join(", ");
+  // "boss rush" carries an internal space on purpose: #94 collapses a multi-word
+  // tag into one hashtag, so the clipboard proves that end to end.
+  const tags = ["speedrun", "glitch", "tutorial", "retro", "boss rush"];
+  // Spelled out rather than derived, so the assertion is independent of the
+  // formatter it checks.
+  const tagsText = "#speedrun #glitch #tutorial #retro #bossrush";
 
   test.beforeAll(async () => {
     await seedTestIdea({ title, description, tags });

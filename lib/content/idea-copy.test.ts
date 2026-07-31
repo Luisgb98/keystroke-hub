@@ -32,14 +32,17 @@ function block(idea: Idea, key: IdeaCopyBlockKey) {
 }
 
 describe("formatIdeaTags", () => {
-  it("joins tags comma-separated", () => {
-    expect(formatIdeaTags(["speedrun", "glitch", "boss rush"])).toBe(
-      "speedrun, glitch, boss rush"
+  it("joins tags as space-separated hashtags", () => {
+    expect(formatIdeaTags(["speedrun", "glitch", "movement"])).toBe(
+      "#speedrun #glitch #movement"
     );
   });
 
-  it("keeps multi-word tags intact (no hashtag conversion)", () => {
-    expect(formatIdeaTags(["boss rush"])).toBe("boss rush");
+  it("collapses a multi-word tag into a single hashtag", () => {
+    expect(formatIdeaTags(["boss rush"])).toBe("#bossrush");
+    expect(formatIdeaTags(["death awakening", "glitch"])).toBe(
+      "#deathawakening #glitch"
+    );
   });
 
   it("is empty for no tags", () => {
@@ -69,19 +72,19 @@ describe("formatIdeaCopyBlocks", () => {
 
   it("copies title, a blank line, then the tags", () => {
     expect(block(full, "title-tags").text).toBe(
-      "Glitch tutorial\n\nspeedrun, glitch, tutorial, retro, any%"
+      "Glitch tutorial\n\n#speedrun #glitch #tutorial #retro #any%"
     );
   });
 
   it("copies description, a blank line, then the tags", () => {
     expect(block(full, "description-tags").text).toBe(
-      "First paragraph.\n\nSecond paragraph.\n\nspeedrun, glitch, tutorial, retro, any%"
+      "First paragraph.\n\nSecond paragraph.\n\n#speedrun #glitch #tutorial #retro #any%"
     );
   });
 
   it("copies the tags alone", () => {
     expect(block(full, "tags").text).toBe(
-      "speedrun, glitch, tutorial, retro, any%"
+      "#speedrun #glitch #tutorial #retro #any%"
     );
   });
 
@@ -131,14 +134,29 @@ describe("formatIdeaCopyBlocks", () => {
 
     it("still copies title + tags and tags", () => {
       expect(block(noDescription, "title-tags").text).toBe(
-        "Speedrun any% commentary\n\nspeedrun, glitch"
+        "Speedrun any% commentary\n\n#speedrun #glitch"
       );
-      expect(block(noDescription, "tags").text).toBe("speedrun, glitch");
+      expect(block(noDescription, "tags").text).toBe("#speedrun #glitch");
     });
+  });
+
+  it("collapses a multi-word tag inside every tag-bearing block", () => {
+    const idea = makeIdea({
+      title: "Boss guide",
+      description: "How to beat it.",
+      tags: ["death awakening", "glifos"],
+    });
+    expect(block(idea, "tags").text).toBe("#deathawakening #glifos");
+    expect(block(idea, "title-tags").text).toBe(
+      "Boss guide\n\n#deathawakening #glifos"
+    );
+    expect(block(idea, "description-tags").text).toBe(
+      "How to beat it.\n\n#deathawakening #glifos"
+    );
   });
 
   it("copies fewer than the five-tag standard when that's all there is", () => {
     const idea = makeIdea({ tags: ["speedrun", "glitch"] });
-    expect(block(idea, "tags").text).toBe("speedrun, glitch");
+    expect(block(idea, "tags").text).toBe("#speedrun #glitch");
   });
 });

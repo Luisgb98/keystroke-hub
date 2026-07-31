@@ -196,9 +196,11 @@ Mobile-first, one-handed capture is the design center:
   retype. The block text is built by the pure `formatIdeaCopyBlocks`
   (`lib/content/idea-copy.ts`): title/description and tags are separated by a
   blank line, the author's line breaks are preserved verbatim, and tags render
-  **comma-separated** (matching the platform tags field; safe for multi-word
-  tags, unlike hashtag form). A block with nothing to copy (no description, no
-  tags) renders disabled. Clipboard idiom follows `CopySummaryButton`
+  as **hashtags** (`#speedrun #glitch`, #94) — the form actually pasted when
+  publishing, matching the filter chips. A hashtag can't carry spaces, so a
+  multi-word tag collapses into one (`boss rush` → `#bossrush`); tag entry and
+  storage are unchanged (still comma-separated, spaces allowed). A block with
+  nothing to copy (no description, no tags) renders disabled. Clipboard idiom follows `CopySummaryButton`
   (see docs/journal.md): success toast + brief check-icon confirmation, error
   toast when the browser blocks clipboard access.
 - **Status control (#72, #73)**: the themed shadcn `Select`
