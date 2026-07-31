@@ -52,13 +52,13 @@ export function truncateSnippet(
 
 export function buildIdeaSearchCondition(query: string): SQL {
   const pattern = containsPattern(query);
-  return or(ilike(ideas.title, pattern), ilike(ideas.notes, pattern))!;
+  return or(ilike(ideas.title, pattern), ilike(ideas.description, pattern))!;
 }
 
 interface IdeaSearchRow {
   id: string;
   title: string;
-  notes: string | null;
+  description: string | null;
   updatedAt: Date;
 }
 
@@ -68,7 +68,7 @@ export function mapIdeaToResult(row: IdeaSearchRow): SearchResult {
     type: "idea",
     world: "content",
     title: row.title,
-    snippet: truncateSnippet(row.notes),
+    snippet: truncateSnippet(row.description),
     href: `/content/ideas/${row.id}/script`,
     updatedAt: row.updatedAt,
   };
@@ -77,7 +77,7 @@ export function mapIdeaToResult(row: IdeaSearchRow): SearchResult {
 const ideaSearchColumns = {
   id: ideas.id,
   title: ideas.title,
-  notes: ideas.notes,
+  description: ideas.description,
   updatedAt: ideas.updatedAt,
 };
 

@@ -134,13 +134,13 @@ describe("triageEntry", () => {
     const result = await triageEntry("entry-1", {
       type: "content_idea",
       title: "Retro video",
-      notes: "cover the highlights",
+      description: "cover the highlights",
     });
     expect(result.success).toBe(true);
     expect(dbMock.insertCalls[0].table).toBe(ideas);
     expect(dbMock.insertCalls[0].values).toMatchObject({
       title: "Retro video",
-      notes: "cover the highlights",
+      description: "cover the highlights",
     });
     // Atomicity: destination insert + entry update go in one batch.
     expect(dbMock.batchCalls).toHaveLength(1);

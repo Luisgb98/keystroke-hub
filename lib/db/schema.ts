@@ -191,7 +191,10 @@ export const ideas = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     title: text("title").notNull(),
-    notes: text("notes"),
+    // The publish-facing video description, drafted at capture time (#88).
+    // Renamed from `notes` — capture asks for the real description rather than
+    // scribbled notes, and the copy-to-clipboard blocks paste it verbatim.
+    description: text("description"),
     format: ideaFormatEnum("format").notNull().default("either"),
     status: ideaStatusEnum("status").notNull().default("idea"),
     // Free-form, single-user tags — filter options are derived from tags in

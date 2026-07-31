@@ -155,7 +155,7 @@ export async function createIdea(
 
   const parsed = ideaCaptureSchema.safeParse({
     title: formData.get("title") ?? "",
-    notes: formData.get("notes") ?? "",
+    description: formData.get("description") ?? "",
     format: formData.get("format") || undefined,
     tags: formData.get("tags") ?? "",
     script: formData.get("script") ?? "",
@@ -196,8 +196,8 @@ export async function createIdea(
 
 /**
  * Edit every field of an existing idea except the script (which keeps its own
- * dedicated editor page — see docs/scripts.md): title, notes, format, tags,
- * and the release date/time. Status/`stageEnteredAt` are owned by
+ * dedicated editor page — see docs/scripts.md): title, description, format,
+ * tags, and the release date/time. Status/`stageEnteredAt` are owned by
  * `updateIdeaStatus` and left untouched here.
  *
  * The release transition is derived by comparing the desired release against
@@ -216,7 +216,7 @@ export async function updateIdea(
 
   const parsed = ideaEditSchema.safeParse({
     title: formData.get("title") ?? "",
-    notes: formData.get("notes") ?? "",
+    description: formData.get("description") ?? "",
     format: formData.get("format") || undefined,
     tags: formData.get("tags") ?? "",
     releaseDate: formData.get("releaseDate") ?? "",

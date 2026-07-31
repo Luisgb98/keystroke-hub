@@ -19,7 +19,7 @@ function makeIdea(overrides: Partial<Idea> = {}): Idea {
   return {
     id: "idea-1",
     title: "Speedrun any% commentary",
-    notes: null,
+    description: null,
     format: "either",
     status: "idea",
     tags: [],
@@ -42,6 +42,30 @@ describe("IdeaEditor — create mode", () => {
     expect(screen.getByText("New idea")).toBeInTheDocument();
     expect(screen.getByLabelText("Release time")).toHaveValue("19:00");
     expect(screen.getByLabelText("Script (optional)")).toBeInTheDocument();
+  });
+
+  // #88: capture asks for the publish-facing description, not vague "Notes" —
+  // the label, the placeholder, and the submitted field name all say so.
+  it("asks for a Description, never Notes, and submits it under that name", async () => {
+    createIdea.mockResolvedValue({ success: true });
+    const user = userEvent.setup();
+    render(<IdeaEditor mode="create" open onOpenChange={vi.fn()} />);
+
+    const field = screen.getByLabelText("Description");
+    expect(field).toHaveAttribute(
+      "placeholder",
+      "The description you'll publish with the video"
+    );
+    expect(screen.queryByLabelText("Notes")).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Title"), "Glitch tutorial");
+    await user.type(field, "Cover the wrong warp");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(createIdea).toHaveBeenCalledTimes(1));
+    const [, formData] = createIdea.mock.calls[0] as [unknown, FormData];
+    expect(formData.get("description")).toBe("Cover the wrong warp");
+    expect(formData.get("notes")).toBeNull();
   });
 
   it("submits the script and release date/time in the capture payload", async () => {
@@ -109,7 +133,7 @@ describe("IdeaEditor — edit mode", () => {
         mode="edit"
         idea={makeIdea({
           title: "Boss rush",
-          notes: "cover phase 3",
+          description: "cover phase 3",
           format: "video",
           tags: ["speedrun", "glitch"],
         })}
@@ -121,7 +145,7 @@ describe("IdeaEditor — edit mode", () => {
 
     expect(screen.getByText("Edit idea")).toBeInTheDocument();
     expect(screen.getByLabelText("Title")).toHaveValue("Boss rush");
-    expect(screen.getByLabelText("Notes")).toHaveValue("cover phase 3");
+    expect(screen.getByLabelText("Description")).toHaveValue("cover phase 3");
     expect(screen.getByRole("radio", { name: "Video" })).toHaveAttribute(
       "aria-checked",
       "true"

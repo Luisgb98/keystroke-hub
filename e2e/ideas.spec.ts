@@ -43,7 +43,7 @@ test.describe("idea capture", () => {
     );
   });
 
-  test("captures full input — notes, format, and tags all render", async ({
+  test("captures full input — description, format, and tags all render", async ({
     page,
   }) => {
     const title = `${PREFIX} Glitch tutorial`;
@@ -53,7 +53,7 @@ test.describe("idea capture", () => {
     const dialog = page.getByRole("dialog", { name: "New idea" });
     await dialog.getByLabel("Title").fill(title);
     await dialog.getByRole("radio", { name: "Video" }).click();
-    await dialog.getByLabel("Notes").fill("Cover the wrong warp");
+    await dialog.getByLabel("Description").fill("Cover the wrong warp");
     await dialog.getByLabel("Tags").fill("speedrun, glitch");
     await dialog.getByRole("button", { name: "Save" }).click();
 
@@ -335,7 +335,7 @@ test.describe("idea release scheduling and editing", () => {
     await card.getByRole("button", { name: `Edit "${title}"` }).click();
     const dialog = page.getByRole("dialog", { name: "Edit idea" });
     await dialog.getByRole("radio", { name: "Video" }).click();
-    await dialog.getByLabel("Notes").fill("Now with a plan");
+    await dialog.getByLabel("Description").fill("Now with a plan");
     await dialog.getByLabel("Tags").fill("speedrun, glitch, tutorial");
     await dialog.getByRole("button", { name: "Save" }).click();
     await expect(dialog).not.toBeVisible({ timeout: 10000 });
@@ -372,12 +372,12 @@ test.describe("idea publish copy blocks", () => {
 
   const PREFIX = "[e2e-idea-copy]";
   const title = `${PREFIX} Publish ready`;
-  const notes = "First paragraph.\n\nSecond paragraph.";
+  const description = "First paragraph.\n\nSecond paragraph.";
   const tags = ["speedrun", "glitch", "tutorial", "retro", "movement"];
   const tagsText = tags.join(", ");
 
   test.beforeAll(async () => {
-    await seedTestIdea({ title, notes, tags });
+    await seedTestIdea({ title, description, tags });
   });
 
   test.afterAll(async () => {
@@ -409,10 +409,31 @@ test.describe("idea publish copy blocks", () => {
     await card
       .getByRole("button", { name: "Copy Description + tags", exact: true })
       .click();
-    expect(await readClipboard(page)).toBe(`${notes}\n\n${tagsText}`);
+    expect(await readClipboard(page)).toBe(`${description}\n\n${tagsText}`);
 
     await card.getByRole("button", { name: "Copy Tags", exact: true }).click();
     expect(await readClipboard(page)).toBe(tagsText);
+  });
+
+  // #88: the empty case survives the rename — an idea captured without a
+  // description renders no description paragraph and can't copy that block.
+  test("an idea with no description renders no paragraph and disables its copy block", async ({
+    page,
+  }) => {
+    const bareTitle = `${PREFIX} No description`;
+    await seedTestIdea({ title: bareTitle, tags });
+    await page.goto(`/content/ideas?q=${encodeURIComponent(bareTitle)}`);
+
+    const card = page.locator(IDEA_CARD_SELECTOR, { hasText: bareTitle });
+    await expect(card).toBeVisible();
+    await expect(card.getByText(description)).toHaveCount(0);
+    await expect(
+      card.getByRole("button", { name: "Copy Description + tags", exact: true })
+    ).toBeDisabled();
+    // The blocks that only need tags stay copyable.
+    await expect(
+      card.getByRole("button", { name: "Copy Tags", exact: true })
+    ).toBeEnabled();
   });
 });
 
@@ -425,10 +446,10 @@ test.describe("uniform idea card dimensions", () => {
   const longTitle = `${PREFIX} Long one`;
 
   test.beforeAll(async () => {
-    await seedTestIdea({ title: shortTitle, notes: "Tiny." });
+    await seedTestIdea({ title: shortTitle, description: "Tiny." });
     await seedTestIdea({
       title: longTitle,
-      notes: Array.from(
+      description: Array.from(
         { length: 12 },
         (_, i) =>
           `Paragraph ${i + 1} with plenty of detail that would otherwise stretch this card well past its neighbour.`
@@ -522,7 +543,7 @@ test.describe("idea capture mobile viewport", () => {
     const title = `${PREFIX} Copy targets`;
     await seedTestIdea({
       title,
-      notes: "Body",
+      description: "Body",
       tags: ["a", "b", "c", "d", "e"],
     });
     await page.goto(`/content/ideas?q=${encodeURIComponent(PREFIX)}`);

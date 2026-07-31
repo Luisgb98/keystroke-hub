@@ -113,7 +113,7 @@ function form(entries: Record<string, string>): FormData {
 
 const validCaptureForm = {
   title: "Speedrun any% commentary",
-  notes: "",
+  description: "",
   format: "",
   tags: "",
 };
@@ -151,7 +151,7 @@ describe("createIdea", () => {
     expect(state).toEqual({ success: true });
     expect(dbMock.insertValues).toHaveBeenCalledWith({
       title: "Speedrun any% commentary",
-      notes: null,
+      description: null,
       format: "either",
       tags: [],
     });
@@ -161,19 +161,19 @@ describe("createIdea", () => {
     expect(revalidatePath).not.toHaveBeenCalledWith("/calendar");
   });
 
-  it("inserts full input with notes, format, and normalized tags", async () => {
+  it("inserts full input with a description, format, and normalized tags", async () => {
     await createIdea(
       undefined,
       form({
         title: "Glitch tutorial",
-        notes: "Cover the wrong warp",
+        description: "Cover the wrong warp",
         format: "video",
         tags: "Speedrun, glitch, speedrun",
       })
     );
     expect(dbMock.insertValues).toHaveBeenCalledWith({
       title: "Glitch tutorial",
-      notes: "Cover the wrong warp",
+      description: "Cover the wrong warp",
       format: "video",
       tags: ["speedrun", "glitch"],
     });
@@ -261,7 +261,7 @@ describe("createIdea", () => {
 describe("updateIdea", () => {
   const editForm = {
     title: "Edited title",
-    notes: "new notes",
+    description: "new description",
     format: "video",
     tags: "speedrun, glitch",
   };
@@ -285,7 +285,7 @@ describe("updateIdea", () => {
     expect(state).toEqual({ success: true });
     expect(dbMock.updateSet).toHaveBeenCalledWith({
       title: "Edited title",
-      notes: "new notes",
+      description: "new description",
       format: "video",
       tags: ["speedrun", "glitch"],
     });

@@ -123,9 +123,9 @@ export function IdeaCard({
               {idea.title}
             </Link>
           </h3>
-          {idea.notes ? (
+          {idea.description ? (
             <p className="line-clamp-3 text-small whitespace-pre-line text-muted-foreground">
-              {idea.notes}
+              {idea.description}
             </p>
           ) : null}
 

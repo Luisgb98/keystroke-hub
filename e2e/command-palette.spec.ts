@@ -180,4 +180,25 @@ test.describe("command palette content search", () => {
     await dialog.getByText(projectName).click();
     await expect(page).toHaveURL(/\/projects\//);
   });
+
+  // #88: search matches ideas on the renamed `description` column, not just
+  // the title — the query token here lives only in the description.
+  test("finds an idea by text that only its description carries", async ({
+    page,
+  }) => {
+    const token = `${PREFIX} ${Date.now()}`;
+    const ideaTitle = `${PREFIX} Untitled capture`;
+    await seedTestIdea({
+      title: ideaTitle,
+      description: `Publish blurb mentioning ${token}`,
+    });
+
+    await page.goto("/");
+    const dialog = await openWithShortcut(page);
+
+    await page.keyboard.type(token);
+
+    await expect(dialog.getByText(ideaTitle)).toBeVisible();
+    await expect(dialog.getByText("Content · Idea")).toBeVisible();
+  });
 });

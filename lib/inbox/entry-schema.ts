@@ -54,10 +54,10 @@ export const triagePayloadSchema = z.discriminatedUnion("type", [
         MAX_TITLE_LENGTH,
         `Keep the title under ${MAX_TITLE_LENGTH} characters`
       ),
-    notes: z
+    description: z
       .string()
       .trim()
-      .max(4000, "Keep notes under 4000 characters")
+      .max(4000, "Keep the description under 4000 characters")
       .optional(),
   }),
   z.object({

@@ -50,13 +50,43 @@ describe("isTriageDestination", () => {
 });
 
 describe("triagePayloadSchema", () => {
-  it("accepts a content idea with title + notes", () => {
+  it("accepts a content idea with title + description", () => {
     const parsed = triagePayloadSchema.safeParse({
+      type: "content_idea",
+      title: "Speedrun retrospective",
+      description: "cover the WR history",
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success && parsed.data.type === "content_idea") {
+      expect(parsed.data.description).toBe("cover the WR history");
+    }
+  });
+
+  // #88: triage's idea destination writes the ideas table's `description`
+  // column, so it reuses that field's cap and wording — a stray `notes` key is
+  // not the payload's shape any more and is dropped rather than persisted.
+  it("caps the content idea's description and ignores a legacy notes key", () => {
+    const tooLong = triagePayloadSchema.safeParse({
+      type: "content_idea",
+      title: "Speedrun retrospective",
+      description: "a".repeat(4001),
+    });
+    expect(tooLong.success).toBe(false);
+    if (!tooLong.success) {
+      expect(tooLong.error.issues[0].message).toBe(
+        "Keep the description under 4000 characters"
+      );
+    }
+
+    const legacy = triagePayloadSchema.safeParse({
       type: "content_idea",
       title: "Speedrun retrospective",
       notes: "cover the WR history",
     });
-    expect(parsed.success).toBe(true);
+    expect(legacy.success).toBe(true);
+    if (legacy.success && legacy.data.type === "content_idea") {
+      expect(legacy.data.description).toBeUndefined();
+    }
   });
 
   it("rejects a content idea with a blank title", () => {

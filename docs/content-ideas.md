@@ -16,7 +16,7 @@ calendar's `track` discriminator.
 | --------------------------- | -------------------------------------------------- | ------------------------------------------------------------ |
 | `id`                        | `uuid` PK, default random                          |                                                              |
 | `title`                     | `text` **not null**                                | the only required field                                      |
-| `notes`                     | `text` null                                        | free text                                                    |
+| `description`               | `text` null                                        | the publish-facing video description (#88)                   |
 | `format`                    | enum `video \| stream \| either`, default `either` |                                                              |
 | `status`                    | enum, default `idea`                               | pipeline stage — see below                                   |
 | `tags`                      | `text[]` not null default `{}`                     | free-form, GIN-indexed for containment                       |
@@ -54,8 +54,8 @@ was lost from the grid or board.
 
 **Every field is editable after capture** (#71). The pencil on `IdeaCard`
 opens the shared `IdeaEditor` (`components/content/idea-editor.tsx`, also the
-capture surface) prefilled with the idea's title, notes, format, tags, and
-release date/time; `updateIdea` (`lib/content/actions.ts`) persists the whole
+capture surface) prefilled with the idea's title, description, format, tags,
+and release date/time; `updateIdea` (`lib/content/actions.ts`) persists the whole
 form. The script keeps its own dedicated editor page (see docs/scripts.md), so
 the edit dialog links out to it rather than editing script inline.
 

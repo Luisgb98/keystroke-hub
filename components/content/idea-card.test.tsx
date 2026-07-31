@@ -27,7 +27,7 @@ function makeIdea(overrides: Partial<Idea> = {}): Idea {
   return {
     id: "idea-1",
     title: "Speedrun any% commentary",
-    notes: null,
+    description: null,
     format: "either",
     status: "idea",
     tags: [],
@@ -85,13 +85,13 @@ describe("IdeaCard", () => {
     expect(screen.getByText("glitch")).toBeInTheDocument();
   });
 
-  it("renders notes when present, and omits the block when absent", () => {
+  it("renders the description when present, and omits the block when absent", () => {
     const { rerender } = render(
-      <IdeaCard idea={makeIdea({ notes: "Cover the wrong warp" })} />
+      <IdeaCard idea={makeIdea({ description: "Cover the wrong warp" })} />
     );
     expect(screen.getByText("Cover the wrong warp")).toBeInTheDocument();
 
-    rerender(<IdeaCard idea={makeIdea({ notes: null })} />);
+    rerender(<IdeaCard idea={makeIdea({ description: null })} />);
     expect(screen.queryByText("Cover the wrong warp")).not.toBeInTheDocument();
   });
 

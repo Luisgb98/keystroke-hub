@@ -38,18 +38,19 @@ function joinWithBlankLine(...parts: (string | null)[]): string {
 }
 
 /**
- * Builds the idea's four publish blocks. `notes` is the description; the
- * author's line breaks are preserved verbatim (no reflowing). A block whose
- * source is empty resolves to `text: null` so the UI can disable it:
- * "Title + tags" and "Tags" need tags; "Description + tags" needs a
- * description (its tags are optional — the description is always copied
- * together with whatever tags exist).
+ * Builds the idea's four publish blocks. The author's line breaks in the
+ * description are preserved verbatim (no reflowing). A block whose source is
+ * empty resolves to `text: null` so the UI can disable it: "Title + tags" and
+ * "Tags" need tags; "Description + tags" needs a description (its tags are
+ * optional — the description is always copied together with whatever tags
+ * exist).
  */
 export function formatIdeaCopyBlocks(
-  idea: Pick<Idea, "title" | "notes" | "tags">
+  idea: Pick<Idea, "title" | "description" | "tags">
 ): IdeaCopyBlock[] {
   const tagsText = idea.tags.length > 0 ? formatIdeaTags(idea.tags) : null;
-  const description = idea.notes && idea.notes.length > 0 ? idea.notes : null;
+  const description =
+    idea.description && idea.description.length > 0 ? idea.description : null;
 
   return [
     { key: "title", label: "Title", text: idea.title },

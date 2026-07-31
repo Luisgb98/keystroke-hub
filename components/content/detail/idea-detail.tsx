@@ -72,8 +72,8 @@ export function IdeaDetail({
           ) : null}
         </div>
 
-        {idea.notes ? (
-          <p className="text-body whitespace-pre-line">{idea.notes}</p>
+        {idea.description ? (
+          <p className="text-body whitespace-pre-line">{idea.description}</p>
         ) : null}
 
         {idea.tags.length > 0 ? (
