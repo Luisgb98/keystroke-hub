@@ -77,7 +77,7 @@ The captured text maps to the destination's most natural field
 
 | Destination      | Title                   | Secondary field           | Notes                                            |
 | ---------------- | ----------------------- | ------------------------- | ------------------------------------------------ |
-| Content idea     | first line              | `notes` = remaining lines |                                                  |
+| Content idea     | first line              | `description` = remaining |                                                  |
 | Improvement      | first line              | `rationale` = remaining   |                                                  |
 | Today's log item | whole body, single-line | —                         | lands on **today's** log as `planned` (lazy log) |
 | Meeting note     | empty (user names it)   | `notes` = whole body      | date defaults to today                           |

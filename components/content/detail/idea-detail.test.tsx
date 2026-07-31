@@ -32,7 +32,7 @@ function makeIdea(overrides: Partial<Idea> = {}): Idea {
   return {
     id: "idea-1",
     title: "Speedrun any% commentary",
-    notes: null,
+    description: null,
     format: "video",
     status: "scripted",
     tags: [],
@@ -84,7 +84,7 @@ describe("IdeaDetail", () => {
   it("preserves paragraph breaks in the description", () => {
     render(
       <IdeaDetail
-        idea={makeIdea({ notes: "First beat.\n\nSecond beat." })}
+        idea={makeIdea({ description: "First beat.\n\nSecond beat." })}
         script={null}
         scheduledEvents={[]}
       />

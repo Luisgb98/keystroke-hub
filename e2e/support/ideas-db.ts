@@ -32,7 +32,7 @@ export async function clearTestIdeas(prefix: string): Promise<void> {
 /** Inserts a single idea directly, bypassing the capture UI — for specs that need pre-existing rows (filtering, status change, delete). */
 export async function seedTestIdea(fixture: {
   title: string;
-  notes?: string;
+  description?: string;
   format?: IdeaFormat;
   status?: IdeaStatus;
   tags?: string[];
@@ -42,7 +42,7 @@ export async function seedTestIdea(fixture: {
   const db = getTestDb();
   await db.insert(ideas).values({
     title: fixture.title,
-    notes: fixture.notes ?? null,
+    description: fixture.description ?? null,
     format: fixture.format ?? "either",
     status: fixture.status ?? "idea",
     tags: fixture.tags ?? [],

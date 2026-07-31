@@ -11,7 +11,7 @@ export function titleFromBody(body: string): string {
   return (firstLine ?? "").slice(0, MAX_TITLE_LENGTH);
 }
 
-/** Everything after the first non-empty line — the natural "notes" remainder. */
+/** Everything after the first non-empty line — the natural secondary-field remainder. */
 export function remainderFromBody(body: string): string {
   const lines = body.split("\n");
   const firstIndex = lines.findIndex((line) => line.trim().length > 0);
@@ -29,7 +29,7 @@ export function singleLineFromBody(body: string): string {
 
 export interface TriagePrefill {
   title: string;
-  /** Idea notes / improvement rationale / meeting notes, depending on destination. */
+  /** Idea description / improvement rationale / meeting notes, depending on destination. */
   secondary: string;
   /** Only meaningful for `meeting_note`. */
   date: string;
@@ -39,7 +39,7 @@ export interface TriagePrefill {
  * The initial field values a triage dialog shows for a given destination,
  * derived from the captured text (see docs/inbox.md). The captured thought
  * maps to the destination's most natural field: an idea/improvement splits
- * into title + notes/rationale; a daily-log item is a single-line title; a
+ * into title + description/rationale; a daily-log item is a single-line title; a
  * meeting note keeps the full text as notes and leaves the title to the user
  * (meetings are named by what they were, not the seed thought).
  */

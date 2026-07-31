@@ -63,11 +63,11 @@ describe("escapeLikePattern", () => {
 });
 
 describe("buildIdeaSearchCondition", () => {
-  it("matches title or notes case-insensitively", () => {
+  it("matches title or description case-insensitively", () => {
     const { sql, params } = render(buildIdeaSearchCondition("speedrun"));
     expect(sql).toContain("ilike");
     expect(sql).toContain('"title"');
-    expect(sql).toContain('"notes"');
+    expect(sql).toContain('"description"');
     expect(sql).toContain(" or ");
     expect(params).toEqual(["%speedrun%", "%speedrun%"]);
   });
@@ -123,7 +123,7 @@ describe("mapIdeaToResult", () => {
     const result = mapIdeaToResult({
       id: "idea-1",
       title: "Speedrun commentary",
-      notes: "Cover the wrong warp",
+      description: "Cover the wrong warp",
       updatedAt,
     });
     expect(result).toEqual({
@@ -137,11 +137,11 @@ describe("mapIdeaToResult", () => {
     });
   });
 
-  it("omits the snippet when notes are null", () => {
+  it("omits the snippet when the description is null", () => {
     const result = mapIdeaToResult({
       id: "idea-2",
       title: "Untitled",
-      notes: null,
+      description: null,
       updatedAt: new Date(),
     });
     expect(result.snippet).toBeUndefined();
@@ -265,7 +265,7 @@ describe("mergeRecentCandidates", () => {
     const a = mapIdeaToResult({
       id: "a",
       title: "A",
-      notes: null,
+      description: null,
       updatedAt: new Date("2026-07-01T00:00:00Z"),
     });
     const b = mapProjectToResult({

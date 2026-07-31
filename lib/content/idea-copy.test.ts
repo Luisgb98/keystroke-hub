@@ -11,7 +11,7 @@ function makeIdea(overrides: Partial<Idea> = {}): Idea {
   return {
     id: "idea-1",
     title: "Speedrun any% commentary",
-    notes: null,
+    description: null,
     format: "either",
     status: "idea",
     tags: [],
@@ -50,7 +50,7 @@ describe("formatIdeaTags", () => {
 describe("formatIdeaCopyBlocks", () => {
   const full = makeIdea({
     title: "Glitch tutorial",
-    notes: "First paragraph.\n\nSecond paragraph.",
+    description: "First paragraph.\n\nSecond paragraph.",
     tags: ["speedrun", "glitch", "tutorial", "retro", "any%"],
   });
 
@@ -86,14 +86,16 @@ describe("formatIdeaCopyBlocks", () => {
   });
 
   it("preserves the author's line breaks in the description verbatim", () => {
-    const idea = makeIdea({ notes: "Line one\nLine two\n\nAfter a gap" });
+    const idea = makeIdea({
+      description: "Line one\nLine two\n\nAfter a gap",
+    });
     expect(block(idea, "description-tags").text).toBe(
       "Line one\nLine two\n\nAfter a gap"
     );
   });
 
   describe("without tags", () => {
-    const noTags = makeIdea({ notes: "Just a description", tags: [] });
+    const noTags = makeIdea({ description: "Just a description", tags: [] });
 
     it("still copies the title", () => {
       expect(block(noTags, "title").text).toBe("Speedrun any% commentary");
@@ -113,22 +115,25 @@ describe("formatIdeaCopyBlocks", () => {
   });
 
   describe("without a description", () => {
-    const noNotes = makeIdea({ notes: null, tags: ["speedrun", "glitch"] });
+    const noDescription = makeIdea({
+      description: null,
+      tags: ["speedrun", "glitch"],
+    });
 
     it("disables description + tags", () => {
-      expect(block(noNotes, "description-tags").text).toBeNull();
+      expect(block(noDescription, "description-tags").text).toBeNull();
     });
 
     it("treats an empty-string description as absent", () => {
-      const empty = makeIdea({ notes: "", tags: ["speedrun"] });
+      const empty = makeIdea({ description: "", tags: ["speedrun"] });
       expect(block(empty, "description-tags").text).toBeNull();
     });
 
     it("still copies title + tags and tags", () => {
-      expect(block(noNotes, "title-tags").text).toBe(
+      expect(block(noDescription, "title-tags").text).toBe(
         "Speedrun any% commentary\n\nspeedrun, glitch"
       );
-      expect(block(noNotes, "tags").text).toBe("speedrun, glitch");
+      expect(block(noDescription, "tags").text).toBe("speedrun, glitch");
     });
   });
 

@@ -61,7 +61,7 @@ function timeParam(date: Date): string {
 
 interface EditorValues {
   title: string;
-  notes: string;
+  description: string;
   format: IdeaFormat;
   tags: string;
   releaseDate: string;
@@ -77,7 +77,7 @@ function initialValues(
   if (mode === "edit" && idea) {
     return {
       title: idea.title,
-      notes: idea.notes ?? "",
+      description: idea.description ?? "",
       format: idea.format,
       tags: idea.tags.join(", "),
       releaseDate: releaseStartsAt ? dateParam(releaseStartsAt) : "",
@@ -89,7 +89,7 @@ function initialValues(
   }
   return {
     title: "",
-    notes: "",
+    description: "",
     format: INITIAL_IDEA_FORMAT,
     tags: "",
     releaseDate: "",
@@ -242,13 +242,14 @@ export function IdeaEditor({
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="idea-notes">Notes</Label>
+            <Label htmlFor="idea-description">Description</Label>
             <Textarea
-              id="idea-notes"
-              name="notes"
-              value={values.notes}
+              id="idea-description"
+              name="description"
+              value={values.description}
+              placeholder="The description you'll publish with the video"
               onChange={(e) =>
-                setValues((v) => ({ ...v, notes: e.target.value }))
+                setValues((v) => ({ ...v, description: e.target.value }))
               }
             />
           </div>

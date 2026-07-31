@@ -32,7 +32,9 @@ describe("TriageDialog", () => {
       />
     );
     expect(screen.getByLabelText("Title")).toHaveValue("Retro video");
-    expect(screen.getByLabelText("Notes")).toHaveValue("cover the highlights");
+    expect(screen.getByLabelText("Description")).toHaveValue(
+      "cover the highlights"
+    );
   });
 
   it("triages an idea and closes on success", async () => {
@@ -56,12 +58,23 @@ describe("TriageDialog", () => {
       expect(triageEntry).toHaveBeenCalledWith("entry-1", {
         type: "content_idea",
         title: "Retro video",
-        notes: "",
+        description: "",
       })
     );
     expect(toastSuccess).toHaveBeenCalledWith("Sent to Content idea");
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(onTriaged).toHaveBeenCalled();
+  });
+
+  // #88: the content-idea destination lands in the ideas table's renamed
+  // column, so it labels its secondary field "Description". The other
+  // destinations are unaffected — a meeting note still takes "Notes".
+  it("labels the content idea's secondary field Description, not Notes", () => {
+    render(
+      <TriageDialog {...baseProps} destination="content_idea" body="Retro" />
+    );
+    expect(screen.getByLabelText("Description")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Notes")).not.toBeInTheDocument();
   });
 
   it("shows a date field and an empty title for a meeting note", () => {
@@ -75,6 +88,7 @@ describe("TriageDialog", () => {
     expect(screen.getByLabelText("Date")).toHaveValue("2026-07-18");
     expect(screen.getByLabelText("Title")).toHaveValue("");
     expect(screen.getByLabelText("Notes")).toHaveValue("sync notes");
+    expect(screen.queryByLabelText("Description")).not.toBeInTheDocument();
   });
 
   it("surfaces the action error and stays open", async () => {

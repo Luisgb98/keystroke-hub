@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import {
   ideaCaptureSchema,
@@ -53,7 +54,7 @@ describe("normalizeTags", () => {
 function baseInput(overrides: Record<string, unknown> = {}) {
   return {
     title: "Speedrun any% commentary",
-    notes: "",
+    description: "",
     format: undefined,
     tags: undefined,
     ...overrides,
@@ -70,7 +71,7 @@ describe("ideaCaptureSchema", () => {
     if (result.success) {
       expect(result.data).toEqual({
         title: "Speedrun any% commentary",
-        notes: null,
+        description: null,
         format: "either",
         tags: [],
         release: null,
@@ -91,17 +92,17 @@ describe("ideaCaptureSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("accepts full input: notes, format, tags", () => {
+  it("accepts full input: description, format, tags", () => {
     const result = ideaCaptureSchema.safeParse(
       baseInput({
-        notes: "Cover the glitch route",
+        description: "Cover the glitch route",
         format: "video",
         tags: "speedrun, glitch",
       })
     );
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.notes).toBe("Cover the glitch route");
+      expect(result.data.description).toBe("Cover the glitch route");
       expect(result.data.format).toBe("video");
       expect(result.data.tags).toEqual(["speedrun", "glitch"]);
     }
@@ -114,11 +115,29 @@ describe("ideaCaptureSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("trims whitespace-only notes down to null", () => {
-    const result = ideaCaptureSchema.safeParse(baseInput({ notes: "   " }));
+  it("trims a whitespace-only description down to null", () => {
+    const result = ideaCaptureSchema.safeParse(
+      baseInput({ description: "   " })
+    );
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.notes).toBeNull();
+      expect(result.data.description).toBeNull();
+    }
+  });
+
+  // #88: the field is the publish-facing description, so the cap's message has
+  // to name it that way — this is the copy the capture form surfaces verbatim.
+  it("rejects a description over the 4000-character cap, naming the field", () => {
+    const result = ideaCaptureSchema.safeParse(
+      baseInput({ description: "a".repeat(4001) })
+    );
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const { fieldErrors } = z.flattenError(result.error);
+      expect(fieldErrors.description).toEqual([
+        "Keep the description under 4000 characters",
+      ]);
+      expect(fieldErrors).not.toHaveProperty("notes");
     }
   });
 
@@ -220,7 +239,7 @@ describe("ideaEditSchema", () => {
     const result = ideaEditSchema.safeParse(
       baseInput({
         title: "Edited title",
-        notes: "new notes",
+        description: "new description",
         format: "stream",
         tags: FIVE_TAGS,
         releaseDate: "2026-09-10",

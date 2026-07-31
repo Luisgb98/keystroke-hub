@@ -36,7 +36,7 @@ export interface ReleaseInput {
 /** The DB-ready shape shared by capture and edit; `release` is null for an unscheduled idea. */
 export interface IdeaFields {
   title: string;
-  notes: string | null;
+  description: string | null;
   format: IdeaFormat;
   tags: string[];
   release: ReleaseInput | null;
@@ -103,10 +103,10 @@ const sharedIdeaFields = {
     .trim()
     .min(1, "Title is required")
     .max(200, "Keep the title under 200 characters"),
-  notes: z
+  description: z
     .string()
     .trim()
-    .max(4000, "Keep notes under 4000 characters")
+    .max(4000, "Keep the description under 4000 characters")
     .optional(),
   format: z
     .string()
@@ -135,20 +135,21 @@ const sharedIdeaFields = {
 
 function normalizeSharedFields(data: {
   title: string;
-  notes?: string;
+  description?: string;
   format?: string;
   tags?: string;
   releaseDate?: string;
   releaseTime?: string;
 }): IdeaFields {
-  const notes = data.notes && data.notes.length > 0 ? data.notes : null;
+  const description =
+    data.description && data.description.length > 0 ? data.description : null;
   const format: IdeaFormat =
     data.format && data.format.length > 0
       ? (data.format as IdeaFormat)
       : INITIAL_IDEA_FORMAT;
   return {
     title: data.title,
-    notes,
+    description,
     format,
     tags: normalizeTags(data.tags),
     release: buildRelease(

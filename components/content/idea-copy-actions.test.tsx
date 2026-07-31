@@ -15,7 +15,7 @@ function makeIdea(overrides: Partial<Idea> = {}): Idea {
   return {
     id: "idea-1",
     title: "Glitch tutorial",
-    notes: "First paragraph.\n\nSecond paragraph.",
+    description: "First paragraph.\n\nSecond paragraph.",
     format: "either",
     status: "idea",
     tags: ["speedrun", "glitch", "tutorial", "retro", "any%"],
@@ -133,7 +133,7 @@ describe("IdeaCopyActions", () => {
   });
 
   it("disables description + tags when the idea has no description", () => {
-    render(<IdeaCopyActions idea={makeIdea({ notes: null })} />);
+    render(<IdeaCopyActions idea={makeIdea({ description: null })} />);
     expect(
       screen.getByRole("button", { name: "Copy Description + tags" })
     ).toBeDisabled();

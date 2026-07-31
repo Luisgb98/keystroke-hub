@@ -115,7 +115,10 @@ export async function triageEntry(
     destinationInsert = db.insert(ideas).values({
       id: destinationId,
       title: data.title,
-      notes: data.notes && data.notes.length > 0 ? data.notes : null,
+      description:
+        data.description && data.description.length > 0
+          ? data.description
+          : null,
     });
   } else if (data.type === "improvement") {
     destinationInsert = db.insert(improvements).values({

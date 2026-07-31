@@ -26,7 +26,7 @@ interface BoardCardProps {
 
 /**
  * A pipeline card: format + time-in-stage up top, title, and the move
- * control. Deliberately lighter than `IdeaCard` (no notes/tags/delete) — the
+ * control. Deliberately lighter than `IdeaCard` (no description/tags/delete) — the
  * board is a status-at-a-glance surface, not a replacement for the ideas
  * list (see docs/content-ideas.md).
  */

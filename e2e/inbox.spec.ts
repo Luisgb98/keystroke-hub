@@ -81,6 +81,9 @@ test.describe("quick-capture inbox", () => {
     const dialog = page.getByRole("dialog");
     // Prefill: the captured text arrives in the idea's title field.
     await expect(dialog.getByLabel("Title")).toHaveValue(body);
+    // #88: the idea destination asks for a Description, not "Notes".
+    await expect(dialog.getByLabel("Description")).toBeVisible();
+    await expect(dialog.getByLabel("Notes")).toHaveCount(0);
     await dialog.getByRole("button", { name: /Send to/ }).click();
     await expect(dialog).not.toBeVisible({ timeout: 10000 });
 

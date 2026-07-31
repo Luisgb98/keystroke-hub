@@ -81,7 +81,7 @@ export function TriageDialog({
         return {
           type: destination,
           title: values.title,
-          notes: values.secondary,
+          description: values.secondary,
         };
       case "improvement":
         return {
@@ -168,7 +168,7 @@ export function TriageDialog({
             <div className="flex flex-col gap-2">
               <Label htmlFor="triage-secondary">
                 {destination === "content_idea"
-                  ? "Notes"
+                  ? "Description"
                   : destination === "improvement"
                     ? "Rationale"
                     : "Notes"}
