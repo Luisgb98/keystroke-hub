@@ -131,7 +131,7 @@ export function PublishChecklistDialog({
               {items.map((item) => (
                 <li
                   key={item.id}
-                  className="flex items-center gap-2 rounded-lg border border-border px-3 py-2.5"
+                  className="flex items-center gap-2.5 rounded-xl bg-card px-3 py-2.5 ring-1 ring-border transition-colors duration-motion-fast ease-motion-standard hover:ring-track-content-border/60"
                 >
                   <Checkbox
                     aria-label={item.label}
@@ -156,6 +156,7 @@ export function PublishChecklistDialog({
                     aria-label={`Remove "${item.label}"`}
                     disabled={pending}
                     onClick={() => handleRemove(item)}
+                    className="text-muted-foreground hover:text-destructive"
                   >
                     <X aria-hidden className="size-3.5" />
                   </Button>
@@ -179,7 +180,6 @@ export function PublishChecklistDialog({
             />
             <Button
               type="button"
-              variant="outline"
               size="sm"
               disabled={pending || !newLabel.trim()}
               onClick={handleAdd}
