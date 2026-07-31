@@ -6,6 +6,7 @@ import { AlertTriangle } from "lucide-react";
 import type { CSSProperties } from "react";
 
 import { cn } from "@/lib/utils";
+import { usePointerDrag } from "@/hooks/use-pointer-drag";
 import { HOUR_HEIGHT_REM, MINUTES_IN_DAY } from "@/lib/calendar/constants";
 import {
   moveEvent,
@@ -21,7 +22,6 @@ import {
 
 import { EventEditor } from "./event-editor";
 import { TRACK_ICON, TRACK_LABEL, TRACK_SURFACE_CLASSES } from "./track-styles";
-import { useEventDrag } from "./use-event-drag";
 
 interface EventBlockProps {
   segment: DaySegment;
@@ -86,7 +86,7 @@ export function EventBlock({
     );
   }
 
-  const move = useEventDrag({
+  const move = usePointerDrag({
     disabled: !onReschedule,
     onDragMove: ({ dx, dy }) => {
       const { pxPerMinute, columnWidthPx } = geometryRef.current;
@@ -112,7 +112,7 @@ export function EventBlock({
     onDragCancel: () => setGesture(null),
   });
 
-  const resizeStart = useEventDrag({
+  const resizeStart = usePointerDrag({
     disabled: !onReschedule,
     onDragMove: ({ dy }) => {
       const { pxPerMinute } = geometryRef.current;
@@ -131,7 +131,7 @@ export function EventBlock({
     onDragCancel: () => setGesture(null),
   });
 
-  const resizeEnd = useEventDrag({
+  const resizeEnd = usePointerDrag({
     disabled: !onReschedule,
     onDragMove: ({ dy }) => {
       const { pxPerMinute } = geometryRef.current;

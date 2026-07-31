@@ -1,22 +1,25 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { useEventDrag } from "./use-event-drag";
+import { usePointerDrag, type PointerDragPosition } from "./use-pointer-drag";
 
 interface HarnessProps {
-  onDragMove: (delta: { dx: number; dy: number }) => void;
-  onDragEnd: (delta: { dx: number; dy: number }) => void;
+  onDragStart?: (position: PointerDragPosition) => void;
+  onDragMove: (position: PointerDragPosition) => void;
+  onDragEnd: (position: PointerDragPosition) => void;
   onDragCancel: () => void;
   disabled?: boolean;
 }
 
 function Harness({
+  onDragStart,
   onDragMove,
   onDragEnd,
   onDragCancel,
   disabled,
 }: HarnessProps) {
-  const { onPointerDown, isDragging, consumeClickAfterDrag } = useEventDrag({
+  const { onPointerDown, isDragging, consumeClickAfterDrag } = usePointerDrag({
+    onDragStart,
     onDragMove,
     onDragEnd,
     onDragCancel,
@@ -29,7 +32,7 @@ function Harness({
       onPointerDown={onPointerDown}
       onClick={() => {
         if (consumeClickAfterDrag()) return;
-        onDragMove({ dx: 0, dy: 0 }); // reuse as a "click fired" signal
+        onDragMove({ dx: 0, dy: 0, x: 0, y: 0 }); // reuse as a "click fired" signal
       }}
       data-dragging={isDragging}
     >
@@ -57,11 +60,16 @@ function pointerEvent(
   });
 }
 
+/** jsdom ships no TouchEvent constructor — a cancelable Event is all the scroll blocker reads. */
+function touchMoveEvent() {
+  return new window.Event("touchmove", { bubbles: true, cancelable: true });
+}
+
 afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("useEventDrag", () => {
+describe("usePointerDrag", () => {
   it("does not engage a drag for movement under the threshold", () => {
     const onDragMove = vi.fn();
     const onDragEnd = vi.fn();
@@ -93,7 +101,7 @@ describe("useEventDrag", () => {
     expect(onDragEnd).not.toHaveBeenCalled();
   });
 
-  it("engages a mouse drag past the threshold and reports the live delta", () => {
+  it("engages a mouse drag past the threshold and reports the live delta and position", () => {
     const onDragMove = vi.fn();
     render(
       <Harness
@@ -114,10 +122,56 @@ describe("useEventDrag", () => {
       );
     });
 
-    expect(onDragMove).toHaveBeenCalledWith({ dx: 30, dy: 40 });
+    expect(onDragMove).toHaveBeenCalledWith({
+      dx: 30,
+      dy: 40,
+      x: 130,
+      y: 140,
+    });
   });
 
-  it("commits the final delta on pointerup after an engaged drag", () => {
+  it("fires onDragStart exactly once, when a mouse drag engages", () => {
+    const onDragStart = vi.fn();
+    render(
+      <Harness
+        onDragStart={onDragStart}
+        onDragMove={vi.fn()}
+        onDragEnd={vi.fn()}
+        onDragCancel={vi.fn()}
+      />
+    );
+
+    fireEvent.pointerDown(screen.getByText("handle"), {
+      clientX: 100,
+      clientY: 100,
+      pointerId: 1,
+    });
+    act(() => {
+      window.dispatchEvent(
+        pointerEvent("pointermove", { clientX: 103, clientY: 100 })
+      );
+    });
+    expect(onDragStart).not.toHaveBeenCalled();
+
+    act(() => {
+      window.dispatchEvent(
+        pointerEvent("pointermove", { clientX: 120, clientY: 100 })
+      );
+      window.dispatchEvent(
+        pointerEvent("pointermove", { clientX: 140, clientY: 100 })
+      );
+    });
+
+    expect(onDragStart).toHaveBeenCalledTimes(1);
+    expect(onDragStart).toHaveBeenCalledWith({
+      dx: 20,
+      dy: 0,
+      x: 120,
+      y: 100,
+    });
+  });
+
+  it("commits the final delta and position on pointerup after an engaged drag", () => {
     const onDragEnd = vi.fn();
     render(
       <Harness
@@ -141,7 +195,7 @@ describe("useEventDrag", () => {
       );
     });
 
-    expect(onDragEnd).toHaveBeenCalledWith({ dx: 50, dy: 5 });
+    expect(onDragEnd).toHaveBeenCalledWith({ dx: 50, dy: 5, x: 50, y: 5 });
   });
 
   it("suppresses the trailing click after an engaged drag commits", () => {
@@ -197,7 +251,7 @@ describe("useEventDrag", () => {
     });
     fireEvent.click(screen.getByText("handle"));
 
-    expect(onDragMove).toHaveBeenCalledWith({ dx: 0, dy: 0 });
+    expect(onDragMove).toHaveBeenCalledWith({ dx: 0, dy: 0, x: 0, y: 0 });
   });
 
   it("cancels an engaged drag on Escape without committing", () => {
@@ -288,11 +342,13 @@ describe("useEventDrag", () => {
     expect(onDragMove).not.toHaveBeenCalled();
   });
 
-  it("engages a touch drag once the long-press timer fires", () => {
+  it("engages a touch drag once the long-press timer fires, reporting the press point", () => {
     vi.useFakeTimers();
+    const onDragStart = vi.fn();
     const onDragMove = vi.fn();
     render(
       <Harness
+        onDragStart={onDragStart}
         onDragMove={onDragMove}
         onDragEnd={vi.fn()}
         onDragCancel={vi.fn()}
@@ -300,25 +356,29 @@ describe("useEventDrag", () => {
     );
 
     fireEvent.pointerDown(screen.getByText("handle"), {
-      clientX: 0,
-      clientY: 0,
+      clientX: 30,
+      clientY: 40,
       pointerId: 1,
       pointerType: "touch",
     });
     act(() => {
       vi.advanceTimersByTime(400);
     });
+
+    // The lift shows from the long-press alone — no finger movement needed.
+    expect(onDragStart).toHaveBeenCalledWith({ dx: 0, dy: 0, x: 30, y: 40 });
+
     act(() => {
       window.dispatchEvent(
         pointerEvent("pointermove", {
-          clientX: 10,
-          clientY: 5,
+          clientX: 40,
+          clientY: 45,
           pointerType: "touch",
         })
       );
     });
 
-    expect(onDragMove).toHaveBeenCalledWith({ dx: 10, dy: 5 });
+    expect(onDragMove).toHaveBeenCalledWith({ dx: 10, dy: 5, x: 40, y: 45 });
   });
 
   it("cancels a pending long-press if the touch moves like a scroll first", () => {
@@ -349,6 +409,112 @@ describe("useEventDrag", () => {
       vi.advanceTimersByTime(400);
     });
 
+    expect(onDragMove).not.toHaveBeenCalled();
+  });
+
+  it("lets a pre-engage touch swipe scroll natively, then blocks scrolling once engaged", () => {
+    vi.useFakeTimers();
+    render(
+      <Harness
+        onDragMove={vi.fn()}
+        onDragEnd={vi.fn()}
+        onDragCancel={vi.fn()}
+      />
+    );
+
+    fireEvent.pointerDown(screen.getByText("handle"), {
+      clientX: 0,
+      clientY: 0,
+      pointerId: 1,
+      pointerType: "touch",
+    });
+
+    const beforeEngage = touchMoveEvent();
+    act(() => {
+      window.dispatchEvent(beforeEngage);
+    });
+    expect(beforeEngage.defaultPrevented).toBe(false);
+
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    const whileDragging = touchMoveEvent();
+    act(() => {
+      window.dispatchEvent(whileDragging);
+    });
+    expect(whileDragging.defaultPrevented).toBe(true);
+  });
+
+  it("stops blocking touch scrolling once the drag ends", () => {
+    vi.useFakeTimers();
+    render(
+      <Harness
+        onDragMove={vi.fn()}
+        onDragEnd={vi.fn()}
+        onDragCancel={vi.fn()}
+      />
+    );
+
+    fireEvent.pointerDown(screen.getByText("handle"), {
+      clientX: 0,
+      clientY: 0,
+      pointerId: 1,
+      pointerType: "touch",
+    });
+    act(() => {
+      vi.advanceTimersByTime(400);
+      window.dispatchEvent(
+        pointerEvent("pointerup", {
+          clientX: 0,
+          clientY: 0,
+          pointerType: "touch",
+        })
+      );
+    });
+
+    const afterDrag = touchMoveEvent();
+    act(() => {
+      window.dispatchEvent(afterDrag);
+    });
+    expect(afterDrag.defaultPrevented).toBe(false);
+  });
+
+  it("detaches its window listeners when the element unmounts mid-drag", () => {
+    vi.useFakeTimers();
+    const onDragMove = vi.fn();
+    const { unmount } = render(
+      <Harness
+        onDragMove={onDragMove}
+        onDragEnd={vi.fn()}
+        onDragCancel={vi.fn()}
+      />
+    );
+
+    fireEvent.pointerDown(screen.getByText("handle"), {
+      clientX: 0,
+      clientY: 0,
+      pointerId: 1,
+      pointerType: "touch",
+    });
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    unmount();
+
+    const afterUnmount = touchMoveEvent();
+    act(() => {
+      window.dispatchEvent(afterUnmount);
+      window.dispatchEvent(
+        pointerEvent("pointermove", {
+          clientX: 20,
+          clientY: 20,
+          pointerType: "touch",
+        })
+      );
+    });
+
+    // A leaked scroll block would leave the whole page unscrollable.
+    expect(afterUnmount.defaultPrevented).toBe(false);
     expect(onDragMove).not.toHaveBeenCalled();
   });
 
