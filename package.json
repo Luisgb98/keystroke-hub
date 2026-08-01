@@ -19,12 +19,14 @@
     "version:check": "node scripts/verify-version-bump.mjs",
     "auth:hash": "node scripts/hash-password.mts",
     "seed:events": "node scripts/seed-events.mts",
+    "fix:shifted-times": "node scripts/fix-shifted-times.mts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
+    "@date-fns/tz": "^1.5.0",
     "@neondatabase/serverless": "1.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
