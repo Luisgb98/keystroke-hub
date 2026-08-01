@@ -1,4 +1,10 @@
-import { addDays, format, isSameDay, startOfDay } from "date-fns";
+import {
+  appAddDays,
+  appIsSameDay,
+  appStartOfDay,
+  formatAppDateParam,
+  formatInAppZone,
+} from "@/lib/time";
 
 import { eventOverlapsDay } from "./segments";
 import type { CalendarEvent } from "./types";
@@ -32,7 +38,7 @@ export interface AgendaDayGroup {
  * ends exactly at `now` has just finished and isn't "upcoming" anymore.
  */
 function isEventOver(event: CalendarEvent, now: Date): boolean {
-  return event.allDay ? event.endsAt < startOfDay(now) : event.endsAt <= now;
+  return event.allDay ? event.endsAt < appStartOfDay(now) : event.endsAt <= now;
 }
 
 function isInProgress(event: CalendarEvent, now: Date): boolean {
@@ -42,7 +48,7 @@ function isInProgress(event: CalendarEvent, now: Date): boolean {
 function timeLabelFor(event: CalendarEvent, now: Date): string {
   if (event.allDay) return "All day";
   if (isInProgress(event, now)) return "Now";
-  return format(event.startsAt, "HH:mm");
+  return formatInAppZone(event.startsAt, "HH:mm");
 }
 
 /**
@@ -53,7 +59,7 @@ function timeLabelFor(event: CalendarEvent, now: Date): string {
  * one bucket instead of duplicating it across Today and Tomorrow (issue #58).
  */
 function timedEventBucketStart(event: CalendarEvent, todayStart: Date): Date {
-  const startDay = startOfDay(event.startsAt);
+  const startDay = appStartOfDay(event.startsAt);
   return startDay < todayStart ? todayStart : startDay;
 }
 
@@ -72,19 +78,19 @@ export function buildAgenda(
   now: Date,
   maxItems: number = DEFAULT_AGENDA_MAX_ITEMS
 ): AgendaDayGroup[] {
-  const todayStart = startOfDay(now);
+  const todayStart = appStartOfDay(now);
   const active = events.filter((event) => !isEventOver(event, now));
 
   const groups: AgendaDayGroup[] = [];
   let remaining = maxItems;
 
   for (let i = 0; i < AGENDA_HORIZON_DAYS && remaining > 0; i++) {
-    const day = addDays(todayStart, i);
+    const day = appAddDays(todayStart, i);
     const dayEvents = active
       .filter((event) =>
         event.allDay
           ? eventOverlapsDay(event, day)
-          : isSameDay(timedEventBucketStart(event, todayStart), day)
+          : appIsSameDay(timedEventBucketStart(event, todayStart), day)
       )
       .sort((a, b) => {
         if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
@@ -101,8 +107,8 @@ export function buildAgenda(
     remaining -= items.length;
 
     groups.push({
-      key: format(day, "yyyy-MM-dd"),
-      label: isSameDay(day, todayStart) ? "Today" : "Tomorrow",
+      key: formatAppDateParam(day),
+      label: appIsSameDay(day, todayStart) ? "Today" : "Tomorrow",
       items,
     });
   }

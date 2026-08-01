@@ -1,9 +1,9 @@
 "use client";
 
-import { isSameDay } from "date-fns";
 import { useEffect, useState } from "react";
 
 import { HOURS_IN_DAY } from "@/lib/calendar/constants";
+import { appIsSameDay, appMinutesSinceMidnight } from "@/lib/time";
 
 interface NowIndicatorProps {
   day: Date;
@@ -11,7 +11,17 @@ interface NowIndicatorProps {
   initialNow: Date;
 }
 
-/** Animated line marking the current time in a day/week time-grid column — only for today's column. */
+/**
+ * Animated line marking the current time in a day/week time-grid column —
+ * only for today's column.
+ *
+ * Both the day comparison and the vertical position are resolved in the app
+ * timezone (see lib/time). That matters twice over: the server pass and the
+ * hydration pass have to agree on the initial position, and the 60s tick
+ * swaps the server-passed instant for a browser `new Date()` — which under
+ * the old renderer-local reads would silently jump the line by the offset
+ * between the browser and the server (issue #95).
+ */
 export function NowIndicator({ day, initialNow }: NowIndicatorProps) {
   const [now, setNow] = useState(initialNow);
 
@@ -20,10 +30,9 @@ export function NowIndicator({ day, initialNow }: NowIndicatorProps) {
     return () => clearInterval(id);
   }, []);
 
-  if (!isSameDay(now, day)) return null;
+  if (!appIsSameDay(now, day)) return null;
 
-  const minutesSinceMidnight = now.getHours() * 60 + now.getMinutes();
-  const topPercent = (minutesSinceMidnight / (HOURS_IN_DAY * 60)) * 100;
+  const topPercent = (appMinutesSinceMidnight(now) / (HOURS_IN_DAY * 60)) * 100;
 
   return (
     <div

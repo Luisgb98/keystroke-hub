@@ -1,11 +1,11 @@
 import "server-only";
 import { and, asc, eq, gte, lt, or } from "drizzle-orm";
-import { startOfDay } from "date-fns";
 
 import { getDb } from "@/lib/db";
 import { eventSyncLinks, events } from "@/lib/db/schema";
 import type { CalendarEvent } from "@/lib/calendar/types";
 import { getLinkedIdeaSummariesForEvents } from "@/lib/data/idea-event-links";
+import { appStartOfDay } from "@/lib/time";
 
 /**
  * Events overlapping `[from, to)` — anything whose span touches the range,
@@ -53,7 +53,9 @@ export async function getEventsInRange(
  * kind: a timed event needs `endsAt >= now`, but an all-day event stores
  * `startsAt`/`endsAt` as day boundaries (docs/calendar.md), so using `now`
  * there would drop today's all-day events the moment the clock passes
- * midnight; `endsAt >= startOfDay(now)` is the equivalent check for them.
+ * midnight; `endsAt >= appStartOfDay(now)` is the equivalent check for them.
+ * That boundary is the app timezone's, matching how the rows were written
+ * (see lib/time).
  * In-progress events are intentionally included — see `lib/calendar/agenda.ts`.
  */
 export async function getUpcomingEvents(
@@ -61,7 +63,7 @@ export async function getUpcomingEvents(
   horizonEnd: Date
 ): Promise<CalendarEvent[]> {
   const db = getDb();
-  const todayStart = startOfDay(now);
+  const todayStart = appStartOfDay(now);
   const rows = await db
     .select({ event: events, conflictNote: eventSyncLinks.conflictNote })
     .from(events)

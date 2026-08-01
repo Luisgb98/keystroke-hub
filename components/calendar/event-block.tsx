@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { format } from "date-fns";
 import { AlertTriangle } from "lucide-react";
 import type { CSSProperties } from "react";
 
@@ -19,6 +18,7 @@ import {
   minutesSinceMidnight,
   type DaySegment,
 } from "@/lib/calendar/segments";
+import { formatInAppZone } from "@/lib/time";
 
 import { EventEditor } from "./event-editor";
 import { TRACK_ICON, TRACK_LABEL, TRACK_SURFACE_CLASSES } from "./track-styles";
@@ -187,8 +187,8 @@ export function EventBlock({
   }, [gesture, style, day, event, previewShift]);
 
   const timeLabel = previewShift
-    ? `${format(previewShift.startsAt, "HH:mm")}–${format(previewShift.endsAt, "HH:mm")}`
-    : `${format(start, "HH:mm")}–${format(end, "HH:mm")}`;
+    ? `${formatInAppZone(previewShift.startsAt, "HH:mm")}–${formatInAppZone(previewShift.endsAt, "HH:mm")}`
+    : `${formatInAppZone(start, "HH:mm")}–${formatInAppZone(end, "HH:mm")}`;
 
   return (
     <>

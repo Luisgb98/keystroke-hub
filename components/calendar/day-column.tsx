@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { format } from "date-fns";
 
 import {
   DAY_GRID_HEIGHT_REM,
@@ -17,6 +16,7 @@ import {
   minutesSinceMidnight,
 } from "@/lib/calendar/segments";
 import type { CalendarEvent } from "@/lib/calendar/types";
+import { formatInAppZone } from "@/lib/time";
 
 import { EventBlock } from "./event-block";
 import { EventEditor } from "./event-editor";
@@ -73,7 +73,7 @@ export function DayColumn({
         <button
           key={hour}
           type="button"
-          aria-label={`Add event at ${hour}:00 on ${format(day, "MMMM d, yyyy")}`}
+          aria-label={`Add event at ${hour}:00 on ${formatInAppZone(day, "MMMM d, yyyy")}`}
           onClick={() => setQuickAddHour(hour)}
           className="absolute inset-x-0 z-0 hover:bg-muted/40"
           style={{

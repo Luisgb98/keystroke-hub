@@ -2,8 +2,30 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { CalendarEvent } from "@/lib/calendar/types";
+import { parseAppDate, parseAppDateTime } from "@/lib/time";
 
 import { EventBlock } from "./event-block";
+
+/**
+ * Runs under `TZ=UTC` (vitest.config.ts) while the app zone is Europe/Madrid,
+ * so fixtures are built in the app zone — `at("2026-07-08", "09:00")`
+ * would render as "11:00" here and the label assertions would be testing the
+ * process timezone rather than the component (issue #95).
+ */
+
+/** The instant of a wall-clock time in the app zone. */
+function at(date: string, time: string): Date {
+  const parsed = parseAppDateTime(date, time);
+  if (!parsed) throw new Error(`bad test fixture: ${date} ${time}`);
+  return parsed;
+}
+
+/** App-zone midnight for a `yyyy-MM-dd` day. */
+function day(value: string): Date {
+  const parsed = parseAppDate(value);
+  if (!parsed) throw new Error(`bad test fixture: ${value}`);
+  return parsed;
+}
 
 function pointerEvent(
   type: string,
@@ -25,8 +47,8 @@ function makeEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     track: "work",
     title: "Sprint planning",
     description: null,
-    startsAt: new Date("2026-07-08T09:00:00"),
-    endsAt: new Date("2026-07-08T10:30:00"),
+    startsAt: at("2026-07-08", "09:00"),
+    endsAt: at("2026-07-08", "10:30"),
     allDay: false,
     conflictNote: null,
     linkedIdeas: [],
@@ -67,15 +89,15 @@ describe("EventBlock", () => {
 
   it("shows the clamped segment times, not the event's full span", () => {
     const event = makeEvent({
-      startsAt: new Date("2026-07-08T22:00:00"),
-      endsAt: new Date("2026-07-09T02:00:00"),
+      startsAt: at("2026-07-08", "22:00"),
+      endsAt: at("2026-07-09", "02:00"),
     });
     render(
       <EventBlock
         segment={{
           event,
           start: event.startsAt,
-          end: new Date("2026-07-08T23:59:00"),
+          end: at("2026-07-08", "23:59"),
         }}
         style={{}}
       />
@@ -93,7 +115,7 @@ describe("EventBlock — drag/resize", () => {
       <EventBlock
         segment={{ event, start: event.startsAt, end: event.endsAt }}
         style={{ top: "0%", height: "10%" }}
-        day={new Date("2026-07-08")}
+        day={day("2026-07-08")}
         onReschedule={onReschedule}
       />
     );
@@ -110,7 +132,7 @@ describe("EventBlock — drag/resize", () => {
       <EventBlock
         segment={{ event, start: event.startsAt, end: event.endsAt }}
         style={{ top: "0%", height: "10%" }}
-        day={new Date("2026-07-08")}
+        day={day("2026-07-08")}
         onReschedule={onReschedule}
       />
     );
@@ -121,8 +143,8 @@ describe("EventBlock — drag/resize", () => {
     expect(onReschedule).toHaveBeenCalledTimes(1);
     const shift = onReschedule.mock.calls[0][0];
     // The event is 90 min long (09:00–10:30); moving preserves duration.
-    expect(shift.startsAt).toEqual(new Date("2026-07-08T10:00:00"));
-    expect(shift.endsAt).toEqual(new Date("2026-07-08T11:30:00"));
+    expect(shift.startsAt).toEqual(at("2026-07-08", "10:00"));
+    expect(shift.endsAt).toEqual(at("2026-07-08", "11:30"));
   });
 
   it("does not reopen the editor via the click that follows a committed drag", () => {
@@ -132,7 +154,7 @@ describe("EventBlock — drag/resize", () => {
       <EventBlock
         segment={{ event, start: event.startsAt, end: event.endsAt }}
         style={{ top: "0%", height: "10%" }}
-        day={new Date("2026-07-08")}
+        day={day("2026-07-08")}
         onReschedule={onReschedule}
       />
     );
@@ -162,18 +184,18 @@ describe("EventBlock — drag/resize", () => {
 
   it("shows a resize handle only on an edge that matches the event's real boundary", () => {
     const event = makeEvent({
-      startsAt: new Date("2026-07-08T22:00:00"),
-      endsAt: new Date("2026-07-09T02:00:00"),
+      startsAt: at("2026-07-08", "22:00"),
+      endsAt: at("2026-07-09", "02:00"),
     });
     render(
       <EventBlock
         segment={{
           event,
           start: event.startsAt,
-          end: new Date("2026-07-08T23:59:00"),
+          end: at("2026-07-08", "23:59"),
         }}
         style={{ top: "0%", height: "10%" }}
-        day={new Date("2026-07-08")}
+        day={day("2026-07-08")}
         onReschedule={vi.fn()}
       />
     );
@@ -194,7 +216,7 @@ describe("EventBlock — drag/resize", () => {
       <EventBlock
         segment={{ event, start: event.startsAt, end: event.endsAt }}
         style={{ top: "0%", height: "10%" }}
-        day={new Date("2026-07-08")}
+        day={day("2026-07-08")}
         onReschedule={onReschedule}
       />
     );
@@ -207,7 +229,7 @@ describe("EventBlock — drag/resize", () => {
     expect(onReschedule).toHaveBeenCalledTimes(1);
     const shift = onReschedule.mock.calls[0][0];
     expect(shift.startsAt).toEqual(event.startsAt);
-    expect(shift.endsAt).toEqual(new Date("2026-07-08T11:00:00"));
+    expect(shift.endsAt).toEqual(at("2026-07-08", "11:00"));
   });
 });
 
