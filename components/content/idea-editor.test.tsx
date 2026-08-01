@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -429,6 +430,82 @@ describe("IdeaEditor — edit mode", () => {
 
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
     expect(toastSuccess).toHaveBeenCalledWith("Idea updated");
+  });
+
+  // #102: submitting used to be a `useActionState` form action, so a rejection
+  // stayed in the action state until the next submit. Now the dialog owns its
+  // result and clears it on open, so a fresh open never wears an old error.
+  it("drops a previous attempt's errors when reopened", async () => {
+    updateIdea.mockResolvedValue({
+      error: "Check the highlighted fields.",
+      fieldErrors: { title: ["Title is required"] },
+    });
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <IdeaEditor mode="edit" idea={makeIdea()} open onOpenChange={vi.fn()} />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Title is required")).toBeInTheDocument();
+
+    rerender(
+      <IdeaEditor
+        mode="edit"
+        idea={makeIdea()}
+        open={false}
+        onOpenChange={vi.fn()}
+      />
+    );
+    rerender(
+      <IdeaEditor mode="edit" idea={makeIdea()} open onOpenChange={vi.fn()} />
+    );
+
+    expect(screen.queryByText("Title is required")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Title")).not.toHaveAttribute("aria-invalid");
+  });
+
+  // #102: the close used to be issued from the render pass that noticed
+  // `state.success`, which writes the *parent's* state mid-render. React let
+  // the save through but logged "Cannot update a component (IdeaCard) while
+  // rendering a different component (IdeaEditor)" every time. Only a real
+  // stateful parent reproduces it — an `onOpenChange={vi.fn()}` spy has no
+  // state to update, so every other test here stayed green through the bug.
+  it("closes without asking React to update its parent mid-render", async () => {
+    updateIdea.mockResolvedValue({ success: true });
+    const consoleError = vi.spyOn(console, "error");
+    const user = userEvent.setup();
+
+    function Host() {
+      const [open, setOpen] = useState(true);
+      return (
+        <>
+          <IdeaEditor
+            mode="edit"
+            idea={makeIdea()}
+            releaseStartsAt={new Date("2026-09-10T16:30:00.000Z")}
+            open={open}
+            onOpenChange={setOpen}
+          />
+          <span data-testid="host-open">{String(open)}</span>
+        </>
+      );
+    }
+
+    render(<Host />);
+    // Change the release hour — the exact flow the error was reported on.
+    await user.clear(screen.getByLabelText("Release time"));
+    await user.type(screen.getByLabelText("Release time"), "21:00");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("host-open")).toHaveTextContent("false")
+    );
+    expect(
+      consoleError.mock.calls.filter(([first]) =>
+        String(first).includes("Cannot update a component")
+      )
+    ).toEqual([]);
+    consoleError.mockRestore();
   });
 
   it("renders the format radios on the shared button system", () => {
