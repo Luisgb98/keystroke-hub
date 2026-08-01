@@ -14,6 +14,7 @@ vi.mock("sonner", () => ({
 
 import type { Idea } from "@/lib/db/schema";
 import { IdeaEditor } from "./idea-editor";
+import { appTodayParam, formatInAppZone } from "@/lib/time";
 
 function makeIdea(overrides: Partial<Idea> = {}): Idea {
   return {
@@ -31,6 +32,19 @@ function makeIdea(overrides: Partial<Idea> = {}): Idea {
     updatedAt: new Date(),
     ...overrides,
   };
+}
+
+/**
+ * react-day-picker labels the current day "Today, Saturday, August 1st, 2026"
+ * and every other day without the prefix, and the popover opens on the current
+ * month — so a hardcoded date only resolves on some days of some months. Drive
+ * the calendar off today instead, which is always present and always labelled
+ * this way.
+ */
+function todayCellName(): RegExp {
+  return new RegExp(
+    `^Today, ${formatInAppZone(new Date(), "EEEE, MMMM do, yyyy")}$`
+  );
 }
 
 describe("IdeaEditor — create mode", () => {
@@ -84,7 +98,7 @@ describe("IdeaEditor — create mode", () => {
     const [, formData] = createIdea.mock.calls[0] as [unknown, FormData];
     expect(formData.get("title")).toBe("Glitch tutorial");
     expect(formData.get("script")).toBe("# Intro");
-    expect(formData.get("releaseDate")).toBe("2026-08-01");
+    expect(formData.get("releaseDate")).toBe(appTodayParam());
     expect(formData.get("releaseTime")).toBe("19:00");
   });
 
@@ -99,10 +113,10 @@ describe("IdeaEditor — create mode", () => {
       screen.getByRole("button", { name: "Open publish day calendar" })
     );
     await user.click(
-      await screen.findByRole("button", { name: "Saturday, August 1st, 2026" })
+      await screen.findByRole("button", { name: todayCellName() })
     );
 
-    expect(screen.getByLabelText("Release date")).toHaveValue("2026-08-01");
+    expect(screen.getByLabelText("Release date")).toHaveValue(appTodayParam());
     expect(screen.getByLabelText("Release time")).toBeEnabled();
 
     await user.type(screen.getByLabelText("Title"), "Glitch tutorial");
@@ -110,7 +124,7 @@ describe("IdeaEditor — create mode", () => {
 
     await waitFor(() => expect(createIdea).toHaveBeenCalledTimes(1));
     const [, formData] = createIdea.mock.calls[0] as [unknown, FormData];
-    expect(formData.get("releaseDate")).toBe("2026-08-01");
+    expect(formData.get("releaseDate")).toBe(appTodayParam());
     expect(formData.get("releaseTime")).toBe("19:00");
   });
 
@@ -315,7 +329,9 @@ describe("IdeaEditor — edit mode", () => {
           format: "video",
           tags: ["speedrun", "glitch"],
         })}
-        releaseStartsAt={new Date("2026-09-10T18:30:00")}
+        // 18:30 in Madrid (CEST, +2) as an absolute instant — the prefill
+        // must read it back in the app zone, not the process one (#95).
+        releaseStartsAt={new Date("2026-09-10T16:30:00.000Z")}
         open
         onOpenChange={vi.fn()}
       />
@@ -358,7 +374,7 @@ describe("IdeaEditor — edit mode", () => {
       <IdeaEditor
         mode="edit"
         idea={makeIdea()}
-        releaseStartsAt={new Date("2026-09-10T18:30:00")}
+        releaseStartsAt={new Date("2026-09-10T16:30:00.000Z")}
         open
         onOpenChange={vi.fn()}
       />

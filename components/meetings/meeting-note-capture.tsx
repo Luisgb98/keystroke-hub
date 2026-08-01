@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useId, useState } from "react";
-import { format } from "date-fns";
 import { Plus } from "lucide-react";
 
 import { createMeetingNote } from "@/lib/meetings/actions";
@@ -24,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { appTodayParam } from "@/lib/time";
 
 interface MeetingNoteCaptureProps {
   projects: LinkableProjectOption[];
@@ -31,7 +31,7 @@ interface MeetingNoteCaptureProps {
 
 function emptyValues() {
   return {
-    date: format(new Date(), "yyyy-MM-dd"),
+    date: appTodayParam(),
     title: "",
     notes: "",
     meetingType: INITIAL_MEETING_TYPE as string,

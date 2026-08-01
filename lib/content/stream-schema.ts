@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { parseAppDate, parseAppDateTime } from "@/lib/time";
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -18,15 +20,6 @@ export interface StreamCaptureInput {
   notes: string | null;
   /** `null` means the stream is created unscheduled. */
   schedule: StreamScheduleInput | null;
-}
-
-/** Local midnight for a `yyyy-MM-dd` string — matches `lib/calendar/event-schema.ts`. */
-function parseLocalDate(date: string): Date {
-  return new Date(`${date}T00:00:00`);
-}
-
-function combineDateAndTime(date: string, time: string): Date {
-  return new Date(`${date}T${time}:00`);
 }
 
 const rawStreamCaptureSchema = z.object({
@@ -52,7 +45,8 @@ const rawStreamCaptureSchema = z.object({
  * Shared by the create form and `createStream`. Unlike `eventFormSchema`,
  * only a start date/time is collected — the end is a fixed 2h slot (or the
  * same day, for all-day) rather than a second picker, matching "capture in
- * seconds" (see docs/content-streams.md).
+ * seconds" (see docs/content-streams.md). The wall clock is read in the app
+ * timezone (see lib/time), not the server's own (issue #95).
  */
 export const streamCaptureSchema = rawStreamCaptureSchema.transform(
   (data, ctx) => {
@@ -73,24 +67,37 @@ export const streamCaptureSchema = rawStreamCaptureSchema.transform(
     }
 
     const allDay = data.allDay ?? false;
-    let startsAt: Date;
-    let endsAt: Date;
 
-    if (allDay) {
-      startsAt = parseLocalDate(data.date);
-      endsAt = startsAt;
-    } else {
-      if (!data.time) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["time"],
-          message: "Pick a start time",
-        });
-        return z.NEVER;
-      }
-      startsAt = combineDateAndTime(data.date, data.time);
-      endsAt = new Date(startsAt.getTime() + DEFAULT_STREAM_DURATION_MS);
+    if (!allDay && !data.time) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["time"],
+        message: "Pick a start time",
+      });
+      return z.NEVER;
     }
+
+    const startsAt = allDay
+      ? parseAppDate(data.date)
+      : parseAppDateTime(data.date, data.time!);
+
+    // `DATE_RE` only checks the shape, so a well-formed but nonexistent day
+    // (2026-02-30) still reaches here — reject it rather than scheduling the
+    // stream at an Invalid Date.
+    if (!startsAt) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["date"],
+        message: "Pick a valid date",
+      });
+      return z.NEVER;
+    }
+
+    // All-day streams are a single date-scoped day (`startsAt === endsAt`,
+    // see docs/calendar.md); timed ones get the fixed 2h slot.
+    const endsAt = allDay
+      ? startsAt
+      : new Date(startsAt.getTime() + DEFAULT_STREAM_DURATION_MS);
 
     const result: StreamCaptureInput = {
       title: data.title,

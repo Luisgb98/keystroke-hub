@@ -24,8 +24,9 @@ function makeEvent(
   return {
     id: "evt-1",
     title: "Stream: Boss rush",
-    startsAt: new Date("2026-08-01T14:00:00"),
-    endsAt: new Date("2026-08-01T15:00:00"),
+    // 14:00–15:00 in Madrid (CEST, +2) as absolute instants — see #95.
+    startsAt: new Date("2026-08-01T12:00:00.000Z"),
+    endsAt: new Date("2026-08-01T13:00:00.000Z"),
     allDay: false,
     ...overrides,
   };

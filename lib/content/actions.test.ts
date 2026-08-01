@@ -211,7 +211,8 @@ describe("createIdea", () => {
         track: "content",
         title: "Release: Speedrun any% commentary",
         allDay: false,
-        startsAt: new Date("2026-08-01T19:00:00"),
+        // 19:00 Madrid (CEST, +2) as an absolute instant — see lib/time / #95.
+        startsAt: new Date("2026-08-01T17:00:00.000Z"),
       })
     );
     // Linked, and the idea points at the event.
@@ -306,7 +307,7 @@ describe("updateIdea", () => {
     expect(dbMock.insertValues).toHaveBeenCalledWith(
       expect.objectContaining({
         track: "content",
-        startsAt: new Date("2026-09-10T18:00:00"),
+        startsAt: new Date("2026-09-10T16:00:00.000Z"),
       })
     );
     expect(pushEventCreated).toHaveBeenCalledWith("evt-9", "content");
@@ -328,7 +329,7 @@ describe("updateIdea", () => {
     expect(dbMock.updateSet).toHaveBeenCalledWith(
       expect.objectContaining({
         title: "Release: Edited title",
-        startsAt: new Date("2026-10-05T20:00:00"),
+        startsAt: new Date("2026-10-05T18:00:00.000Z"),
       })
     );
     expect(pushEventUpdated).toHaveBeenCalledWith("evt-1", "content");

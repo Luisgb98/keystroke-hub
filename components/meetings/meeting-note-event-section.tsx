@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { format } from "date-fns";
 import { CalendarDays, Unlink } from "lucide-react";
 import { toast } from "sonner";
 
@@ -10,6 +9,7 @@ import type { LinkedEventSummary } from "@/lib/data/meeting-notes";
 import { Button } from "@/components/ui/button";
 
 import { MeetingEventAttachPicker } from "./meeting-event-attach-picker";
+import { formatInAppZone } from "@/lib/time";
 
 interface MeetingNoteEventSectionProps {
   meetingNoteId: string;
@@ -67,8 +67,8 @@ export function MeetingNoteEventSection({
             {event.title}{" "}
             <span className="font-mono text-caption text-muted-foreground">
               {event.allDay
-                ? format(event.startsAt, "MMM d, yyyy")
-                : format(event.startsAt, "MMM d, yyyy HH:mm")}
+                ? formatInAppZone(event.startsAt, "MMM d, yyyy")
+                : formatInAppZone(event.startsAt, "MMM d, yyyy HH:mm")}
             </span>
           </span>
           <Button

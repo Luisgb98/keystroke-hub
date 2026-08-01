@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { parseAppDateTime } from "@/lib/time";
+
 import {
   IDEA_FORMATS,
   INITIAL_IDEA_FORMAT,
@@ -67,17 +69,17 @@ export function normalizeTags(raw: string | undefined | null): string[] {
   return tags;
 }
 
-/** Local date+time for `yyyy-MM-dd` + `HH:mm` strings — matches `event-schema.ts`'s parsing. */
-function combineDateAndTime(date: string, time: string): Date {
-  return new Date(`${date}T${time}:00`);
-}
-
 /**
  * Builds the release span from a form's `releaseDate`/`releaseTime`. No date →
  * no release. A date without a time defaults to 19:00 (`DEFAULT_RELEASE_TIME`),
  * the channel's standard publish slot. The end is a nominal
  * `RELEASE_EVENT_DURATION_MINUTES` block after the start (the calendar has no
  * zero-length events).
+ *
+ * The wall clock is read in the app timezone (see lib/time), so the 19:00
+ * default lands at 19:00 on the calendar whether the parse runs on Vercel's
+ * UTC servers or in local dev (issue #95). An unparseable date yields no
+ * release rather than an Invalid Date — the caller adds the validation issue.
  */
 function buildRelease(
   releaseDate: string | undefined,
@@ -86,7 +88,8 @@ function buildRelease(
   if (!releaseDate) return null;
   const time =
     releaseTime && releaseTime.length > 0 ? releaseTime : DEFAULT_RELEASE_TIME;
-  const startsAt = combineDateAndTime(releaseDate, time);
+  const startsAt = parseAppDateTime(releaseDate, time);
+  if (!startsAt) return null;
   const endsAt = new Date(
     startsAt.getTime() + RELEASE_EVENT_DURATION_MINUTES * 60_000
   );
@@ -175,6 +178,29 @@ function refineTagCount(
   }
 }
 
+/**
+ * `DATE_RE` only checks the shape, so a well-formed but nonexistent day
+ * (2026-02-30) passes it and `buildRelease` returns null. Surface that as a
+ * field error instead of silently dropping the release.
+ */
+function refineRelease(
+  raw: { releaseDate?: string },
+  fields: IdeaFields,
+  ctx: z.RefinementCtx
+): void {
+  if (
+    raw.releaseDate &&
+    raw.releaseDate.length > 0 &&
+    fields.release === null
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["releaseDate"],
+      message: "Enter a valid release date",
+    });
+  }
+}
+
 /** Shared by the capture form and `createIdea`: parses raw form-shaped input into the DB-ready shape. */
 export const ideaCaptureSchema = z
   .object({
@@ -190,6 +216,7 @@ export const ideaCaptureSchema = z
   .transform((data, ctx): IdeaCaptureInput => {
     const fields = normalizeSharedFields(data);
     refineTagCount(fields, ctx);
+    refineRelease(data, fields, ctx);
     return {
       ...fields,
       script: data.script && data.script.length > 0 ? data.script : null,
@@ -202,6 +229,7 @@ export const ideaEditSchema = z
   .transform((data, ctx): IdeaFields => {
     const fields = normalizeSharedFields(data);
     refineTagCount(fields, ctx);
+    refineRelease(data, fields, ctx);
     return fields;
   });
 

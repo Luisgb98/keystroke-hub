@@ -2,7 +2,6 @@
 
 import { useTransition } from "react";
 import Link from "next/link";
-import { format } from "date-fns";
 import { X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -12,6 +11,7 @@ import {
   unlinkIdeaFromEvent,
 } from "@/lib/content/link-actions";
 import type { ScheduledEventSummary } from "@/lib/data/idea-event-links";
+import { formatInAppZone } from "@/lib/time";
 
 interface IdeaScheduledEventsProps {
   ideaId: string;
@@ -64,8 +64,8 @@ export function IdeaScheduledEvents({
             className="hover:underline"
           >
             {event.allDay
-              ? format(event.startsAt, "MMM d")
-              : format(event.startsAt, "MMM d, HH:mm")}
+              ? formatInAppZone(event.startsAt, "MMM d")
+              : formatInAppZone(event.startsAt, "MMM d, HH:mm")}
           </Link>
           <button
             type="button"

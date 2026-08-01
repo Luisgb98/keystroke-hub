@@ -6,6 +6,20 @@ const createStream = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/content/stream-actions", () => ({ createStream }));
 
 import { StreamCreate } from "./stream-create";
+import { appTodayParam, formatInAppZone } from "@/lib/time";
+
+/**
+ * react-day-picker labels the current day "Today, Saturday, August 1st, 2026"
+ * and every other day without the prefix, and the popover opens on the current
+ * month — so a hardcoded date only resolves on some days of some months. Drive
+ * the calendar off today instead, which is always present and always labelled
+ * this way.
+ */
+function todayCellName(): RegExp {
+  return new RegExp(
+    `^Today, ${formatInAppZone(new Date(), "EEEE, MMMM do, yyyy")}$`
+  );
+}
 
 describe("StreamCreate", () => {
   afterEach(() => {
@@ -95,7 +109,7 @@ describe("StreamCreate", () => {
       screen.getByRole("button", { name: "Open stream day calendar" })
     );
     await user.click(
-      await screen.findByRole("button", { name: "Saturday, August 1st, 2026" })
+      await screen.findByRole("button", { name: todayCellName() })
     );
 
     await user.click(
@@ -107,7 +121,7 @@ describe("StreamCreate", () => {
 
     await waitFor(() => expect(createStream).toHaveBeenCalledTimes(1));
     const [, formData] = createStream.mock.calls[0] as [unknown, FormData];
-    expect(formData.get("date")).toBe("2026-08-01");
+    expect(formData.get("date")).toBe(appTodayParam());
     expect(formData.get("time")).toBe("20:00");
   });
 
