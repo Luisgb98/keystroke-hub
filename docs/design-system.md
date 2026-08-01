@@ -165,6 +165,31 @@ Handled by `next-themes` (`ThemeProvider` in `app/layout.tsx`), class-based
 persisting the user's explicit choice. `suppressHydrationWarning` is set on
 `<html>` per next-themes' recommendation, so there's no flash on load.
 
+## Dialogs that close on a server action (#102)
+
+A dialog whose close depends on a mutation's result must **not** drive that
+close off `useActionState`'s state. That state commits only once the router has
+applied the refresh the action's `revalidatePath` calls trigger, so the close
+waits on a full page re-render, not on the mutation. `IdeaEditor` sat on a
+disabled "Saving…" for 20s+ this way while the row had already landed in ~300ms
+— a modal the user could not dismiss after a save that had already succeeded.
+
+Instead: `useTransition`, `await` the action directly, and act on the result
+inside the transition callback (`TriageDialog`, `RecordOutcomeDialog`,
+`AttachPicker`, `IdeaEditor`). That settles on the server response, and a
+transition callback is an ordinary post-event context — so it is also the only
+legal place to call a parent's `onOpenChange`. Doing that during render earns
+React's "Cannot update a component while rendering a different component".
+
+The cost scales with the **revalidated route's** own render cost, which is why
+only the ideas page crossed the line — `/content/ideas` runs two sequential
+waves of queries (ideas + tags + scripts, then linked events + projects).
+Measured close latency for the dialogs still on `useActionState`, cold server,
+12 runs: `EventEditor` 341–849ms, inbox `CaptureDialog` 436–461ms,
+`StreamCreate` 442–952ms. None hangs today, so none was rewritten; they are
+about one heavier page-level query away from doing so. Write new dialogs the
+transition way.
+
 ## Adding a component
 
 1. Reach for `pnpm dlx shadcn@latest add <component>` first — it already
