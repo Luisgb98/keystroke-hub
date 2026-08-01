@@ -46,7 +46,8 @@ interface IdeaCardProps {
  * to change back) via the shared `IdeaStatusSelect` (#73 extracted it so the
  * detail page shares one implementation) — a themed shadcn `Select` (#72)
  * rather than a native `<select>`, so its trigger and option popup follow the
- * app theme in both modes.
+ * app theme in both modes. The release chip commits inline the same way (#102)
+ * — see `IdeaScheduledEvents`.
  */
 export function IdeaCard({
   idea,
@@ -166,6 +167,7 @@ export function IdeaCard({
             <IdeaScheduledEvents
               ideaId={idea.id}
               scheduledEvents={scheduledEvents}
+              releaseEventId={idea.releaseEventId}
             />
           </div>
 

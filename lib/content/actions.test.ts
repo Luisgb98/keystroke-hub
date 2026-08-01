@@ -101,6 +101,7 @@ import {
 import {
   createIdea,
   deleteIdea,
+  rescheduleIdeaRelease,
   updateIdea,
   updateIdeaStatus,
 } from "./actions";
@@ -359,6 +360,121 @@ describe("updateIdea", () => {
     );
     expect(state.fieldErrors?.title).toBeTruthy();
     expect(dbMock.select).not.toHaveBeenCalled();
+  });
+});
+
+// #102: the one-tap reschedule behind the idea card's release chip. A narrow
+// mutation on purpose — it moves the span and nothing else, so the title, tags
+// and description the user never opened are never re-sent or re-validated.
+describe("rescheduleIdeaRelease", () => {
+  it("verifies the session before touching the database", async () => {
+    dbMock.selectQueue.push([{ releaseEventId: "evt-1" }]);
+    dbMock.updateReturning.mockResolvedValue([
+      { id: "evt-1", track: "content" },
+    ]);
+
+    await rescheduleIdeaRelease("idea-1", "2026-10-05", "20:00");
+    expect(verifySession).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects an unauthenticated call before writing", async () => {
+    vi.mocked(verifySession).mockRejectedValueOnce(
+      new Error("NEXT_REDIRECT:/login")
+    );
+    await expect(
+      rescheduleIdeaRelease("idea-1", "2026-10-05", "20:00")
+    ).rejects.toThrow("NEXT_REDIRECT:/login");
+    expect(dbMock.update).not.toHaveBeenCalled();
+  });
+
+  it("moves the release span, revalidates every surface, and pushes to Google", async () => {
+    dbMock.selectQueue.push([{ releaseEventId: "evt-1" }]);
+    dbMock.updateReturning.mockResolvedValue([
+      { id: "evt-1", track: "content" },
+    ]);
+
+    const result = await rescheduleIdeaRelease("idea-1", "2026-10-05", "20:00");
+
+    expect(result).toEqual({});
+    // 20:00 in Madrid (CEST, +2) — parsed in the app zone, not the UTC this
+    // test process runs in (#95).
+    expect(dbMock.updateSet).toHaveBeenCalledWith({
+      startsAt: new Date("2026-10-05T18:00:00.000Z"),
+      endsAt: new Date("2026-10-05T19:00:00.000Z"),
+    });
+    expect(revalidatePath).toHaveBeenCalledWith("/content/ideas");
+    expect(revalidatePath).toHaveBeenCalledWith("/content/ideas/idea-1");
+    expect(revalidatePath).toHaveBeenCalledWith("/content/board");
+    expect(revalidatePath).toHaveBeenCalledWith("/calendar");
+    expect(pushEventUpdated).toHaveBeenCalledWith("evt-1", "content");
+  });
+
+  it("leaves the release's title alone — a move is not a rename", async () => {
+    dbMock.selectQueue.push([{ releaseEventId: "evt-1" }]);
+    dbMock.updateReturning.mockResolvedValue([
+      { id: "evt-1", track: "content" },
+    ]);
+
+    await rescheduleIdeaRelease("idea-1", "2026-10-05", "20:00");
+
+    const [setArgs] = dbMock.updateSet.mock.calls[0];
+    expect(setArgs).not.toHaveProperty("title");
+  });
+
+  it("takes the event id from the idea's own row, never from the caller", async () => {
+    dbMock.selectQueue.push([{ releaseEventId: "evt-from-db" }]);
+    dbMock.updateReturning.mockResolvedValue([
+      { id: "evt-from-db", track: "content" },
+    ]);
+
+    await rescheduleIdeaRelease("idea-1", "2026-10-05", "20:00");
+
+    expect(dbMock.select).toHaveBeenCalledTimes(1);
+    expect(pushEventUpdated).toHaveBeenCalledWith("evt-from-db", "content");
+  });
+
+  it("rejects a well-shaped but nonexistent day without writing", async () => {
+    const result = await rescheduleIdeaRelease("idea-1", "2026-02-30", "20:00");
+
+    expect(result.error).toBe("Pick a real day and time.");
+    expect(dbMock.select).not.toHaveBeenCalled();
+    expect(dbMock.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects a malformed time without writing", async () => {
+    const result = await rescheduleIdeaRelease("idea-1", "2026-10-05", "25:00");
+
+    expect(result.error).toBe("Pick a real day and time.");
+    expect(dbMock.update).not.toHaveBeenCalled();
+  });
+
+  it("reports a deleted idea instead of writing", async () => {
+    dbMock.selectQueue.push([]);
+
+    const result = await rescheduleIdeaRelease("idea-1", "2026-10-05", "20:00");
+
+    expect(result.error).toBe("That idea no longer exists.");
+    expect(dbMock.update).not.toHaveBeenCalled();
+  });
+
+  it("reports an unscheduled idea instead of writing", async () => {
+    dbMock.selectQueue.push([{ releaseEventId: null }]);
+
+    const result = await rescheduleIdeaRelease("idea-1", "2026-10-05", "20:00");
+
+    expect(result.error).toBe("That idea has no release to move.");
+    expect(dbMock.update).not.toHaveBeenCalled();
+  });
+
+  it("reports a release event that vanished, and pushes nothing", async () => {
+    dbMock.selectQueue.push([{ releaseEventId: "evt-1" }]);
+    dbMock.updateReturning.mockResolvedValue([]);
+
+    const result = await rescheduleIdeaRelease("idea-1", "2026-10-05", "20:00");
+
+    expect(result.error).toBe("That release no longer exists.");
+    expect(pushEventUpdated).not.toHaveBeenCalled();
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 });
 

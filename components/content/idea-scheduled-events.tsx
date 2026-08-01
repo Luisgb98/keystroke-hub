@@ -1,31 +1,164 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
 import { toast } from "sonner";
 
 import { formatDateParam } from "@/lib/calendar/range";
+import { rescheduleIdeaRelease } from "@/lib/content/actions";
 import {
   linkIdeaToEvent,
   unlinkIdeaFromEvent,
 } from "@/lib/content/link-actions";
 import type { ScheduledEventSummary } from "@/lib/data/idea-event-links";
-import { formatInAppZone } from "@/lib/time";
+import {
+  formatAppDateParam,
+  formatAppTimeParam,
+  formatInAppZone,
+  parseAppDateTime,
+} from "@/lib/time";
+import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
+import {
+  Popover,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { TimePicker } from "@/components/ui/time-picker";
 
 interface IdeaScheduledEventsProps {
   ideaId: string;
   scheduledEvents: ScheduledEventSummary[];
+  /**
+   * The idea's own release event, when it has one. That single chip becomes a
+   * reschedule control instead of a calendar link (#102) — every other chip
+   * points at an event the idea merely links to, which this surface doesn't own.
+   */
+  releaseEventId?: string | null;
+}
+
+/** The chip's text: a release is a moment, an all-day event is just a day. */
+function chipLabel(event: ScheduledEventSummary): string {
+  return event.allDay
+    ? formatInAppZone(event.startsAt, "MMM d")
+    : formatInAppZone(event.startsAt, "MMM d, HH:mm");
 }
 
 /**
- * "Scheduled" chips on `IdeaCard` — the idea side of the link (see
- * docs/content-links.md). No idea detail page exists yet, so this mounts
- * directly on the card rather than a dedicated surface.
+ * The release chip: shows the publish slot and opens a date + time picker in
+ * place to move it (#102). Shifting a release is the most frequent edit a
+ * content schedule takes, and it used to cost a trip through the whole edit
+ * dialog — this is the same mutation at one tap from the card.
+ *
+ * The chip's own click is the trigger, so unlike every other chip it doesn't
+ * link to the calendar day. That link is what the calendar's own navigation is
+ * for; the reschedule is what this surface can't otherwise offer.
+ */
+function ReleaseChip({
+  ideaId,
+  event,
+}: {
+  ideaId: string;
+  event: ScheduledEventSummary;
+}) {
+  const label = chipLabel(event);
+  const [open, setOpen] = useState(false);
+  const [date, setDate] = useState(() => formatAppDateParam(event.startsAt));
+  const [time, setTime] = useState(() => formatAppTimeParam(event.startsAt));
+  const [pending, startTransition] = useTransition();
+
+  // Re-seed the fields on each open rather than only at mount: a save
+  // revalidates the page, so the next open must offer the slot that's actually
+  // stored. Adjusted during render (this component's own state) rather than in
+  // an effect — the same idiom as EventEditor, minus the extra render pass.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) {
+      setDate(formatAppDateParam(event.startsAt));
+      setTime(formatAppTimeParam(event.startsAt));
+    }
+  }
+
+  function handleSave() {
+    const moved = parseAppDateTime(date, time);
+    startTransition(async () => {
+      const result = await rescheduleIdeaRelease(ideaId, date, time);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      setOpen(false);
+      toast.success(
+        moved
+          ? `Release moved to ${formatInAppZone(moved, "MMM d, HH:mm")}`
+          : "Release moved"
+      );
+    });
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            // The visible text is a date, which says nothing about what
+            // clicking it does — spell that out for assistive tech, and keep
+            // the current slot in the name so it's still announced.
+            aria-label={`Reschedule release, currently ${label}`}
+          />
+        }
+        className="rounded-full hover:underline"
+      >
+        {label}
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64">
+        <PopoverHeader>
+          <PopoverTitle>Reschedule release</PopoverTitle>
+        </PopoverHeader>
+        {/* Field names stay short and distinct from the edit dialog's "Release
+            date"/"Release time": Playwright's `getByLabel` matches substrings,
+            so overlapping names would make every existing query ambiguous
+            while a card's editor is open (see DatePicker's `triggerLabel`). */}
+        <DatePicker
+          aria-label="New day"
+          triggerLabel="Open reschedule calendar"
+          value={date}
+          onChange={setDate}
+        />
+        <TimePicker
+          aria-label="New time"
+          triggerLabel="Choose reschedule time"
+          value={time}
+          onChange={setTime}
+        />
+        <Button
+          type="button"
+          size="sm"
+          disabled={pending || !date || !time}
+          onClick={handleSave}
+        >
+          {pending ? "Moving…" : "Move release"}
+        </Button>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
+ * "Scheduled" chips on `IdeaCard` and the idea detail page — the idea side of
+ * the link (see docs/content-ideas.md). Chips for linked events open the
+ * calendar day they sit on; the idea's own release chip reschedules in place
+ * (see `ReleaseChip`).
  */
 export function IdeaScheduledEvents({
   ideaId,
   scheduledEvents,
+  releaseEventId,
 }: IdeaScheduledEventsProps) {
   const [pending, startTransition] = useTransition();
 
@@ -59,14 +192,16 @@ export function IdeaScheduledEvents({
           key={event.id}
           className="inline-flex items-center gap-1 rounded-full border border-track-content-border bg-track-content px-2 py-0.5 text-caption text-track-content-foreground"
         >
-          <Link
-            href={`/calendar?view=day&date=${formatDateParam(event.startsAt)}`}
-            className="hover:underline"
-          >
-            {event.allDay
-              ? formatInAppZone(event.startsAt, "MMM d")
-              : formatInAppZone(event.startsAt, "MMM d, HH:mm")}
-          </Link>
+          {releaseEventId && event.id === releaseEventId ? (
+            <ReleaseChip ideaId={ideaId} event={event} />
+          ) : (
+            <Link
+              href={`/calendar?view=day&date=${formatDateParam(event.startsAt)}`}
+              className="hover:underline"
+            >
+              {chipLabel(event)}
+            </Link>
+          )}
           <button
             type="button"
             aria-label={`Unlink from "${event.title}"`}

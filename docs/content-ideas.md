@@ -92,6 +92,30 @@ re-read from the DB (not trusted from the client). Because Neon's HTTP driver
 has no transactions, the writes run sequentially, idea-first, so a later
 failure degrades to an unscheduled idea rather than a lost capture.
 
+### One-tap reschedule from the card (#102)
+
+Shifting a release is the most frequent edit a content schedule takes, so it
+doesn't go through the edit dialog: the **release chip on `IdeaCard` (and the
+detail page) is the reschedule control**. Clicking it opens a
+`DatePicker`/`TimePicker` popover in place and `rescheduleIdeaRelease` moves the
+span — a narrow, direct-args mutation in the shape of `updateIdeaStatus`, so the
+title, tags and description the user never opened are never re-sent or
+re-validated. Notes:
+
+- **Only the release chip.** `IdeaScheduledEvents` takes `releaseEventId` and
+  swaps just that chip; every other chip points at an event the idea merely
+  links to, which this surface doesn't own, and keeps its calendar-day link. The
+  release chip trades that link away — the calendar has its own navigation, the
+  reschedule is what the card can't otherwise offer.
+- **The event id comes from the idea's row**, never from the client, so the
+  action can't be pointed at an arbitrary `events` row.
+- **The title is left alone.** A move is not a rename; `releaseEventTitle` is
+  `updateIdea`'s business, and it's derived from a field a reschedule can't
+  change.
+- Sync and revalidation ride the same `schedulePush(pushEventUpdated)` +
+  `revalidatePath` contract as every other release change, so the calendar and
+  Google Calendar follow without new code.
+
 ## Tags & the five-tag publishing standard (#71)
 
 Five tags is the publishing standard (`PUBLISHING_TAG_STANDARD`,
@@ -125,7 +149,8 @@ comma-separated text field, normalized by `normalizeTags`
 - **Mutations**: `lib/content/actions.ts` — `createIdea` (form action via
   `useActionState`, same shape as `lib/calendar/actions.ts`'s `createEvent`;
   optionally saves a script and creates the release event), `updateIdea` (the
-  full edit-all-fields form action — #71), `updateIdeaStatus` (narrow,
+  full edit-all-fields form action — #71), `rescheduleIdeaRelease` (narrow
+  release-only move behind the card's release chip — #102), `updateIdeaStatus` (narrow,
   direct-args mutation — mirrors `rescheduleEvent`'s precedent; shared by the
   list's inline `<select>` and #16's board move menu), `deleteIdea` (hard
   delete, no soft-archive, matching #11's event-delete precedent; also deletes
