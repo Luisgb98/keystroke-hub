@@ -43,6 +43,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { TimePicker } from "@/components/ui/time-picker";
+import { formatAppDateParam, formatAppTimeParam } from "@/lib/time";
 
 import { IDEA_FORMAT_ICON } from "./idea-format-styles";
 
@@ -56,18 +57,14 @@ interface IdeaEditorProps {
   onOpenChange: (open: boolean) => void;
 }
 
-function dateParam(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function timeParam(date: Date): string {
-  return `${String(date.getHours()).padStart(2, "0")}:${String(
-    date.getMinutes()
-  ).padStart(2, "0")}`;
-}
+/**
+ * Prefill reads the stored instant back as app-timezone wall clock (see
+ * lib/time). Using the raw `getFullYear`/`getHours` getters here would render
+ * the server's own zone during SSR and the device's after hydration — the
+ * form would show a different time than the calendar behind it (issue #95).
+ */
+const dateParam = formatAppDateParam;
+const timeParam = formatAppTimeParam;
 
 interface EditorValues {
   title: string;

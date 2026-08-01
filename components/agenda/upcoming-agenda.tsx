@@ -1,8 +1,8 @@
-import { addDays, endOfDay, startOfDay } from "date-fns";
 import { CalendarClock } from "lucide-react";
 import Link from "next/link";
 
 import { AGENDA_HORIZON_DAYS, buildAgenda } from "@/lib/calendar/agenda";
+import { appAddDays, appEndOfDay, appStartOfDay } from "@/lib/time";
 import type { CalendarEvent } from "@/lib/calendar/types";
 import { getUpcomingEvents } from "@/lib/data/events";
 import {
@@ -32,8 +32,8 @@ export async function UpcomingAgenda({
   maxItems,
 }: UpcomingAgendaProps) {
   const now = new Date();
-  const horizonEnd = endOfDay(
-    addDays(startOfDay(now), AGENDA_HORIZON_DAYS - 1)
+  const horizonEnd = appEndOfDay(
+    appAddDays(appStartOfDay(now), AGENDA_HORIZON_DAYS - 1)
   );
 
   let events: CalendarEvent[] = [];

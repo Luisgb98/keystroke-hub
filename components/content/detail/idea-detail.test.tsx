@@ -1,5 +1,4 @@
 import { render, screen } from "@testing-library/react";
-import { format } from "date-fns";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({
@@ -97,6 +96,7 @@ describe("IdeaDetail", () => {
   });
 
   it("shows the release date and time from the linked release event", () => {
+    // 17:00Z is 19:00 in Madrid (CEST) — the label the owner expects.
     const startsAt = new Date("2026-08-01T17:00:00Z");
     const releaseEvent: ScheduledEventSummary = {
       id: "event-1",
@@ -116,9 +116,7 @@ describe("IdeaDetail", () => {
       />
     );
 
-    expect(
-      screen.getByText(format(startsAt, "MMM d, yyyy · HH:mm"))
-    ).toBeInTheDocument();
+    expect(screen.getByText("Aug 1, 2026 · 19:00")).toBeInTheDocument();
   });
 
   it("shows a tags-incomplete counter until the five-tag standard is met", () => {

@@ -1,5 +1,4 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { format } from "date-fns";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { replace } = vi.hoisted(() => ({ replace: vi.fn() }));
@@ -92,7 +91,8 @@ describe("ScriptEditor", () => {
     await waitFor(() =>
       expect(
         screen.getByText(
-          `Saved ${format(new Date("2026-07-08T12:00:00Z"), "HH:mm")}`
+          // 12:00Z is 14:00 in Madrid (CEST).
+          "Saved 14:00"
         )
       ).toBeInTheDocument()
     );

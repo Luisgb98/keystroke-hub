@@ -2,6 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import { eventFormSchema, rescheduleSchema } from "./event-schema";
 
+/**
+ * Runs under `TZ=UTC` (vitest.config.ts) while the app zone is Europe/Madrid,
+ * so every instant below is asserted as an absolute `…Z` value. Comparing
+ * against `new Date("2026-07-08T09:00:00")` — the shape these tests used to
+ * have — re-parses the same wall clock the schema parses, agrees with it in
+ * every timezone, and is exactly why the +2h shift shipped unnoticed (#95).
+ */
+
 function baseInput(overrides: Record<string, unknown> = {}) {
   return {
     title: "Sprint planning",
@@ -23,8 +31,10 @@ describe("eventFormSchema", () => {
     if (result.success) {
       expect(result.data.track).toBe("work");
       expect(result.data.allDay).toBe(false);
-      expect(result.data.startsAt).toEqual(new Date("2026-07-08T09:00:00"));
-      expect(result.data.endsAt).toEqual(new Date("2026-07-08T10:00:00"));
+      expect(result.data.startsAt.toISOString()).toBe(
+        "2026-07-08T07:00:00.000Z"
+      );
+      expect(result.data.endsAt.toISOString()).toBe("2026-07-08T08:00:00.000Z");
       expect(result.data.description).toBeNull();
     }
   });
@@ -53,8 +63,10 @@ describe("eventFormSchema", () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.allDay).toBe(true);
-      expect(result.data.startsAt).toEqual(new Date("2026-07-08T00:00:00"));
-      expect(result.data.endsAt).toEqual(new Date("2026-07-08T00:00:00"));
+      expect(result.data.startsAt.toISOString()).toBe(
+        "2026-07-07T22:00:00.000Z"
+      );
+      expect(result.data.endsAt.toISOString()).toBe("2026-07-07T22:00:00.000Z");
     }
   });
 
@@ -70,8 +82,10 @@ describe("eventFormSchema", () => {
     );
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.startsAt).toEqual(new Date("2026-07-08T00:00:00"));
-      expect(result.data.endsAt).toEqual(new Date("2026-07-10T00:00:00"));
+      expect(result.data.startsAt.toISOString()).toBe(
+        "2026-07-07T22:00:00.000Z"
+      );
+      expect(result.data.endsAt.toISOString()).toBe("2026-07-09T22:00:00.000Z");
     }
   });
 

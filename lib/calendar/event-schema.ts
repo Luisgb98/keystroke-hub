@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { parseAppDate, parseAppDateTime } from "@/lib/time";
+
 import type { Track } from "./types";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -13,16 +15,6 @@ export interface EventInput {
   allDay: boolean;
   startsAt: Date;
   endsAt: Date;
-}
-
-/** Local midnight for a `yyyy-MM-dd` string — matches `parseDateParam` in `range.ts`. */
-function parseLocalDate(date: string): Date {
-  return new Date(`${date}T00:00:00`);
-}
-
-/** Local date+time for `yyyy-MM-dd` + `HH:mm` strings. */
-function combineDateAndTime(date: string, time: string): Date {
-  return new Date(`${date}T${time}:00`);
 }
 
 const rawEventSchema = z.object({
@@ -56,20 +48,23 @@ const rawEventSchema = z.object({
 
 /**
  * Shared by the create/edit form and both server actions: parses raw
- * form-shaped input into the final `{ startsAt, endsAt }` DB shape. All-day
- * events are normalized to local-midnight date boundaries (see
- * docs/calendar.md) — a single-day all-day event has `startsAt === endsAt`.
+ * form-shaped input into the final `{ startsAt, endsAt }` DB shape. The
+ * wall-clock strings are read in the app timezone (see lib/time), never in
+ * the server's own zone — that is what keeps a 19:00 event 19:00 after a save
+ * on Vercel (issue #95). All-day events are normalized to app-timezone
+ * midnight date boundaries (see docs/calendar.md) — a single-day all-day event
+ * has `startsAt === endsAt`.
  */
 export const eventFormSchema = rawEventSchema.transform((data, ctx) => {
   const description =
     data.description && data.description.length > 0 ? data.description : null;
 
-  let startsAt: Date;
-  let endsAt: Date;
+  let startsAt: Date | null;
+  let endsAt: Date | null;
 
   if (data.allDay) {
-    startsAt = parseLocalDate(data.startDate);
-    endsAt = parseLocalDate(data.endDate);
+    startsAt = parseAppDate(data.startDate);
+    endsAt = parseAppDate(data.endDate);
   } else {
     if (!data.startTime) {
       ctx.addIssue({
@@ -87,9 +82,28 @@ export const eventFormSchema = rawEventSchema.transform((data, ctx) => {
     }
     if (!data.startTime || !data.endTime) return z.NEVER;
 
-    startsAt = combineDateAndTime(data.startDate, data.startTime);
-    endsAt = combineDateAndTime(data.endDate, data.endTime);
+    startsAt = parseAppDateTime(data.startDate, data.startTime);
+    endsAt = parseAppDateTime(data.endDate, data.endTime);
   }
+
+  // `DATE_RE` only checks the shape, so a well-formed but nonexistent day
+  // (2026-02-30) still reaches here — reject it rather than storing an
+  // Invalid Date.
+  if (!startsAt) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["startDate"],
+      message: "Enter a valid start date",
+    });
+  }
+  if (!endsAt) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["endDate"],
+      message: "Enter a valid end date",
+    });
+  }
+  if (!startsAt || !endsAt) return z.NEVER;
 
   if (endsAt.getTime() < startsAt.getTime()) {
     ctx.addIssue({

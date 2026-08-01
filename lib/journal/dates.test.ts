@@ -1,4 +1,6 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+
+import { appTodayParam, formatInAppZone } from "@/lib/time";
 
 import {
   formatDateParam,
@@ -11,19 +13,32 @@ import {
   todayParam,
 } from "./dates";
 
-const originalTz = process.env.TZ;
-
-afterEach(() => {
-  process.env.TZ = originalTz;
-});
+/**
+ * Runs under `TZ=UTC` (vitest.config.ts) while the app zone is Europe/Madrid.
+ * Journal dates are `yyyy-MM-dd` strings, so the parse/format round trip was
+ * always symmetric — the real bug was `todayParam()` resolving "today" in the
+ * server's zone, which on Vercel rolled the journal over two hours early and
+ * disagreed with `DayHeader`'s browser-side "today" in that window (#95).
+ */
 
 describe("formatDateParam / todayParam", () => {
   it("formats a Date as yyyy-MM-dd", () => {
-    expect(formatDateParam(new Date("2026-07-08T15:00:00"))).toBe("2026-07-08");
+    expect(formatDateParam(new Date("2026-07-08T15:00:00Z"))).toBe(
+      "2026-07-08"
+    );
   });
 
-  it("todayParam matches the current local date", () => {
-    expect(todayParam()).toBe(formatDateParam(new Date()));
+  it("todayParam matches today in the app zone, not the server's", () => {
+    expect(todayParam()).toBe(appTodayParam());
+    expect(todayParam()).toBe(formatInAppZone(new Date(), "yyyy-MM-dd"));
+  });
+
+  it("formats an instant onto the app-zone day it belongs to", () => {
+    // 22:30Z on Jul 31 is already 00:30 on Aug 1 in Madrid. Under the old
+    // server-local resolution the journal called this "2026-07-31".
+    expect(formatDateParam(new Date("2026-07-31T22:30:00Z"))).toBe(
+      "2026-08-01"
+    );
   });
 });
 

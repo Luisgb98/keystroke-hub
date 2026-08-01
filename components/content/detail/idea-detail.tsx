@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { format } from "date-fns";
 import { Briefcase, CalendarClock } from "lucide-react";
 
 import { PUBLISHING_TAG_STANDARD } from "@/lib/content/idea-schema";
@@ -13,6 +12,7 @@ import { IdeaScheduledEvents } from "../idea-scheduled-events";
 import { IdeaStatusSelect } from "../idea-status-select";
 import { IdeaDetailHeader } from "./idea-detail-header";
 import { IdeaScriptSection } from "./idea-script-section";
+import { formatInAppZone } from "@/lib/time";
 
 interface IdeaDetailProps {
   idea: Idea;
@@ -66,8 +66,8 @@ export function IdeaDetail({
             <span className="flex items-center gap-1.5 text-small text-muted-foreground">
               <CalendarClock aria-hidden className="size-4 shrink-0" />
               {releaseEvent.allDay
-                ? format(releaseEvent.startsAt, "MMM d, yyyy")
-                : format(releaseEvent.startsAt, "MMM d, yyyy · HH:mm")}
+                ? formatInAppZone(releaseEvent.startsAt, "MMM d, yyyy")
+                : formatInAppZone(releaseEvent.startsAt, "MMM d, yyyy · HH:mm")}
             </span>
           ) : null}
         </div>

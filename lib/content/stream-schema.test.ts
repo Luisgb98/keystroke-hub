@@ -54,9 +54,11 @@ describe("streamCaptureSchema", () => {
     if (result.success) {
       expect(result.data.schedule).toEqual({
         allDay: false,
-        startsAt: new Date("2026-08-01T19:00:00"),
+        // 19:00 Madrid (CEST, +2) as an absolute instant — see #95.
+        startsAt: new Date("2026-08-01T17:00:00.000Z"),
         endsAt: new Date(
-          new Date("2026-08-01T19:00:00").getTime() + DEFAULT_STREAM_DURATION_MS
+          new Date("2026-08-01T17:00:00.000Z").getTime() +
+            DEFAULT_STREAM_DURATION_MS
         ),
       });
     }
@@ -70,8 +72,9 @@ describe("streamCaptureSchema", () => {
     if (result.success) {
       expect(result.data.schedule).toEqual({
         allDay: true,
-        startsAt: new Date("2026-08-01T00:00:00"),
-        endsAt: new Date("2026-08-01T00:00:00"),
+        // App-zone midnight on 2026-08-01 is 22:00Z the evening before.
+        startsAt: new Date("2026-07-31T22:00:00.000Z"),
+        endsAt: new Date("2026-07-31T22:00:00.000Z"),
       });
     }
   });

@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { format } from "date-fns";
 import { Briefcase, CalendarDays, Lightbulb } from "lucide-react";
 
 import type { MeetingNoteSummary } from "@/lib/data/meeting-notes";
 import { MEETING_TYPE_LABEL } from "@/lib/meetings/meeting-type";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { formatAppDateString } from "@/lib/time";
 
 interface MeetingNoteCardProps {
   meetingNote: MeetingNoteSummary;
@@ -30,7 +30,7 @@ export function MeetingNoteCard({ meetingNote }: MeetingNoteCardProps) {
           <div className="flex items-center gap-2 text-caption text-muted-foreground">
             <Briefcase aria-hidden className="size-4 shrink-0" />
             <span className="font-mono">
-              {format(new Date(`${meetingNote.date}T00:00:00`), "MMM d, yyyy")}
+              {formatAppDateString(meetingNote.date, "MMM d, yyyy")}
             </span>
           </div>
           <Badge variant="secondary">

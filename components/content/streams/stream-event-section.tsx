@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { format } from "date-fns";
 import { Unlink } from "lucide-react";
 import { toast } from "sonner";
 
@@ -12,6 +11,7 @@ import type { StreamEventSummary } from "@/lib/data/streams";
 import { Button } from "@/components/ui/button";
 
 import { EventAttachPicker } from "./event-attach-picker";
+import { formatInAppZone } from "@/lib/time";
 
 interface StreamEventSectionProps {
   streamId: string;
@@ -46,8 +46,8 @@ export function StreamEventSection({
             className="text-small hover:underline"
           >
             {event.allDay
-              ? format(event.startsAt, "MMM d, yyyy")
-              : format(event.startsAt, "MMM d, yyyy HH:mm")}
+              ? formatInAppZone(event.startsAt, "MMM d, yyyy")
+              : formatInAppZone(event.startsAt, "MMM d, yyyy HH:mm")}
           </Link>
           <Button
             type="button"

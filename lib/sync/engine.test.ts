@@ -1,7 +1,7 @@
-import { format } from "date-fns";
 import { describe, expect, it } from "vitest";
 
 import type { GoogleEvent } from "@/lib/google/client";
+import { formatAppDateParam, parseAppDate } from "@/lib/time";
 
 import {
   fromGoogleAllDayEnd,
@@ -13,6 +13,17 @@ import {
   toGooglePayload,
 } from "./engine";
 import type { LocalEventSnapshot, SyncLinkRecord } from "./types";
+
+/**
+ * All-day boundaries are app-zone midnight instants (see lib/time), and this
+ * suite runs under `TZ=UTC` — so `new Date("2026-07-08T00:00:00")` is *not*
+ * the app's 2026-07-08 and would make the round-trip assertions vacuous (#95).
+ */
+function appMidnight(value: string): Date {
+  const parsed = parseAppDate(value);
+  if (!parsed) throw new Error(`bad test fixture: ${value}`);
+  return parsed;
+}
 
 function googleEvent(overrides: Partial<GoogleEvent> = {}): GoogleEvent {
   return {
@@ -58,20 +69,65 @@ function link(overrides: Partial<SyncLinkRecord> = {}): SyncLinkRecord {
 
 describe("all-day date boundary mapping", () => {
   it("adds one day converting our inclusive end to Google's exclusive end", () => {
-    expect(toGoogleAllDayEnd(new Date("2026-07-08T00:00:00"))).toBe(
-      "2026-07-09"
-    );
+    expect(toGoogleAllDayEnd(appMidnight("2026-07-08"))).toBe("2026-07-09");
   });
 
   it("subtracts one day converting Google's exclusive end back to our inclusive end", () => {
     const result = fromGoogleAllDayEnd("2026-07-09");
-    expect(format(result, "yyyy-MM-dd")).toBe("2026-07-08");
+    expect(formatAppDateParam(result)).toBe("2026-07-08");
+    // Madrid is UTC+2 in July, so the inclusive end really is 22:00Z prior.
+    expect(result.toISOString()).toBe("2026-07-07T22:00:00.000Z");
   });
 
   it("round-trips a single-day all-day event (startsAt === endsAt)", () => {
-    const start = new Date("2026-07-08T00:00:00");
+    const start = appMidnight("2026-07-08");
     const googleEnd = toGoogleAllDayEnd(start);
     expect(fromGoogleAllDayEnd(googleEnd).getTime()).toBe(start.getTime());
+  });
+
+  it("round-trips every day of the year without drifting (no phantom diffs)", () => {
+    // A parse/format pair that disagreed by a day would make every all-day
+    // event look changed on every sync run (issue #95).
+    const drifted: string[] = [];
+    for (let i = 0; i < 365; i++) {
+      const day = formatAppDateParam(
+        new Date(Date.UTC(2026, 0, 1, 12) + i * 86_400_000)
+      );
+      const start = appMidnight(day);
+      const back = fromGoogleAllDayEnd(toGoogleAllDayEnd(start));
+      if (back.getTime() !== start.getTime()) drifted.push(day);
+    }
+    expect(drifted).toEqual([]);
+  });
+
+  it("keeps Google's own all-day strings stable through a full push/pull cycle", () => {
+    // Both DST changeover days are in here: a parse/format pair that
+    // disagreed across an offset change would come back a day off.
+    const cases: [start: string, exclusiveEnd: string][] = [
+      ["2026-01-15", "2026-01-16"],
+      ["2026-03-28", "2026-03-30"], // spans the spring-forward day
+      ["2026-08-01", "2026-08-02"],
+      ["2026-10-24", "2026-10-26"], // spans the fall-back day
+    ];
+
+    for (const [start, exclusiveEnd] of cases) {
+      const pulled = fromGooglePayload(
+        googleEvent({
+          start: { date: start },
+          end: { date: exclusiveEnd },
+        } as Partial<GoogleEvent>)
+      );
+      expect(pulled.allDay).toBe(true);
+      // Pushing straight back must reproduce Google's own strings verbatim —
+      // anything else is a diff Google would see on every sync run.
+      const payload = toGooglePayload(pulled);
+      expect(payload.start).toEqual({ date: start });
+      expect(payload.end).toEqual({ date: exclusiveEnd });
+    }
+  });
+
+  it("throws rather than storing an Invalid Date for an unparseable Google date", () => {
+    expect(() => fromGoogleAllDayEnd("2026-02-30")).toThrow(/unparseable/);
   });
 });
 
@@ -87,8 +143,8 @@ describe("toGooglePayload / fromGooglePayload", () => {
   it("maps an all-day event both ways, preserving the inclusive end date", () => {
     const event = localEvent({
       allDay: true,
-      startsAt: new Date("2026-07-08T00:00:00"),
-      endsAt: new Date("2026-07-08T00:00:00"),
+      startsAt: appMidnight("2026-07-08"),
+      endsAt: appMidnight("2026-07-08"),
     });
     const payload = toGooglePayload(event);
     expect(payload.start).toEqual({ date: "2026-07-08" });

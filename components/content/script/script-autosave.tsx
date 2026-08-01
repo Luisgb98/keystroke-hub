@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { format } from "date-fns";
 import { Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { saveScript } from "@/lib/content/script-actions";
+import { formatInAppZone } from "@/lib/time";
 
 export type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";
 
@@ -167,7 +167,7 @@ export function SaveStateIndicator({
         {state === "saved" ? (
           <Check aria-hidden className="size-3.5 shrink-0" />
         ) : null}
-        Saved {format(savedAt, "HH:mm")}
+        Saved {formatInAppZone(savedAt, "HH:mm")}
       </span>
     );
   }

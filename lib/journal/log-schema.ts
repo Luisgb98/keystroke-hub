@@ -1,15 +1,23 @@
 import { z } from "zod";
 
+import { isValidDateParam } from "./dates";
 import { weekStartParam } from "./week-dates";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-export const logDateSchema = z.string().regex(DATE_RE, "Invalid date");
+// The regex only checks the shape, so a well-formed but nonexistent day
+// (2026-02-30) needs the extra refine — without it the value reaches
+// `weekStartParam`, which has no real day to normalize.
+export const logDateSchema = z
+  .string()
+  .regex(DATE_RE, "Invalid date")
+  .refine(isValidDateParam, "Invalid date");
 
 /** Normalizes to the week's Monday before write, so `weekly_reviews.week_start` is always a Monday (see docs/journal.md). */
 export const weekStartSchema = z
   .string()
   .regex(DATE_RE, "Invalid date")
+  .refine(isValidDateParam, "Invalid date")
   .transform((value) => weekStartParam(value));
 
 const MAX_TITLE_LENGTH = 200;

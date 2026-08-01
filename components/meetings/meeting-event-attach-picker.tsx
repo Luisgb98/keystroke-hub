@@ -1,13 +1,12 @@
 "use client";
 
-import { format } from "date-fns";
-
 import {
   attachEventToMeetingNote,
   searchAttachableEvents,
 } from "@/lib/meetings/actions";
 import type { AttachableEvent } from "@/lib/data/meeting-notes";
 import { AttachPicker } from "@/components/shared/attach-picker";
+import { formatInAppZone } from "@/lib/time";
 
 interface MeetingEventAttachPickerProps {
   meetingNoteId: string;
@@ -36,8 +35,8 @@ export function MeetingEventAttachPicker({
       renderSubLabel={(event) => (
         <span className="text-caption text-muted-foreground">
           {event.allDay
-            ? format(event.startsAt, "MMM d, yyyy")
-            : format(event.startsAt, "MMM d, yyyy HH:mm")}
+            ? formatInAppZone(event.startsAt, "MMM d, yyyy")
+            : formatInAppZone(event.startsAt, "MMM d, yyyy HH:mm")}
         </span>
       )}
       successMessage={(event) => `Attached to "${event.title}"`}

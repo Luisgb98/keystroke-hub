@@ -1,6 +1,5 @@
-import { format } from "date-fns";
-
 import { HOURS_IN_DAY } from "@/lib/calendar/constants";
+import { formatHourLabel } from "@/lib/time";
 
 /**
  * Hour labels running down the left edge of the day/week time grid. Each row
@@ -13,7 +12,7 @@ export function TimeGutter() {
       {Array.from({ length: HOURS_IN_DAY }, (_, hour) => (
         <div key={hour} className="h-16">
           <span className="block -translate-y-1/2 pr-2 text-right font-mono text-caption text-muted-foreground">
-            {format(new Date(2000, 0, 1, hour), "h a")}
+            {formatHourLabel(hour)}
           </span>
         </div>
       ))}

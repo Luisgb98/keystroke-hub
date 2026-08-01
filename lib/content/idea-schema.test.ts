@@ -176,7 +176,10 @@ describe("release date/time parsing", () => {
     expect(result.success).toBe(true);
     if (result.success && result.data.release) {
       const { startsAt, endsAt } = result.data.release;
-      expect(startsAt).toEqual(new Date("2026-08-01T19:00:00"));
+      // 19:00 in Madrid (CEST, +2) is 17:00Z. Asserted as an absolute
+      // instant: re-parsing "2026-08-01T19:00:00" here would agree with the
+      // schema in every timezone and could never catch the shift (#95).
+      expect(startsAt.toISOString()).toBe("2026-08-01T17:00:00.000Z");
       // 60-minute nominal block (see RELEASE_EVENT_DURATION_MINUTES).
       expect(endsAt.getTime() - startsAt.getTime()).toBe(60 * 60_000);
     }
@@ -188,7 +191,7 @@ describe("release date/time parsing", () => {
       baseInput({ releaseDate: "2026-08-01", releaseTime: "21:15" })
     );
     expect(result.success && result.data.release?.startsAt).toEqual(
-      new Date("2026-08-01T21:15:00")
+      new Date("2026-08-01T19:15:00.000Z")
     );
   });
 
@@ -252,7 +255,7 @@ describe("ideaEditSchema", () => {
       expect(result.data.format).toBe("stream");
       expect(result.data.tags).toHaveLength(5);
       expect(result.data.release?.startsAt).toEqual(
-        new Date("2026-09-10T18:00:00")
+        new Date("2026-09-10T16:00:00.000Z")
       );
       // No `script` key on the edit shape — editing defers to the script page.
       expect("script" in result.data).toBe(false);

@@ -13,6 +13,7 @@ import { createEvent, updateEvent } from "@/lib/calendar/actions";
 import type { QuickAddDefaults } from "@/lib/calendar/quick-add";
 import type { CalendarEvent, Track } from "@/lib/calendar/types";
 import { dismissConflictNote } from "@/lib/sync/actions";
+import { formatAppDateParam, formatAppTimeParam } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { EventLinkedIdeas } from "@/components/content/event-linked-ideas";
 import { Button } from "@/components/ui/button";
@@ -43,18 +44,14 @@ interface EventEditorProps {
   onOpenChange: (open: boolean) => void;
 }
 
-function dateParam(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function timeParam(date: Date): string {
-  return `${String(date.getHours()).padStart(2, "0")}:${String(
-    date.getMinutes()
-  ).padStart(2, "0")}`;
-}
+/**
+ * Prefill reads the stored instant back as app-timezone wall clock (see
+ * lib/time). Using the raw `getFullYear`/`getHours` getters here would render
+ * the server's own zone during SSR and the device's after hydration — the
+ * form would show a different time than the calendar behind it (issue #95).
+ */
+const dateParam = formatAppDateParam;
+const timeParam = formatAppTimeParam;
 
 function initialValues(
   event: CalendarEvent | undefined,

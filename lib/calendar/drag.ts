@@ -1,4 +1,6 @@
-import { addDays, addMinutes } from "date-fns";
+import { addMinutes } from "date-fns";
+
+import { appAddDays } from "@/lib/time";
 
 import type { CalendarEvent } from "./types";
 
@@ -31,6 +33,8 @@ export function pxToMinutes(px: number, pxPerHour: number): number {
 /**
  * Moves a timed event by a whole-day offset plus a snapped minute offset
  * within the day, preserving duration. Used for day/week time-grid drags.
+ * Whole days are added in the app timezone (see lib/time) so a drag across a
+ * DST changeover keeps the event at the same wall-clock time.
  */
 export function moveEvent(
   event: TimedEvent,
@@ -39,7 +43,7 @@ export function moveEvent(
 ): TimeShift {
   const durationMs = event.endsAt.getTime() - event.startsAt.getTime();
   const startsAt = addMinutes(
-    addDays(event.startsAt, deltaDays),
+    appAddDays(event.startsAt, deltaDays),
     snapMinutes(deltaMinutes)
   );
   return { startsAt, endsAt: new Date(startsAt.getTime() + durationMs) };
@@ -54,8 +58,8 @@ export function moveEventByDays(
   deltaDays: number
 ): TimeShift {
   return {
-    startsAt: addDays(event.startsAt, deltaDays),
-    endsAt: addDays(event.endsAt, deltaDays),
+    startsAt: appAddDays(event.startsAt, deltaDays),
+    endsAt: appAddDays(event.endsAt, deltaDays),
   };
 }
 

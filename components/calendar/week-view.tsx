@@ -1,9 +1,8 @@
 "use client";
 
-import { format, isSameDay } from "date-fns";
-
 import { cn } from "@/lib/utils";
 import { eventOverlapsDay } from "@/lib/calendar/segments";
+import { appIsSameDay, formatInAppZone } from "@/lib/time";
 import type { CalendarEvent } from "@/lib/calendar/types";
 
 import { AllDayRow } from "./all-day-row";
@@ -42,12 +41,12 @@ export function WeekView({ days, events, now }: WeekViewProps) {
               <h2
                 className={cn(
                   "flex items-baseline gap-2 font-heading text-h3 font-semibold",
-                  isSameDay(day, now) && "text-primary"
+                  appIsSameDay(day, now) && "text-primary"
                 )}
               >
-                {format(day, "EEEE")}
+                {formatInAppZone(day, "EEEE")}
                 <span className="font-mono text-small text-muted-foreground">
-                  {format(day, "MMM d")}
+                  {formatInAppZone(day, "MMM d")}
                 </span>
               </h2>
               {dayEvents.length === 0 ? (
@@ -74,19 +73,19 @@ export function WeekView({ days, events, now }: WeekViewProps) {
                 key={day.toISOString()}
                 className={cn(
                   "border-l border-border py-2 text-center first:border-l-0",
-                  isSameDay(day, now) && "bg-secondary"
+                  appIsSameDay(day, now) && "bg-secondary"
                 )}
               >
                 <p className="text-caption text-muted-foreground">
-                  {format(day, "EEE")}
+                  {formatInAppZone(day, "EEE")}
                 </p>
                 <p
                   className={cn(
                     "font-heading text-h3 font-semibold",
-                    isSameDay(day, now) && "text-primary"
+                    appIsSameDay(day, now) && "text-primary"
                   )}
                 >
-                  {format(day, "d")}
+                  {formatInAppZone(day, "d")}
                 </p>
               </div>
             ))}

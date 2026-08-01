@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { format } from "date-fns";
 import { CheckCircle2, NotebookText, Radio } from "lucide-react";
 
 import type { StreamSummary } from "@/lib/data/streams";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { formatInAppZone } from "@/lib/time";
 
 interface StreamCardProps {
   stream: StreamSummary;
@@ -24,8 +24,8 @@ export function StreamCard({ stream }: StreamCardProps) {
           <span className="font-mono">
             {stream.event
               ? stream.event.allDay
-                ? format(stream.event.startsAt, "MMM d")
-                : format(stream.event.startsAt, "MMM d, HH:mm")
+                ? formatInAppZone(stream.event.startsAt, "MMM d")
+                : formatInAppZone(stream.event.startsAt, "MMM d, HH:mm")
               : "Unscheduled"}
           </span>
         </CardHeader>
