@@ -83,7 +83,6 @@ import {
   detachEventFromStream,
   removeChecklistItem,
   removeTemplateItem,
-  saveRetroNotes,
   searchAttachableEvents,
   toggleChecklistItem,
   updateStreamDetails,
@@ -184,48 +183,59 @@ describe("createStream", () => {
 });
 
 describe("updateStreamDetails", () => {
-  const validForm = { id: "stream-1", title: "Renamed", notes: "" };
+  const validInput = {
+    id: "stream-1",
+    title: "Renamed",
+    notes: "",
+    retroNotes: "",
+  };
 
   it("verifies the session before writing", async () => {
-    await updateStreamDetails(undefined, form(validForm));
+    await updateStreamDetails(validInput);
     expect(verifySession).toHaveBeenCalledTimes(1);
   });
 
-  it("updates title and notes and revalidates", async () => {
-    const result = await updateStreamDetails(undefined, form(validForm));
+  it("writes topic, prep notes and the retro in one statement", async () => {
+    const result = await updateStreamDetails({
+      ...validInput,
+      notes: "Check the mic",
+      retroNotes: "Chat was active",
+    });
     expect(result).toEqual({ success: true, streamId: "stream-1" });
+    // One `update`, not two — the single Save button (#102) can't half-land,
+    // and neon-http has no transaction to wrap a pair in.
+    expect(dbMock.update).toHaveBeenCalledTimes(1);
+    expect(dbMock.updateSet).toHaveBeenCalledWith({
+      title: "Renamed",
+      notes: "Check the mic",
+      retroNotes: "Chat was active",
+    });
     expect(revalidatePath).toHaveBeenCalledWith("/content/streams/stream-1");
+  });
+
+  it("clears emptied notes rather than storing an empty string", async () => {
+    await updateStreamDetails(validInput);
+    expect(dbMock.updateSet).toHaveBeenCalledWith({
+      title: "Renamed",
+      notes: null,
+      retroNotes: null,
+    });
+  });
+
+  it("rejects the whole save when one field is invalid, writing nothing", async () => {
+    const result = await updateStreamDetails({
+      ...validInput,
+      title: "",
+      retroNotes: "Worth keeping",
+    });
+    expect(result.fieldErrors?.title).toEqual(["Title is required"]);
+    expect(dbMock.update).not.toHaveBeenCalled();
   });
 
   it("returns an error (not a throw) when the stream no longer exists", async () => {
     dbMock.updateReturning.mockResolvedValueOnce([]);
-    const result = await updateStreamDetails(undefined, form(validForm));
+    const result = await updateStreamDetails(validInput);
     expect(result.error).toBe("That stream no longer exists.");
-  });
-});
-
-describe("saveRetroNotes", () => {
-  it("verifies the session before writing", async () => {
-    await saveRetroNotes("stream-1", "Went well");
-    expect(verifySession).toHaveBeenCalledTimes(1);
-  });
-
-  it("saves retro notes and revalidates the stream page", async () => {
-    const result = await saveRetroNotes("stream-1", "Went well");
-    expect(result).toEqual({});
-    expect(dbMock.updateSet).toHaveBeenCalledWith({ retroNotes: "Went well" });
-    expect(revalidatePath).toHaveBeenCalledWith("/content/streams/stream-1");
-  });
-
-  it("clears retro notes with an empty string", async () => {
-    await saveRetroNotes("stream-1", "");
-    expect(dbMock.updateSet).toHaveBeenCalledWith({ retroNotes: null });
-  });
-
-  it("returns an error when the stream no longer exists", async () => {
-    dbMock.updateReturning.mockResolvedValueOnce([]);
-    const result = await saveRetroNotes("missing", "note");
-    expect(result).toEqual({ error: "That stream no longer exists." });
   });
 });
 
