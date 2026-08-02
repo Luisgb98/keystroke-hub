@@ -165,6 +165,52 @@ Handled by `next-themes` (`ThemeProvider` in `app/layout.tsx`), class-based
 persisting the user's explicit choice. `suppressHydrationWarning` is set on
 `<html>` per next-themes' recommendation, so there's no flash on load.
 
+## Dialogs and long strings (#102)
+
+`DialogContent` is a `grid` with a `max-w-*` cap, and a grid item's
+`min-width: auto` floors it at its own min-content width. One long unbreakable
+string deep inside therefore used to win against the cap: a linked idea titled
+"Path of Exile 3.29: la build de invocador con la que empiezo la liga" pushed
+`EventEditor`'s form to 726px inside a 448px panel, so the track picker, title
+field, End date/time and footer all painted on the page _outside_ the white box.
+
+Two rules follow:
+
+- `DialogContent` carries `[&>*]:min-w-0`, which zeroes that floor on its direct
+  children and makes `max-w-*` authoritative for every dialog.
+- Any flex item that holds text meant to `truncate` needs `min-w-0` itself —
+  `overflow-hidden` and `flex-1` are not enough. Without it the item reports its
+  full unwrapped width as its minimum and the ellipsis never appears.
+
+`IdeaEditor` never showed this despite the same shape, because
+`overflow-y-auto` makes it a scroll container, which zeroes the floor as a side
+effect. Don't rely on that — it's incidental.
+
+## Dialogs that close on a server action (#102)
+
+A dialog whose close depends on a mutation's result must **not** drive that
+close off `useActionState`'s state. That state commits only once the router has
+applied the refresh the action's `revalidatePath` calls trigger, so the close
+waits on a full page re-render, not on the mutation. `IdeaEditor` sat on a
+disabled "Saving…" for 20s+ this way while the row had already landed in ~300ms
+— a modal the user could not dismiss after a save that had already succeeded.
+
+Instead: `useTransition`, `await` the action directly, and act on the result
+inside the transition callback (`TriageDialog`, `RecordOutcomeDialog`,
+`AttachPicker`, `IdeaEditor`). That settles on the server response, and a
+transition callback is an ordinary post-event context — so it is also the only
+legal place to call a parent's `onOpenChange`. Doing that during render earns
+React's "Cannot update a component while rendering a different component".
+
+The cost scales with the **revalidated route's** own render cost, which is why
+only the ideas page crossed the line — `/content/ideas` runs two sequential
+waves of queries (ideas + tags + scripts, then linked events + projects).
+Measured close latency for the dialogs still on `useActionState`, cold server,
+12 runs: `EventEditor` 341–849ms, inbox `CaptureDialog` 436–461ms,
+`StreamCreate` 442–952ms. None hangs today, so none was rewritten; they are
+about one heavier page-level query away from doing so. Write new dialogs the
+transition way.
+
 ## Adding a component
 
 1. Reach for `pnpm dlx shadcn@latest add <component>` first — it already

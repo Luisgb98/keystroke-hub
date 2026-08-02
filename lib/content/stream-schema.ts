@@ -108,7 +108,12 @@ export const streamCaptureSchema = rawStreamCaptureSchema.transform(
   }
 );
 
-/** Shared by `updateStreamDetails`: title + prep notes are the only fields editable after capture. */
+/**
+ * Shared by `updateStreamDetails` — every field the detail page can edit, in
+ * one schema. Topic, prep notes and the retro save together behind a single
+ * button (#102), so they validate together too: a too-long retro must not let a
+ * valid topic land on its own.
+ */
 export const streamDetailsSchema = z.object({
   id: z.string().min(1),
   title: z
@@ -121,12 +126,11 @@ export const streamDetailsSchema = z.object({
     .trim()
     .max(4000, "Keep notes under 4000 characters")
     .optional(),
-});
-
-/** Shared by `saveRetroNotes`. */
-export const retroNotesSchema = z.object({
-  id: z.string().min(1),
-  retroNotes: z.string().trim().max(4000, "Keep notes under 4000 characters"),
+  retroNotes: z
+    .string()
+    .trim()
+    .max(4000, "Keep notes under 4000 characters")
+    .optional(),
 });
 
 const MAX_CHECKLIST_LABEL_LENGTH = 200;

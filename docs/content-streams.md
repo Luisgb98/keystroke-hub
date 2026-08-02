@@ -60,16 +60,16 @@ the template.
 - **`lib/content/stream-actions.ts`**: `createStream` (title required;
   planning a date creates a content-track event with a fixed 2h duration —
   or the same day, for all-day — rather than a second end-time picker),
-  `updateStreamDetails` (title/notes, the only fields editable after
-  capture), `deleteStream` (hard delete, checklist cascades, the linked
-  event is left alone), `saveRetroNotes`, `toggleChecklistItem`/
+  `updateStreamDetails` (title, prep notes and the retro — every editable
+  field on the detail page, in one statement), `deleteStream` (hard delete,
+  checklist cascades, the linked event is left alone), `toggleChecklistItem`/
   `addChecklistItem`/`removeChecklistItem`, `addTemplateItem`/
   `removeTemplateItem`, and `attachEventToStream`/`detachEventFromStream`
   (attaching an already-claimed event surfaces a friendly error before ever
   reaching the DB's `unique(event_id)` constraint). Every action calls
   `verifySession()` first.
-- **`lib/content/stream-schema.ts`**: zod schemas for capture, detail edits,
-  retro notes, and checklist/template item labels.
+- **`lib/content/stream-schema.ts`**: zod schemas for capture, detail edits
+  (topic + prep notes + retro together), and checklist/template item labels.
 
 ### Atomicity without transactions
 
@@ -96,12 +96,26 @@ the "stream" idea format):
   `TemplateEditor` (same pattern as `IdeaCapture`; #85 retired the floating dock
   that used to render it, see docs/inbox.md). `TemplateEditor` (a dialog
   reachable from the list header) edits the default checklist.
-- **Detail** (`/content/streams/[id]`): `StreamDetailsForm` (title/notes),
-  `StreamEventSection` (shows the linked event or an "Attach an event"
-  action backed by `EventAttachPicker` — the inverse of `IdeaLinkPicker`),
-  `StreamChecklist` (large tap targets, inline add/remove), and
-  `StreamRetroNotes` (always editable, visually promoted once the stream's
-  event has passed).
+- **Detail** (`/content/streams/[id]`): `StreamDetailsForm` owns every text
+  field on the page — topic, prep notes and the retro (always editable,
+  visually promoted once the stream's event has passed) — behind a **single
+  "Save changes" button**, disabled until something differs from what's
+  stored. #102 collapsed what used to be two Save buttons, one per section: it
+  was never clear which one committed what. Because the fields are separated on
+  screen by `StreamEventSection` (the linked event, or an "Attach an event"
+  action backed by `EventAttachPicker` — the inverse of `IdeaLinkPicker`) and
+  `StreamChecklist` (large tap targets, inline add/remove), those two sections
+  are passed to `StreamDetailsForm` as **children**, which keeps the reading
+  order while letting one component hold all three values. Both keep their own
+  instant-save actions — a checklist tick or an attach shouldn't wait for a
+  Save.
+
+  The fields are **controlled**, never `defaultValue`: a save revalidates this
+  route, so the server hands back a fresh `stream` on the next render, and an
+  uncontrolled Base UI field both warns about the changed `defaultValue` and
+  keeps painting the old string. Local state is re-seeded from the props only
+  when the saved columns actually change, so a revalidation triggered by a
+  checklist toggle doesn't discard in-progress typing.
 
 ## Scope cuts
 
@@ -120,8 +134,8 @@ the "stream" idea format):
 
 ## Testing
 
-Unit (Vitest + RTL): `stream-schema` (capture/detail/retro/checklist-label
-validation), `lib/data/streams` (`bucketStreams`'s upcoming/past/unscheduled
+Unit (Vitest + RTL): `stream-schema` (capture/detail/checklist-label
+validation, incl. an over-long retro failing the whole save), `lib/data/streams` (`bucketStreams`'s upcoming/past/unscheduled
 split incl. the same-day "past is after start time, not end of day" boundary,
 `aggregateChecklistProgress`, and the DB-mocked queries), `stream-actions`
 (auth gate on every action, template snapshot on create, the batch-vs-direct-
@@ -134,7 +148,8 @@ e2e (`e2e/streams.spec.ts`, real DB via `e2e/support/streams-db.ts` with
 the default checklist seeds those items onto a newly created stream; planning
 a date creates a content-track event visible under Upcoming and on the
 calendar; toggling/adding per-stream checklist items persists across reload;
-writing retro notes persists across reload; deleting the linked calendar
+one Save commits topic + prep notes + retro together and they survive a
+reload, with exactly one save control on the page; deleting the linked calendar
 event leaves the stream unscheduled; a mobile-viewport capture flow. The
 delete-leaves-unscheduled check retries the whole navigation (not just the
 assertion) via `expect(...).toPass()`, since a single `page.goto` can race

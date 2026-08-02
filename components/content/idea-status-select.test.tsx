@@ -45,6 +45,27 @@ describe("IdeaStatusSelect", () => {
     );
   });
 
+  // #102: the trigger used to read straight off the `status` prop, so it kept
+  // showing the *old* status — disabled, since it disables while pending —
+  // until the revalidated page arrived. On /content/ideas that is seconds, and
+  // "commits inline" has to look like it committed. Mirrors PipelineBoard's
+  // handling of this same mutation.
+  it("shows the picked status immediately, without waiting for the server", async () => {
+    // A promise that never settles: the optimistic value is only observable
+    // while the transition is still in flight.
+    updateIdeaStatus.mockReturnValue(new Promise(() => {}));
+    const user = userEvent.setup();
+    render(<IdeaStatusSelect ideaId="idea-1" status="idea" />);
+
+    await changeStatus(user, "Scripted");
+
+    const trigger = screen.getByRole("combobox", { name: "Status" });
+    await waitFor(() => expect(trigger).toHaveTextContent("Scripted"));
+    expect(trigger).not.toHaveTextContent("Idea");
+    // Still guarded against a second overlapping write.
+    expect(trigger).toBeDisabled();
+  });
+
   it("toasts an error when the update fails", async () => {
     updateIdeaStatus.mockResolvedValue({
       error: "That idea no longer exists.",

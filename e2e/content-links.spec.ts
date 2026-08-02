@@ -100,6 +100,57 @@ test.describe("idea <-> event links", () => {
     ).toBeVisible();
   });
 
+  // #102: a linked idea with a long title used to make the editor's whole form
+  // render wider than the dialog panel — track picker, title field, End
+  // date/time and footer all painted outside the white box. The row's flex item
+  // had no `min-w-0`, so its min-content floor was the full unwrapped title,
+  // and `DialogContent`'s grid item inherited that floor straight past
+  // `max-w-md`.
+  test("a long linked-idea title stays inside the editor dialog", async ({
+    page,
+  }) => {
+    const ideaTitle = `${PREFIX} Path of Exile 3.29: la build de invocador con la que empiezo la liga`;
+    const eventTitle = `${PREFIX} Release stream`;
+    await seedTestIdea({ title: ideaTitle });
+    await createContentEvent(page, eventTitle);
+
+    await page.locator(EVENT_BLOCK_SELECTOR, { hasText: eventTitle }).click();
+    const editDialog = page.getByRole("dialog", { name: "Edit event" });
+    await editDialog.getByRole("button", { name: "Link an idea" }).click();
+    const picker = page.getByRole("dialog", { name: "Link an idea" });
+    await picker.getByText(ideaTitle).click();
+    await expect(picker).not.toBeVisible({ timeout: 10000 });
+
+    // Nothing inside the panel may paint past its edges. The footer is exempt:
+    // `-mx-4` deliberately spans the panel's own 1rem padding.
+    const escaped = await editDialog.evaluate((panel) => {
+      const bounds = panel.getBoundingClientRect();
+      const offenders: string[] = [];
+      for (const el of Array.from(panel.querySelectorAll<HTMLElement>("*"))) {
+        if (el.closest('[data-slot="dialog-footer"]')) continue;
+        const box = el.getBoundingClientRect();
+        if (box.width === 0) continue;
+        if (box.right > bounds.right + 1 || box.left < bounds.left - 1) {
+          offenders.push(
+            `${el.tagName.toLowerCase()}.${el.className.toString().slice(0, 40)}`
+          );
+        }
+      }
+      return offenders;
+    });
+    expect(escaped).toEqual([]);
+
+    // And the title earns its keep by truncating rather than pushing outwards.
+    const titleCell = editDialog.locator(
+      '[data-slot="event-linked-ideas"] .truncate'
+    );
+    const { clientWidth, scrollWidth } = await titleCell.evaluate((el) => ({
+      clientWidth: el.clientWidth,
+      scrollWidth: el.scrollWidth,
+    }));
+    expect(scrollWidth).toBeGreaterThan(clientWidth);
+  });
+
   test("opens the linked idea's script from the event editor", async ({
     page,
   }) => {

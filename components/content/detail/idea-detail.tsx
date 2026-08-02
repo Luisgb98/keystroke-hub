@@ -110,6 +110,7 @@ export function IdeaDetail({
         <IdeaScheduledEvents
           ideaId={idea.id}
           scheduledEvents={scheduledEvents}
+          releaseEventId={idea.releaseEventId}
         />
       </div>
 

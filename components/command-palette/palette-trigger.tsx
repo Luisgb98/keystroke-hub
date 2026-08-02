@@ -25,7 +25,7 @@ function useModifierKeyLabel(): string {
   return isMac ? "⌘" : "Ctrl";
 }
 
-/** Sidebar chip — visible search affordance plus the ⌘F/Ctrl F hint (see docs/command-palette.md). */
+/** Sidebar chip — visible search affordance plus the ⌘K/Ctrl K hint (see docs/command-palette.md). */
 export function PaletteTriggerChip() {
   const { setOpen } = useCommandPalette();
   const modifierLabel = useModifierKeyLabel();
@@ -42,7 +42,7 @@ export function PaletteTriggerChip() {
       <Search aria-hidden className="size-4 shrink-0" />
       <span className="flex-1 truncate text-left">Search</span>
       <kbd className="inline-flex shrink-0 items-center gap-0.5 rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-caption">
-        {`${modifierLabel}F`}
+        {`${modifierLabel}K`}
       </kbd>
     </Button>
   );

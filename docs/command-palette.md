@@ -1,6 +1,6 @@
 # Command palette & global search
 
-Issue #29. A Cmd/Ctrl-F palette (plus a mobile entry point) that jumps
+Issue #29. A Cmd/Ctrl-K palette (plus a mobile entry point) that jumps
 anywhere in the app and searches every content and work entity by
 title/content, so navigation cost stays near zero as the app grows. Depends
 on #15 (ideas/scripts), #21 (daily logs), and #24 (projects) for searchable
@@ -119,10 +119,15 @@ label match as nav items.
 - **`CommandPaletteProvider`** (`components/command-palette/`) — a client
   context mounted in `app/(app)/layout.tsx`, inside the auth-gated shell
   only (the palette must not exist on `/login`). Owns `open` state and the
-  global `keydown` listener for Cmd/Ctrl-F, calling `preventDefault` first so
-  the browser's own find-in-page never opens — inside the app, "search" means
-  the palette, deliberately. The shortcut was Cmd/Ctrl-K until #85 moved it to
-  the key the owner actually reaches for. `useCommandPalette()` exposes
+  global `keydown` listener for Cmd/Ctrl-K, calling `preventDefault` first
+  because Chrome and Firefox both bind that combo to the address bar's search
+  mode, which would pull focus out of the app. The shortcut has moved twice:
+  #85 took it off Cmd/Ctrl-K onto Cmd/Ctrl-F so that "search" inside the app
+  meant the palette, and #102 put it back on K. Reason for the reversal: the
+  script editor is a page of prose, and finding a word inside a script needs
+  the browser's own find-in-page, which only Cmd/Ctrl-F opens — swallowing it
+  cost more than the palette gained. F is now left strictly alone (no
+  listener, no `preventDefault`). `useCommandPalette()` exposes
   `{ open, setOpen }` to any trigger.
 - **`CommandPalette`** — the dialog itself, built on shadcn's `command.tsx`
   (`cmdk`, added via `pnpm dlx shadcn@latest add command`) rendered inside
@@ -135,7 +140,7 @@ label match as nav items.
   rows rather than a layout jump; no matches at all render `CommandEmpty`.
   Selecting any item closes the dialog and `router.push`es its `href`.
 - **`PaletteTriggerChip`** / **`PaletteSearchButton`**
-  (`palette-trigger.tsx`) — the sidebar's `⌘F`/`Ctrl F` chip (Mac detection
+  (`palette-trigger.tsx`) — the sidebar's `⌘K`/`Ctrl K` chip (Mac detection
   via a `useSyncExternalStore`-based hook, resolved client-only so the
   server-rendered chip never mismatches the hydrated one — same idiom as
   `theme-toggle.tsx`'s `useMounted`) and the bottom-nav's `Search` button
@@ -169,9 +174,10 @@ Unit (Vitest + RTL, colocated):
 - `lib/search/actions.test.ts` — `verifySession` is called, a blank query
   short-circuits without calling `searchEntities`, a real query is trimmed
   and forwarded.
-- `command-palette-provider.test.tsx` — Cmd-F and Ctrl-F both toggle open, the
-  retired Cmd/Ctrl-K does nothing, `preventDefault` is called, the listener is
-  removed on unmount.
+- `command-palette-provider.test.tsx` — Cmd-K and Ctrl-K both toggle open,
+  `preventDefault` is called, the listener is removed on unmount, and
+  Cmd/Ctrl-F neither opens the palette nor has its default prevented, so
+  find-in-page survives (#102).
 - `command-palette.test.tsx` — groups render with world label + icon per
   result, selecting an item closes the dialog and calls `router.push` with
   its href (mocked `next/navigation` and `lib/search/actions`), a
@@ -182,10 +188,10 @@ e2e (`e2e/command-palette.spec.ts`, Playwright, `chromium` + a
 `ideas.spec.ts`'s mobile describe, so this file is added to the
 `mobile-chrome` project's `testIgnore` in `playwright.config.ts`):
 
-- Ctrl/Cmd-F opens the palette; typing a nav label filters to it; Enter
+- Ctrl/Cmd-K opens the palette; typing a nav label filters to it; Enter
   navigates. Doesn't need `DATABASE_URL` (pure navigation).
-- Ctrl-K no longer opens it, and the sidebar chip advertises the new
-  shortcut (#85).
+- Ctrl-F no longer opens it (find-in-page is the browser's again), and the
+  sidebar chip advertises the new shortcut (#102).
 - Esc closes the palette and returns focus to the trigger that opened it.
 - Empty query shows the Navigate group immediately.
 - Tapping the bottom-nav Search button (mobile viewport) opens the palette

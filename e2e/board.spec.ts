@@ -1,6 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { clearTestIdeas, seedTestIdea } from "./support/ideas-db";
+import {
+  clearTestIdeas,
+  getTestIdeaStatus,
+  seedTestIdea,
+} from "./support/ideas-db";
 
 // The board page queries the database on every render, so — like the ideas
 // list and calendar — it can only be exercised where DATABASE_URL is
@@ -11,6 +15,21 @@ const skipReason =
   "locally (see .env.example) or on a Vercel preview to exercise this.";
 
 const BOARD_CARD_SELECTOR = '[data-slot="board-card"]';
+
+/**
+ * Waits for a move to actually reach the database.
+ *
+ * Every column assertion above one of these passes the instant a card is
+ * dropped, because `PipelineBoard` moves optimistically — so those assertions
+ * say nothing about persistence, and a `page.reload()` issued straight after
+ * can outrun the write it never waited for. That raced about one run in three
+ * (#102). Gate the reload on the row instead.
+ */
+async function expectPersistedStatus(title: string, status: string) {
+  await expect
+    .poll(() => getTestIdeaStatus(title), { timeout: 10_000 })
+    .toBe(status);
+}
 
 /** The stage column whose header matches `label` — disambiguates from the move menu, which lists the same stage names. */
 function column(page: Page, label: string) {
@@ -184,6 +203,7 @@ test.describe("content pipeline board", () => {
     await expect(column(page, "Recorded").getByText(title)).toBeVisible();
     await expect(column(page, "Scripted").getByText(title)).toHaveCount(0);
 
+    await expectPersistedStatus(title, "recorded");
     await page.reload();
     await expect(column(page, "Recorded").getByText(title)).toBeVisible();
   });
@@ -233,6 +253,7 @@ test.describe("content pipeline board", () => {
     await expect(column(page, "Scripted").getByText(title)).toHaveCount(0);
     await expect(page.locator(DRAG_PREVIEW_SELECTOR)).toHaveCount(0);
 
+    await expectPersistedStatus(title, "recorded");
     await page.reload();
     await expect(column(page, "Recorded").getByText(title)).toBeVisible();
   });
@@ -252,6 +273,7 @@ test.describe("content pipeline board", () => {
     await dragCardToColumn(page, title, "Edited", { aim: "shelf" });
 
     await expect(column(page, "Edited").getByText(title)).toBeVisible();
+    await expectPersistedStatus(title, "edited");
     await page.reload();
     await expect(column(page, "Edited").getByText(title)).toBeVisible();
   });
@@ -286,6 +308,8 @@ test.describe("content pipeline board", () => {
     await expect(column(page, "Scripted").getByText(title)).toBeVisible();
     await expect(column(page, "Recorded").getByText(title)).toHaveCount(0);
 
+    // A cancelled drag must not have written anything at all.
+    await expectPersistedStatus(title, "scripted");
     await page.reload();
     await expect(column(page, "Scripted").getByText(title)).toBeVisible();
   });
@@ -353,6 +377,7 @@ test.describe("content pipeline board mobile viewport", () => {
     await touchDragCardToColumn(page, title, "Recorded");
 
     await expect(column(page, "Recorded").getByText(title)).toBeVisible();
+    await expectPersistedStatus(title, "recorded");
     await page.reload();
     await expect(column(page, "Recorded").getByText(title)).toBeVisible();
   });

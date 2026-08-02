@@ -8,7 +8,7 @@ later into wherever it belongs.
 The inbox lives at `/inbox` inside the authenticated shell. Capture itself is
 shell-wide: the dialog is mounted once in the `(app)` layout, so a thought can
 be filed from anywhere — the command palette's **Capture a thought** action
-(Ctrl/Cmd-F, then pick it) on any screen, or the Inbox page's own capture
+(Ctrl/Cmd-K, then pick it) on any screen, or the Inbox page's own capture
 button. Issue #85 retired the floating bottom-right dock that used to own that
 job; the count now lives on the Inbox nav link, on both viewports.
 

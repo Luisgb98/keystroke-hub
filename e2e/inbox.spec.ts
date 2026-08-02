@@ -33,7 +33,7 @@ async function capture(page: Page, body: string) {
   // loaded page the first one can land before hydration (same guard as
   // e2e/command-palette.spec.ts).
   await expect(async () => {
-    await page.keyboard.press("Control+f");
+    await page.keyboard.press("Control+k");
     await expect(palette).toBeVisible({ timeout: 2000 });
   }).toPass({ timeout: 20000 });
   await palette.getByRole("option", { name: "Capture a thought" }).click();

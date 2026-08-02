@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useId, useState } from "react";
+import { useId, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   ChevronsDownUp,
@@ -11,7 +11,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { createIdea, updateIdea } from "@/lib/content/actions";
+import {
+  createIdea,
+  updateIdea,
+  type IdeaActionState,
+} from "@/lib/content/actions";
 import {
   IDEA_FORMATS,
   INITIAL_IDEA_FORMAT,
@@ -122,57 +126,78 @@ export function IdeaEditor({
   const titleId = useId();
   const action =
     mode === "edit" && idea ? updateIdea.bind(null, idea.id) : createIdea;
-  const [state, formAction, pending] = useActionState(action, undefined);
+  const [state, setState] = useState<IdeaActionState | undefined>(undefined);
+  const [pending, startTransition] = useTransition();
   const [values, setValues] = useState(() =>
     initialValues(mode, idea, releaseStartsAt)
   );
-  const [capturedTitle, setCapturedTitle] = useState("");
   const [scriptExpanded, setScriptExpanded] = useState(false);
 
   // Recompute field values on each open (the instance stays mounted, only
-  // `open` toggles) and detect a successful submit — the same "adjust state
-  // during render" pattern as EventEditor, avoiding an extra render pass.
+  // `open` toggles) — the same "adjust state during render" pattern as
+  // EventEditor, avoiding an extra render pass.
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
     if (open) {
       setValues(initialValues(mode, idea, releaseStartsAt));
       setScriptExpanded(false);
+      // A fresh open starts clean — errors from a previous attempt would
+      // otherwise be attached to fields that have just been re-seeded.
+      setState(undefined);
     }
   }
 
-  const [prevState, setPrevState] = useState(state);
-  if (state !== prevState) {
-    setPrevState(state);
-    if (state?.success) {
-      setCapturedTitle(values.title);
+  /**
+   * Submit, then react to the result — the `useTransition` + direct-call idiom
+   * every other dialog in the app uses (`TriageDialog`, `RecordOutcomeDialog`,
+   * `AttachPicker`). This deliberately replaced `useActionState` (#102).
+   *
+   * Two problems came from driving the outcome off the action *state*. The
+   * `state.success` branch used to run during render and called `onOpenChange`
+   * there, which writes the parent card's state — React logged "Cannot update a
+   * component (IdeaCard) while rendering a different component (IdeaEditor)" on
+   * every save. Moving that to a post-commit effect silenced the warning but
+   * traded it for a worse bug: the action state only commits once the router has
+   * applied the refresh that `revalidatePath` triggers, and the ideas page's
+   * refresh is slow enough (a remote Postgres, several queries) that the dialog
+   * sat on "Saving…" long after the row had landed.
+   *
+   * Awaiting the action here settles as soon as the server responds, and a
+   * transition callback is an ordinary post-event context — so the close is both
+   * legal and immediate.
+   */
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const savedTitle = values.title;
+    startTransition(async () => {
+      const result = await action(undefined, formData);
+      setState(result);
+      if (!result.success) {
+        // An over-cap paste has to be both visible and reachable to trim, so a
+        // rejected script opens the field up (#93).
+        if (result.fieldErrors?.script) setScriptExpanded(true);
+        return;
+      }
       onOpenChange(false);
-    } else if (state?.fieldErrors?.script) {
-      // An over-cap paste has to be both visible and reachable to trim, so a
-      // rejected script opens the field up (#93).
-      setScriptExpanded(true);
-    }
+      if (mode === "create") {
+        toast.custom(() => (
+          <div
+            data-slot="idea-toast"
+            className="flex items-center gap-2 rounded-lg border border-track-content-border bg-track-content px-3 py-2 text-sm text-track-content-foreground shadow-sm"
+          >
+            <Clapperboard aria-hidden className="size-4 shrink-0" />
+            <span>
+              Idea captured: <strong>{savedTitle}</strong>
+            </span>
+          </div>
+        ));
+      } else {
+        toast.success("Idea updated");
+      }
+    });
   }
-
-  useEffect(() => {
-    if (!state?.success) return;
-    if (mode === "create") {
-      toast.custom(() => (
-        <div
-          data-slot="idea-toast"
-          className="flex items-center gap-2 rounded-lg border border-track-content-border bg-track-content px-3 py-2 text-sm text-track-content-foreground shadow-sm"
-        >
-          <Clapperboard aria-hidden className="size-4 shrink-0" />
-          <span>
-            Idea captured: <strong>{capturedTitle}</strong>
-          </span>
-        </div>
-      ));
-    } else {
-      toast.success("Idea updated");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
 
   const fieldErrors = state?.fieldErrors ?? {};
   const scriptError = fieldErrors.script?.[0];
@@ -186,7 +211,11 @@ export function IdeaEditor({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md">
-        <form action={formAction} className="flex flex-col gap-4" noValidate>
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col gap-4"
+          noValidate
+        >
           <input type="hidden" name="format" value={values.format} />
 
           <DialogHeader>

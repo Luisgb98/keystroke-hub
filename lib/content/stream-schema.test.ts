@@ -4,7 +4,6 @@ import {
   DEFAULT_STREAM_DURATION_MS,
   attachEventSchema,
   checklistLabelSchema,
-  retroNotesSchema,
   streamCaptureSchema,
   streamDetailsSchema,
 } from "./stream-schema";
@@ -100,6 +99,7 @@ describe("streamDetailsSchema", () => {
       id: "stream-1",
       title: "Renamed stream",
       notes: "",
+      retroNotes: "",
     });
     expect(result.success).toBe(true);
   });
@@ -109,23 +109,26 @@ describe("streamDetailsSchema", () => {
       id: "stream-1",
       title: "",
       notes: "",
+      retroNotes: "",
     });
     expect(result.success).toBe(false);
   });
-});
 
-describe("retroNotesSchema", () => {
   it("accepts empty retro notes (clearing them)", () => {
-    const result = retroNotesSchema.safeParse({
+    const result = streamDetailsSchema.safeParse({
       id: "stream-1",
+      title: "Renamed stream",
+      notes: "",
       retroNotes: "",
     });
     expect(result.success).toBe(true);
   });
 
-  it("rejects retro notes over the length cap", () => {
-    const result = retroNotesSchema.safeParse({
+  it("rejects retro notes over the length cap, failing the whole save", () => {
+    const result = streamDetailsSchema.safeParse({
       id: "stream-1",
+      title: "Renamed stream",
+      notes: "",
       retroNotes: "a".repeat(4001),
     });
     expect(result.success).toBe(false);

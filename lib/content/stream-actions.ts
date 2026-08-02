@@ -22,7 +22,6 @@ import {
 import {
   attachEventSchema,
   checklistLabelSchema,
-  retroNotesSchema,
   streamCaptureSchema,
   streamDetailsSchema,
 } from "./stream-schema";
@@ -124,18 +123,37 @@ export async function createStream(
   return { success: true, streamId };
 }
 
-/** Title + prep notes are the only fields editable after capture (mirrors `docs/content-ideas.md`'s minimal-edit precedent). */
+export interface StreamDetailsInput {
+  id: string;
+  title: string;
+  notes: string;
+  retroNotes: string;
+}
+
+/** Empty text clears the column rather than storing `""` — a blank note is "no note". */
+function orNull(value: string | undefined): string | null {
+  return value && value.length > 0 ? value : null;
+}
+
+/**
+ * Writes every editable field on the stream detail page in one statement.
+ *
+ * The page used to carry two Save buttons — one for topic/prep notes, one for
+ * the retro — which #102 collapsed into a single one. That makes a single
+ * round trip mandatory rather than merely tidy: two sequential writes behind one
+ * button could half-land, and the neon-http driver has no interactive
+ * transaction to wrap them in (see docs/database.md).
+ *
+ * Takes a plain object, not `FormData`: the caller `await`s it inside a
+ * transition instead of going through `useActionState`, so nothing has to be
+ * serialized through a form (see docs/design-system.md).
+ */
 export async function updateStreamDetails(
-  _prevState: StreamActionState | undefined,
-  formData: FormData
+  input: StreamDetailsInput
 ): Promise<StreamActionState> {
   await verifySession();
 
-  const parsed = streamDetailsSchema.safeParse({
-    id: formData.get("id") ?? "",
-    title: formData.get("title") ?? "",
-    notes: formData.get("notes") ?? "",
-  });
+  const parsed = streamDetailsSchema.safeParse(input);
   if (!parsed.success) {
     return {
       error: VALIDATION_ERROR,
@@ -144,13 +162,13 @@ export async function updateStreamDetails(
   }
 
   const db = getDb();
-  const notes =
-    parsed.data.notes && parsed.data.notes.length > 0
-      ? parsed.data.notes
-      : null;
   const updated = await db
     .update(streams)
-    .set({ title: parsed.data.title, notes })
+    .set({
+      title: parsed.data.title,
+      notes: orNull(parsed.data.notes),
+      retroNotes: orNull(parsed.data.retroNotes),
+    })
     .where(eq(streams.id, parsed.data.id))
     .returning({ id: streams.id });
 
@@ -160,40 +178,6 @@ export async function updateStreamDetails(
 
   revalidateStreamPaths(parsed.data.id);
   return { success: true, streamId: parsed.data.id };
-}
-
-export interface SaveRetroNotesResult {
-  error?: string;
-}
-
-export async function saveRetroNotes(
-  id: string,
-  retroNotes: string
-): Promise<SaveRetroNotesResult> {
-  await verifySession();
-
-  const parsed = retroNotesSchema.safeParse({ id, retroNotes });
-  if (!parsed.success) {
-    return {
-      error: parsed.error.issues[0]?.message ?? "That note couldn't be saved.",
-    };
-  }
-
-  const db = getDb();
-  const value =
-    parsed.data.retroNotes.length > 0 ? parsed.data.retroNotes : null;
-  const updated = await db
-    .update(streams)
-    .set({ retroNotes: value })
-    .where(eq(streams.id, parsed.data.id))
-    .returning({ id: streams.id });
-
-  if (updated.length === 0) {
-    return { error: "That stream no longer exists." };
-  }
-
-  revalidateStreamPaths(parsed.data.id);
-  return {};
 }
 
 export interface DeleteStreamResult {

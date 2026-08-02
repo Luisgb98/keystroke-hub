@@ -80,8 +80,12 @@ export function normalizeTags(raw: string | undefined | null): string[] {
  * default lands at 19:00 on the calendar whether the parse runs on Vercel's
  * UTC servers or in local dev (issue #95). An unparseable date yields no
  * release rather than an Invalid Date — the caller adds the validation issue.
+ *
+ * Exported for `rescheduleIdeaRelease`, which moves an existing release without
+ * touching any other field and so has no full form to transform (#102) — one
+ * date/time → instant rule for every release, however it was set.
  */
-function buildRelease(
+export function buildReleaseSpan(
   releaseDate: string | undefined,
   releaseTime: string | undefined
 ): ReleaseInput | null {
@@ -99,7 +103,7 @@ function buildRelease(
 // Shared raw fields for capture and edit. `format` is validated manually (not
 // z.enum) for a UI-facing message, mirroring lib/calendar/event-schema.ts's
 // `track`. `releaseTime` is only meaningful alongside `releaseDate`; a stray
-// time without a date is ignored by `buildRelease` rather than erroring.
+// time without a date is ignored by `buildReleaseSpan` rather than erroring.
 const sharedIdeaFields = {
   title: z
     .string()
@@ -155,7 +159,7 @@ function normalizeSharedFields(data: {
     description,
     format,
     tags: normalizeTags(data.tags),
-    release: buildRelease(
+    release: buildReleaseSpan(
       data.releaseDate && data.releaseDate.length > 0
         ? data.releaseDate
         : undefined,
@@ -180,7 +184,7 @@ function refineTagCount(
 
 /**
  * `DATE_RE` only checks the shape, so a well-formed but nonexistent day
- * (2026-02-30) passes it and `buildRelease` returns null. Surface that as a
+ * (2026-02-30) passes it and `buildReleaseSpan` returns null. Surface that as a
  * field error instead of silently dropping the release.
  */
 function refineRelease(
@@ -232,6 +236,18 @@ export const ideaEditSchema = z
     refineRelease(data, fields, ctx);
     return fields;
   });
+
+/**
+ * Shared by `rescheduleIdeaRelease`: the one-tap release move behind the
+ * release chip on the idea card (#102). Both parts are required here — unlike
+ * the forms above there is nothing to create or clear, only an existing release
+ * to move, so an empty date is a bad call rather than "no release".
+ */
+export const ideaRescheduleSchema = z.object({
+  ideaId: z.string().min(1),
+  releaseDate: z.string().regex(DATE_RE, "Enter a valid release date"),
+  releaseTime: z.string().regex(TIME_RE, "Enter a valid release time"),
+});
 
 /** Shared by `updateIdeaStatus`: the status control on the card and the board move menu (see docs/content-ideas.md). */
 export const ideaStatusSchema = z.object({

@@ -85,7 +85,11 @@ export function EventLinkedIdeas({
             >
               <Link
                 href={`/content/ideas?q=${encodeURIComponent(idea.title)}`}
-                className="flex flex-1 items-center gap-2 overflow-hidden text-small hover:underline"
+                // `min-w-0` is what lets the `truncate` below bite: without it
+                // this flex item's min-content floor is the title's full
+                // unwrapped width, which propagated all the way out and made
+                // the editor dialog render wider than its own panel (#102).
+                className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-small hover:underline"
               >
                 <span className="truncate">{idea.title}</span>
                 <Badge variant="secondary" className="shrink-0">

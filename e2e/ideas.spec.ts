@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 import { formatDateParam } from "../lib/calendar/range";
-import { clearTestIdeas, seedTestIdea } from "./support/ideas-db";
+import {
+  clearTestIdeas,
+  getTestIdeaStatus,
+  seedTestIdea,
+} from "./support/ideas-db";
 
 // The ideas page queries the database on every render, so — like the
 // calendar and health checks — it can only be exercised where DATABASE_URL
@@ -104,6 +108,11 @@ test.describe("idea capture", () => {
       "Scripted"
     );
 
+    // That assertion is satisfied optimistically (#102), so it proves the
+    // control responded, not that the row moved. Gate the reload on the write.
+    await expect
+      .poll(() => getTestIdeaStatus(title), { timeout: 10_000 })
+      .toBe("scripted");
     await page.reload();
     await expect(
       page
@@ -467,6 +476,60 @@ test.describe("idea release scheduling and editing", () => {
 
     await page.goto(`/calendar?view=day&date=${releaseB}`);
     await expect(page.getByText(`Release: ${title}`)).toHaveCount(0);
+  });
+
+  // #102: the release chip on the card *is* the reschedule control — shifting a
+  // publish slot is the most frequent edit a content schedule takes, and it
+  // used to mean a trip through the whole edit dialog.
+  test("the card's release chip moves the release without opening the editor", async ({
+    page,
+  }) => {
+    const title = `${PREFIX} Chip reschedule`;
+    await page.goto("/content/ideas");
+
+    await page.getByRole("button", { name: "New idea" }).click();
+    const createDialog = page.getByRole("dialog", { name: "New idea" });
+    await createDialog.getByLabel("Title").fill(title);
+    await createDialog.getByLabel("Release date").fill(releaseA);
+    await expect(createDialog.getByLabel("Release time")).toHaveValue("19:00");
+    await createDialog.getByRole("button", { name: "Save" }).click();
+    await expect(createDialog).not.toBeVisible({ timeout: 30000 });
+
+    const card = page.locator(IDEA_CARD_SELECTOR, { hasText: title });
+    await card
+      .getByRole("button", { name: /Reschedule release, currently/ })
+      .click();
+
+    // The popover portals out of the card, so these are page-level queries.
+    await expect(page.getByLabel("New day")).toHaveValue(releaseA);
+    await expect(page.getByLabel("New time")).toHaveValue("19:00");
+    await page.getByLabel("New day").fill(releaseB);
+    await page.getByLabel("New time").fill("21:00");
+    await page.getByRole("button", { name: "Move release" }).click();
+
+    // No dialog was ever opened, and the chip reflects the new slot.
+    await expect(page.getByRole("dialog", { name: "Edit idea" })).toHaveCount(
+      0
+    );
+    await expect(
+      card.getByRole("button", {
+        name: /Reschedule release, currently .*21:00/,
+      })
+    ).toBeVisible({ timeout: 10000 });
+
+    // The move is real: the calendar event follows, and the 21:00 wall clock
+    // reads back as 21:00 rather than shifting by the server's offset (#95).
+    await page.goto(`/calendar?view=day&date=${releaseB}`);
+    await expect(page.getByText(`Release: ${title}`)).toBeVisible();
+    await page.goto(`/calendar?view=day&date=${releaseA}`);
+    await expect(page.getByText(`Release: ${title}`)).toHaveCount(0);
+
+    await page.goto("/content/ideas");
+    await expect(
+      page
+        .locator(IDEA_CARD_SELECTOR, { hasText: title })
+        .getByRole("button", { name: /Reschedule release, currently .*21:00/ })
+    ).toBeVisible();
   });
 
   test("every field is editable after capture and the changes survive a reload", async ({
