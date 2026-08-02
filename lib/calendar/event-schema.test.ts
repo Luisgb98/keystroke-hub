@@ -50,6 +50,31 @@ describe("eventFormSchema", () => {
     }
   });
 
+  it("accepts a stream, storing it on the content track", () => {
+    // A stream is content work at the data level (issue #104) — it's the
+    // *kind* that carries the distinction, so the two travel side by side.
+    const result = eventFormSchema.safeParse(
+      baseInput({ track: "stream", title: "Friday ranked run" })
+    );
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.track).toBe("content");
+      expect(result.data.kind).toBe("stream");
+    }
+  });
+
+  it.each([
+    ["work", "work"],
+    ["content", "content"],
+  ])("keeps kind and track identical for %s", (input, track) => {
+    const result = eventFormSchema.safeParse(baseInput({ track: input }));
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.track).toBe(track);
+      expect(result.data.kind).toBe(input);
+    }
+  });
+
   it("accepts a valid all-day event on either track, ignoring time fields", () => {
     const result = eventFormSchema.safeParse(
       baseInput({

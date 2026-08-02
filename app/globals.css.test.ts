@@ -25,6 +25,15 @@ function extractBlock(selector: string) {
 const rootBlock = extractBlock(":root");
 const darkBlock = extractBlock(".dark");
 
+/** A `--track-stream…:` declaration — the sole exemption to the purple ban (issue #104). */
+const STREAM_TOKEN_DECLARATION = /--track-stream[a-z-]*:/;
+
+/** The file as the purple guard sees it — every stream-token line removed. */
+const withoutStreamTokens = css
+  .split("\n")
+  .filter((line) => !STREAM_TOKEN_DECLARATION.test(line))
+  .join("\n");
+
 const semanticTokens = [
   "background",
   "foreground",
@@ -53,6 +62,9 @@ const trackTokens = [
   "track-content",
   "track-content-foreground",
   "track-content-border",
+  "track-stream",
+  "track-stream-foreground",
+  "track-stream-border",
 ];
 
 /** Reads one token's declared value out of a `:root` / `.dark` block. */
@@ -84,6 +96,8 @@ const modes = [
  */
 const RED_FAMILY = { min: 5, max: 40 };
 const BLUE_FAMILY = { min: 240, max: 265 };
+/** Twitch purple: #9146FF sits at hue 296.1 in OKLCH (issue #104). */
+const PURPLE_FAMILY = { min: 285, max: 310 };
 
 describe("design tokens contract", () => {
   it.each(semanticTokens)("defines --%s in :root and .dark", (token) => {
@@ -92,14 +106,14 @@ describe("design tokens contract", () => {
   });
 
   it.each(trackTokens)(
-    "defines dual-track token --%s in :root and .dark",
+    "defines track token --%s in :root and .dark",
     (token) => {
       expect(rootBlock).toMatch(new RegExp(`--${token}:`));
       expect(darkBlock).toMatch(new RegExp(`--${token}:`));
     }
   );
 
-  it("maps every dual-track token into the Tailwind theme via @theme inline", () => {
+  it("maps every track token into the Tailwind theme via @theme inline", () => {
     const themeBlock = extractBlock("@theme inline");
     for (const token of trackTokens) {
       expect(themeBlock).toMatch(
@@ -125,10 +139,12 @@ describe("design tokens contract", () => {
     }
   });
 
-  it("retains no purple anywhere in the file", () => {
+  it("retains no purple outside the stream track", () => {
     // The retired accent sat at hue ~300. Scan every literal oklch value in the
-    // file, not just the tokens we know about.
-    const purples = [...css.matchAll(/oklch\([^)]*\)/g)]
+    // file, not just the tokens we know about — minus the stream palette
+    // (#104), which is deliberately Twitch purple. The exemption is keyed on
+    // the declared token name, so purple can't reappear on any other token.
+    const purples = [...withoutStreamTokens.matchAll(/oklch\([^)]*\)/g)]
       .map((match) => match[0])
       .filter((raw) => {
         const color = parseOklch(raw);
@@ -163,6 +179,57 @@ describe("design tokens contract", () => {
         expect(h, `--${token} hue`).toBeGreaterThanOrEqual(RED_FAMILY.min);
         expect(h, `--${token} hue`).toBeLessThanOrEqual(RED_FAMILY.max);
       }
+    }
+  );
+
+  it.each(modes)(
+    "derives the stream track from Twitch purple in $name mode",
+    ({ block }) => {
+      // The one purple the palette allows (#104) — and it has to actually be
+      // purple, or the exemption carved into the guard buys nothing.
+      for (const token of [
+        "track-stream",
+        "track-stream-foreground",
+        "track-stream-border",
+      ]) {
+        const { h, c } = tokenColor(block, token);
+        expect(h, `--${token} hue`).toBeGreaterThanOrEqual(PURPLE_FAMILY.min);
+        expect(h, `--${token} hue`).toBeLessThanOrEqual(PURPLE_FAMILY.max);
+        expect(c, `--${token} chroma`).toBeGreaterThan(0.01);
+      }
+    }
+  );
+
+  it.each(modes)(
+    "holds the stream track apart from the work track in $name mode",
+    ({ name, block }) => {
+      // Purple's nearest neighbour on the calendar is the work blue, and dark
+      // mode is where they get closest — both surfaces are dim and desaturated
+      // there. Separate on hue *and* on the painted surface itself.
+      const stream = tokenColor(block, "track-stream");
+      const work = tokenColor(block, "track-work");
+      expect(Math.abs(stream.h - work.h), `${name} hue gap`).toBeGreaterThan(
+        35
+      );
+      expect(oklchToHex(stream), name).not.toBe(oklchToHex(work));
+      expect(
+        contrastRatio(
+          tokenColor(block, "track-stream-foreground"),
+          tokenColor(block, "track-work")
+        ),
+        `${name} stream text on the work surface`
+      ).toBeGreaterThan(1.5);
+    }
+  );
+
+  it.each(modes)(
+    "keeps the stream track subordinate to the accent in $name mode",
+    ({ block }) => {
+      // Same rule the content track lives under: a chip must not out-shout a
+      // primary button.
+      expect(tokenColor(block, "track-stream").c).toBeLessThan(
+        tokenColor(block, "primary").c
+      );
     }
   );
 
@@ -205,7 +272,7 @@ describe("design tokens contract", () => {
     }
   );
 
-  it("declares every red-family token inside the sRGB gamut", () => {
+  it("declares every accent-family token inside the sRGB gamut", () => {
     // Out-of-gamut values get silently gamut-mapped by the browser, which would
     // mean the painted color isn't the one the contrast test below checked.
     for (const { name, block } of modes) {
@@ -220,6 +287,9 @@ describe("design tokens contract", () => {
         "track-content",
         "track-content-foreground",
         "track-content-border",
+        "track-stream",
+        "track-stream-foreground",
+        "track-stream-border",
       ]) {
         const color = tokenColor(block, token);
         expect(
@@ -266,6 +336,9 @@ describe("token contrast", () => {
     ["track-content-foreground", "card"],
     ["track-work-foreground", "track-work"],
     ["track-work-foreground", "background"],
+    ["track-stream-foreground", "track-stream"],
+    ["track-stream-foreground", "background"],
+    ["track-stream-foreground", "card"],
   ];
 
   /** Borders and rings — perceivable at 3:1, not held to the text bar. */
@@ -274,6 +347,7 @@ describe("token contrast", () => {
     ["sidebar-ring", "sidebar"],
     ["track-content-border", "background"],
     ["track-work-border", "background"],
+    ["track-stream-border", "background"],
   ];
 
   for (const { name, block } of modes) {

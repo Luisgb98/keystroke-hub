@@ -21,6 +21,11 @@ vi.mock("@/lib/sync/push", () => ({
   pushEventUpdated: vi.fn(),
   pushEventDeleted: vi.fn(),
 }));
+// The template snapshot itself is covered by lib/content/stream-actions.test.ts;
+// here we only care that the calendar's write paths reach for it.
+vi.mock("@/lib/content/stream-session", () => ({
+  insertStreamSession: vi.fn(),
+}));
 
 const dbMock = vi.hoisted(() => {
   const insertReturning = vi.fn();
@@ -57,7 +62,8 @@ vi.mock("@/lib/db", () => ({
 import { revalidatePath } from "next/cache";
 
 import { verifySession } from "@/lib/auth/session";
-import { pushEventUpdated } from "@/lib/sync/push";
+import { insertStreamSession } from "@/lib/content/stream-session";
+import { pushEventCreated, pushEventUpdated } from "@/lib/sync/push";
 import {
   createEvent,
   deleteEvent,
@@ -89,6 +95,7 @@ beforeEach(() => {
   dbMock.updateReturning.mockResolvedValue([{ id: "evt-1", track: "work" }]);
   // deleteEvent's pre-delete sync-link lookup — no link by default.
   dbMock.selectWhere.mockResolvedValue([]);
+  vi.mocked(insertStreamSession).mockResolvedValue("stream-new");
 });
 
 afterEach(() => {
@@ -139,6 +146,55 @@ describe("createEvent", () => {
     const state = await createEvent(undefined, form(data));
     expect(state.fieldErrors?.track).toEqual(["Choose a track"]);
     expect(dbMock.insert).not.toHaveBeenCalled();
+  });
+
+  it("rejects a track the picker can't produce", async () => {
+    const state = await createEvent(
+      undefined,
+      form({ ...validTimedForm, track: "personal" })
+    );
+    expect(state.fieldErrors?.track).toEqual(["Choose a track"]);
+    expect(dbMock.insert).not.toHaveBeenCalled();
+  });
+
+  it("creates the stream session behind a Stream block (issue #104)", async () => {
+    const state = await createEvent(
+      undefined,
+      form({ ...validTimedForm, track: "stream", title: "Ranked run" })
+    );
+
+    expect(state).toEqual({ success: true });
+    // The event INSERT rides along as the batch's leading query, so the block
+    // and its session land in one round trip.
+    expect(insertStreamSession).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Ranked run" })
+    );
+    expect(
+      vi.mocked(insertStreamSession).mock.calls[0][0].leading
+    ).toBeTruthy();
+    expect(dbMock.insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({ track: "content", title: "Ranked run" })
+    );
+  });
+
+  it("syncs a Stream block through the content calendar, never the work one", async () => {
+    await createEvent(undefined, form({ ...validTimedForm, track: "stream" }));
+    expect(pushEventCreated).toHaveBeenCalledWith(
+      expect.any(String),
+      "content"
+    );
+  });
+
+  it("revalidates the stream planner as well as the calendar for a Stream block", async () => {
+    await createEvent(undefined, form({ ...validTimedForm, track: "stream" }));
+    expect(revalidatePath).toHaveBeenCalledWith("/calendar");
+    expect(revalidatePath).toHaveBeenCalledWith("/content/streams");
+    expect(revalidatePath).toHaveBeenCalledWith("/content/streams/stream-new");
+  });
+
+  it("creates no session for an ordinary content event", async () => {
+    await createEvent(undefined, form({ ...validTimedForm, track: "content" }));
+    expect(insertStreamSession).not.toHaveBeenCalled();
   });
 });
 
@@ -222,6 +278,73 @@ describe("updateEvent", () => {
     );
     expect(state).toEqual({ success: true });
     expect(dbMock.update).toHaveBeenCalledTimes(1);
+  });
+
+  describe("changing the track to and from Stream (issue #104)", () => {
+    const streamForm = { ...validTimedForm, track: "stream" };
+
+    it("creates the session behind an event promoted to Stream", async () => {
+      // No meeting note, and no session on it yet.
+      dbMock.selectWhere.mockResolvedValue([]);
+      const state = await updateEvent("evt-1", undefined, form(streamForm));
+
+      expect(state).toEqual({ success: true });
+      expect(insertStreamSession).toHaveBeenCalledWith({
+        eventId: "evt-1",
+        title: "Sprint planning",
+      });
+      expect(revalidatePath).toHaveBeenCalledWith(
+        "/content/streams/stream-new"
+      );
+    });
+
+    it("leaves an existing session alone when the block stays a Stream", async () => {
+      dbMock.selectWhere
+        .mockResolvedValueOnce([]) // meeting-note guard
+        .mockResolvedValueOnce([{ id: "stream-7" }]); // existing session
+      const state = await updateEvent("evt-1", undefined, form(streamForm));
+
+      expect(state).toEqual({ success: true });
+      expect(insertStreamSession).not.toHaveBeenCalled();
+      expect(revalidatePath).toHaveBeenCalledWith("/content/streams/stream-7");
+    });
+
+    it("unschedules — never destroys — the session when a Stream becomes Content", async () => {
+      dbMock.selectWhere
+        .mockResolvedValueOnce([]) // meeting-note guard
+        .mockResolvedValueOnce([{ id: "stream-7" }]);
+      const state = await updateEvent(
+        "evt-1",
+        undefined,
+        form({ ...validTimedForm, track: "content" })
+      );
+
+      expect(state).toEqual({ success: true });
+      // Two updates: the event itself, then the stream link being cleared.
+      // The checklist and notes are never touched.
+      expect(dbMock.update).toHaveBeenCalledTimes(2);
+      expect(revalidatePath).toHaveBeenCalledWith("/content/streams/stream-7");
+    });
+
+    it("still refuses a Stream flipped to Work with the friendly message", async () => {
+      dbMock.selectWhere
+        .mockResolvedValueOnce([]) // idea links
+        .mockResolvedValueOnce([{ id: "stream-7" }]);
+      const state = await updateEvent("evt-1", undefined, form(validTimedForm));
+
+      expect(state).toEqual({
+        error: "Unlink the stream first — this event is still scheduling one.",
+      });
+      expect(dbMock.update).not.toHaveBeenCalled();
+    });
+
+    it("keeps a Stream block on the content track's Google calendar", async () => {
+      dbMock.updateReturning.mockResolvedValueOnce([
+        { id: "evt-1", track: "content" },
+      ]);
+      await updateEvent("evt-1", undefined, form(streamForm));
+      expect(pushEventUpdated).toHaveBeenCalledWith("evt-1", "content");
+    });
   });
 });
 

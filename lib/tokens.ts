@@ -36,7 +36,7 @@ export const semanticColorTokens: ColorToken[] = [
 ];
 
 export const trackColorTokens: {
-  track: "work" | "content";
+  track: "work" | "content" | "stream";
   name: string;
   base: ColorToken;
   foreground: ColorToken;
@@ -69,6 +69,21 @@ export const trackColorTokens: {
     border: {
       name: "Content border",
       cssVar: "track-content-border",
+      description: "",
+    },
+  },
+  {
+    track: "stream",
+    name: "Stream",
+    base: { name: "Stream surface", cssVar: "track-stream", description: "" },
+    foreground: {
+      name: "Stream foreground",
+      cssVar: "track-stream-foreground",
+      description: "",
+    },
+    border: {
+      name: "Stream border",
+      cssVar: "track-stream-border",
       description: "",
     },
   },
@@ -153,7 +168,7 @@ export const motionTokens = [
 
 export const styleguideSections = [
   { id: "colors", label: "Colors" },
-  { id: "tracks", label: "Dual-track" },
+  { id: "tracks", label: "Tracks" },
   { id: "typography", label: "Typography" },
   { id: "spacing-radii", label: "Spacing & radii" },
   { id: "elevation", label: "Elevation" },

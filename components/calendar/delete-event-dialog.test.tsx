@@ -24,6 +24,7 @@ const event: CalendarEvent = {
   allDay: false,
   conflictNote: null,
   linkedIdeas: [],
+  streamId: null,
 };
 
 describe("DeleteEventDialog", () => {
@@ -50,6 +51,36 @@ describe("DeleteEventDialog", () => {
     await waitFor(() => expect(onDeleted).toHaveBeenCalledTimes(1));
     expect(deleteEvent).toHaveBeenCalledWith("evt-1");
     expect(toastSuccess).toHaveBeenCalled();
+  });
+
+  it("promises the stream session survives when the block schedules one", () => {
+    render(
+      <DeleteEventDialog
+        event={{ ...event, track: "content", streamId: "stream-1" }}
+        open
+        onOpenChange={vi.fn()}
+        onDeleted={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.getByText(
+        /keeps its checklist and notes, and moves to Unscheduled/i
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing about a session on an ordinary event", () => {
+    render(
+      <DeleteEventDialog
+        event={event}
+        open
+        onOpenChange={vi.fn()}
+        onDeleted={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByText(/Unscheduled/i)).not.toBeInTheDocument();
   });
 
   it("cancels without deleting", async () => {

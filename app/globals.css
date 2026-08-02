@@ -50,6 +50,9 @@
   --color-track-content: var(--track-content);
   --color-track-content-foreground: var(--track-content-foreground);
   --color-track-content-border: var(--track-content-border);
+  --color-track-stream: var(--track-stream);
+  --color-track-stream-foreground: var(--track-stream-foreground);
+  --color-track-stream-border: var(--track-stream-border);
 
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -149,6 +152,14 @@
   --track-content-foreground: oklch(0.375 0.105 19.1);
   --track-content-border: oklch(0.66 0.095 19.1);
 
+  /* Stream track: Twitch purple (#9146FF sits at hue 296.1). The one purple
+     the palette allows — see docs/design-system.md. A live session is an
+     appointment, not a deadline, so it gets its own hue rather than a shade
+     of the content red it would otherwise be mistaken for (issue #104). */
+  --track-stream: oklch(0.94 0.032 296.1);
+  --track-stream-foreground: oklch(0.4 0.13 296.1);
+  --track-stream-border: oklch(0.62 0.16 296.1);
+
   --shadow-color: oklch(0.145 0 0 / 10%);
 
   --motion-fast: 100ms;
@@ -207,6 +218,13 @@
   --track-content: oklch(0.275 0.045 19.1);
   --track-content-foreground: oklch(0.895 0.05 19.1);
   --track-content-border: oklch(0.56 0.09 19.1);
+
+  /* Stream track: same identity hue, dark surface. Carries more chroma than
+     the work track it sits nearest to here — 41° of hue alone reads as too
+     subtle once both surfaces are this dark. */
+  --track-stream: oklch(0.265 0.055 296.1);
+  --track-stream-foreground: oklch(0.885 0.06 296.1);
+  --track-stream-border: oklch(0.6 0.13 296.1);
 
   /* Dark surfaces read shadows poorly — lean on border + slightly lighter surface instead */
   --shadow-color: oklch(0 0 0 / 45%);

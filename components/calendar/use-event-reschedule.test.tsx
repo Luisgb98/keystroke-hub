@@ -30,6 +30,7 @@ function makeEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     allDay: false,
     conflictNote: null,
     linkedIdeas: [],
+    streamId: null,
     ...overrides,
   };
 }

@@ -2,15 +2,24 @@ import { z } from "zod";
 
 import { parseAppDate, parseAppDateTime } from "@/lib/time";
 
+import { isTrackKind, trackForKind, type TrackKind } from "./track-kind";
 import type { Track } from "./types";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-/** The final, DB-ready shape produced by `eventFormSchema` on success. */
+/**
+ * The final, DB-ready shape produced by `eventFormSchema` on success.
+ *
+ * `track` is the column value; `kind` is what the user picked. They differ
+ * only for `stream`, which stores `content` and is told apart by its linked
+ * session (see `./track-kind.ts`) — so the actions destructure `kind` off
+ * before handing the rest straight to Drizzle.
+ */
 export interface EventInput {
   title: string;
   track: Track;
+  kind: TrackKind;
   description: string | null;
   allDay: boolean;
   startsAt: Date;
@@ -25,13 +34,7 @@ const rawEventSchema = z.object({
     .max(200, "Keep the title under 200 characters"),
   // Validated manually (not z.enum) so the "never ambiguous" requirement gets
   // a specific, UI-facing message rather than zod's generic invalid-value one.
-  track: z
-    .string()
-    .optional()
-    .refine(
-      (value): value is Track => value === "work" || value === "content",
-      "Choose a track"
-    ),
+  track: z.string().optional().refine(isTrackKind, "Choose a track"),
   description: z
     .string()
     .trim()
@@ -116,9 +119,11 @@ export const eventFormSchema = rawEventSchema.transform((data, ctx) => {
 
   // Guaranteed valid here: a failed `track` refine short-circuits parsing
   // before this transform ever runs.
+  const kind = data.track as TrackKind;
   const result: EventInput = {
     title: data.title,
-    track: data.track as Track,
+    track: trackForKind(kind),
+    kind,
     description,
     allDay: data.allDay,
     startsAt,

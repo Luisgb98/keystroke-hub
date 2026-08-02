@@ -29,6 +29,7 @@ function makeEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     allDay: false,
     conflictNote: null,
     linkedIdeas: [],
+    streamId: null,
     ...overrides,
   };
 }
@@ -169,6 +170,75 @@ describe("EventEditor — edit mode", () => {
       />
     );
     expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+  });
+
+  it("preselects Stream for an event with a session behind it", () => {
+    render(
+      <EventEditor
+        mode="edit"
+        event={makeEvent({ track: "content", streamId: "stream-1" })}
+        open
+        onOpenChange={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole("radio", { name: /stream/i })).toHaveAttribute(
+      "aria-checked",
+      "true"
+    );
+    expect(screen.getByRole("radio", { name: /content/i })).toHaveAttribute(
+      "aria-checked",
+      "false"
+    );
+  });
+
+  it("links straight to the session behind a Stream block", () => {
+    render(
+      <EventEditor
+        mode="edit"
+        event={makeEvent({ track: "content", streamId: "stream-1" })}
+        open
+        onOpenChange={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.getByRole("link", { name: /open stream session/i })
+    ).toHaveAttribute("href", "/content/streams/stream-1");
+  });
+
+  it("offers no session link on an ordinary content event", () => {
+    render(
+      <EventEditor
+        mode="edit"
+        event={makeEvent({ track: "content" })}
+        open
+        onOpenChange={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.queryByRole("link", { name: /open stream session/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("submits the picked kind, so switching to Stream reaches the action", async () => {
+    updateEvent.mockResolvedValue({ success: true });
+    const user = userEvent.setup();
+    render(
+      <EventEditor
+        mode="edit"
+        event={makeEvent({ track: "content" })}
+        open
+        onOpenChange={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("radio", { name: /stream/i }));
+    const field = document.querySelector<HTMLInputElement>(
+      'input[name="track"]'
+    );
+    expect(field?.value).toBe("stream");
   });
 
   it("shows a dismissible conflict note when the event's sync link has one", async () => {

@@ -2,7 +2,7 @@ import "server-only";
 import { and, asc, eq, gte, lt, or } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
-import { eventSyncLinks, events } from "@/lib/db/schema";
+import { eventSyncLinks, events, streams } from "@/lib/db/schema";
 import type { CalendarEvent } from "@/lib/calendar/types";
 import { getLinkedIdeaSummariesForEvents } from "@/lib/data/idea-event-links";
 import { appStartOfDay } from "@/lib/time";
@@ -15,8 +15,9 @@ import { appStartOfDay } from "@/lib/time";
  * day's own `[from, to)` range where `endsAt === from`.
  *
  * Left-joins `event_sync_links` for `conflictNote` (issue #12 — see
- * docs/google-sync.md): most events have no sync link at all, hence the
- * left join rather than requiring one.
+ * docs/google-sync.md) and `streams` for `streamId` (issue #104 — a
+ * content-track event with a session behind it renders as a Stream block):
+ * most events have neither, hence left joins rather than requiring one.
  */
 export async function getEventsInRange(
   from: Date,
@@ -24,9 +25,14 @@ export async function getEventsInRange(
 ): Promise<CalendarEvent[]> {
   const db = getDb();
   const rows = await db
-    .select({ event: events, conflictNote: eventSyncLinks.conflictNote })
+    .select({
+      event: events,
+      conflictNote: eventSyncLinks.conflictNote,
+      streamId: streams.id,
+    })
     .from(events)
     .leftJoin(eventSyncLinks, eq(eventSyncLinks.eventId, events.id))
+    .leftJoin(streams, eq(streams.eventId, events.id))
     .where(and(lt(events.startsAt, to), gte(events.endsAt, from)))
     .orderBy(asc(events.startsAt));
 
@@ -34,7 +40,7 @@ export async function getEventsInRange(
     rows.map(({ event: row }) => row.id)
   );
 
-  return rows.map(({ event: row, conflictNote }) => ({
+  return rows.map(({ event: row, conflictNote, streamId }) => ({
     id: row.id,
     track: row.track,
     title: row.title,
@@ -44,6 +50,7 @@ export async function getEventsInRange(
     allDay: row.allDay,
     conflictNote: conflictNote ?? null,
     linkedIdeas: linkedIdeasByEvent.get(row.id) ?? [],
+    streamId,
   }));
 }
 
@@ -65,9 +72,14 @@ export async function getUpcomingEvents(
   const db = getDb();
   const todayStart = appStartOfDay(now);
   const rows = await db
-    .select({ event: events, conflictNote: eventSyncLinks.conflictNote })
+    .select({
+      event: events,
+      conflictNote: eventSyncLinks.conflictNote,
+      streamId: streams.id,
+    })
     .from(events)
     .leftJoin(eventSyncLinks, eq(eventSyncLinks.eventId, events.id))
+    .leftJoin(streams, eq(streams.eventId, events.id))
     .where(
       and(
         lt(events.startsAt, horizonEnd),
@@ -83,7 +95,7 @@ export async function getUpcomingEvents(
     rows.map(({ event: row }) => row.id)
   );
 
-  return rows.map(({ event: row, conflictNote }) => ({
+  return rows.map(({ event: row, conflictNote, streamId }) => ({
     id: row.id,
     track: row.track,
     title: row.title,
@@ -93,5 +105,6 @@ export async function getUpcomingEvents(
     allDay: row.allDay,
     conflictNote: conflictNote ?? null,
     linkedIdeas: linkedIdeasByEvent.get(row.id) ?? [],
+    streamId,
   }));
 }

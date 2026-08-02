@@ -55,6 +55,9 @@ export function DeleteEventDialog({
             {event.linkedIdeas.length > 0
               ? " Its idea links will be removed too."
               : ""}
+            {event.streamId
+              ? " Its stream session keeps its checklist and notes, and moves to Unscheduled."
+              : ""}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

@@ -37,6 +37,7 @@ function allDayEvent(): CalendarEvent {
     allDay: true,
     conflictNote: null,
     linkedIdeas: [],
+    streamId: null,
   };
 }
 

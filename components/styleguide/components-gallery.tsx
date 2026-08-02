@@ -227,6 +227,7 @@ export function ComponentsGallery() {
             allDay: false,
             conflictNote: null,
             linkedIdeas: [],
+            streamId: null,
           }}
         />
         <EventChip
@@ -240,6 +241,7 @@ export function ComponentsGallery() {
             allDay: false,
             conflictNote: null,
             linkedIdeas: [],
+            streamId: null,
           }}
         />
       </div>
@@ -257,6 +259,7 @@ export function ComponentsGallery() {
               allDay: false,
               conflictNote: null,
               linkedIdeas: [],
+              streamId: null,
             },
             timeLabel: "Now",
             inProgress: true,
@@ -274,6 +277,7 @@ export function ComponentsGallery() {
               allDay: true,
               conflictNote: null,
               linkedIdeas: [],
+              streamId: null,
             },
             timeLabel: "All day",
             inProgress: false,

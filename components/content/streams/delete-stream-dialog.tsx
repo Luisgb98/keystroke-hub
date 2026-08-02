@@ -23,7 +23,7 @@ interface DeleteStreamDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-/** Hard delete with confirmation, no soft-archive — the linked calendar event, if any, is left alone (see docs/content-streams.md). */
+/** Hard delete with confirmation, no soft-archive — the linked calendar event goes with it, so no purple block outlives its session (see docs/content-streams.md). */
 export function DeleteStreamDialog({
   stream,
   open,
@@ -53,8 +53,10 @@ export function DeleteStreamDialog({
           <AlertDialogTitle>Delete this stream?</AlertDialogTitle>
           <AlertDialogDescription>
             &ldquo;{stream.title}&rdquo; and its checklist will be permanently
-            deleted. This can&apos;t be undone. Its linked calendar event, if
-            any, will be left alone.
+            deleted. This can&apos;t be undone.
+            {stream.eventId
+              ? " Its block on the calendar will be removed too."
+              : ""}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

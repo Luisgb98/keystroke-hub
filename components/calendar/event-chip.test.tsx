@@ -59,6 +59,7 @@ function makeEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     allDay: false,
     conflictNote: null,
     linkedIdeas: [],
+    streamId: null,
     ...overrides,
   };
 }
@@ -87,6 +88,27 @@ describe("EventChip", () => {
     const chip = screen.getByText("Record voiceover").closest("button");
     expect(chip).toHaveClass("bg-track-content");
     expect(chip).toHaveClass("border-track-content-border");
+  });
+
+  it("renders a content event with a session behind it as a Stream block", () => {
+    render(
+      <EventChip
+        event={makeEvent({
+          track: "content",
+          title: "Ranked run",
+          streamId: "stream-1",
+        })}
+      />
+    );
+
+    // Purple *and* its own icon and label — grayscale has to survive it.
+    expect(screen.getByText("Stream:")).toBeInTheDocument();
+    const chip = screen.getByText("Ranked run").closest("button");
+    expect(chip).toHaveClass("bg-track-stream");
+    expect(chip).toHaveClass("border-track-stream-border");
+    expect(chip).toHaveClass("text-track-stream-foreground");
+    expect(chip).not.toHaveClass("bg-track-content");
+    expect(chip?.querySelector("svg")).toBeInTheDocument();
   });
 
   it("truncates long titles without breaking layout", () => {
