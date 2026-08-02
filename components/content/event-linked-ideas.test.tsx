@@ -133,6 +133,37 @@ describe("EventLinkedIdeas", () => {
     );
   });
 
+  // #102: a long idea title made the whole `EventEditor` dialog render wider
+  // than its own panel — the row's flex item had no `min-w-0`, so its
+  // min-content floor was the full unwrapped title, and that propagated out to
+  // the dialog's grid item. jsdom measures nothing, so this pins the two
+  // classes that produce the shrink; the layout itself is asserted in
+  // e2e/content-links.spec.ts.
+  it("lets a long title shrink and truncate rather than widening its row", () => {
+    render(
+      <EventLinkedIdeas
+        eventId="evt-1"
+        linkedIdeas={[
+          makeIdea({
+            title:
+              "Path of Exile 3.29: la build de invocador con la que empiezo la liga",
+          }),
+        ]}
+      />
+    );
+
+    const titleCell = screen.getByText(
+      "Path of Exile 3.29: la build de invocador con la que empiezo la liga"
+    );
+    expect(titleCell).toHaveClass("truncate");
+    // Without `min-w-0` the row's link refuses to shrink below its content.
+    expect(titleCell.parentElement).toHaveClass(
+      "min-w-0",
+      "flex-1",
+      "overflow-hidden"
+    );
+  });
+
   it("toasts an error instead of unlinking when the action fails", async () => {
     unlinkIdeaFromEvent.mockResolvedValue({ error: "That link isn't valid." });
     const user = userEvent.setup();
