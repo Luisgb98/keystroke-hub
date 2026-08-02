@@ -169,6 +169,25 @@ describe("toGooglePayload / fromGooglePayload", () => {
   });
 });
 
+describe("what an inbound edit may rewrite (issue #104)", () => {
+  it("never carries a track, so a Google edit can't change a block's kind", () => {
+    // `update-local` applies exactly this object to the `events` row. If
+    // `track` ever appeared here, an edit arriving from Google could move an
+    // event between worlds — and a Stream block is a content event with a
+    // session behind it, so it could silently stop being one. Nothing here
+    // touches `streams` either, which is what actually decides the kind.
+    const input = fromGooglePayload(googleEvent());
+
+    expect(Object.keys(input).sort()).toEqual([
+      "allDay",
+      "description",
+      "endsAt",
+      "startsAt",
+      "title",
+    ]);
+  });
+});
+
 describe("isOwnEcho", () => {
   it("is true when the remote etag matches the link's recorded etag", () => {
     expect(

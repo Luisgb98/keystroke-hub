@@ -52,6 +52,7 @@ function makeEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     allDay: false,
     conflictNote: null,
     linkedIdeas: [],
+    streamId: null,
     ...overrides,
   };
 }
@@ -85,6 +86,26 @@ describe("EventBlock", () => {
       .closest("button.absolute");
     expect(block).toHaveClass("bg-track-content");
     expect(block).toHaveClass("border-track-content-border");
+  });
+
+  it("applies stream track surface classes to a scheduled session", () => {
+    const event = makeEvent({
+      track: "content",
+      title: "Ranked run",
+      streamId: "stream-1",
+    });
+    render(
+      <EventBlock
+        segment={{ event, start: event.startsAt, end: event.endsAt }}
+        style={{}}
+      />
+    );
+
+    expect(screen.getByText("Stream:")).toBeInTheDocument();
+    const block = screen.getByText("Ranked run").closest("button.absolute");
+    expect(block).toHaveClass("bg-track-stream");
+    expect(block).toHaveClass("border-track-stream-border");
+    expect(block).not.toHaveClass("bg-track-content");
   });
 
   it("shows the clamped segment times, not the event's full span", () => {

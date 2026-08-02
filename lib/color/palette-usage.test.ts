@@ -35,6 +35,9 @@ const files = scannedRoots
 const ARBITRARY_LITERAL_COLOR =
   /\b[a-z][a-z-]*-\[[^\]\s]*(?:#[0-9a-f]{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\([\d.]|\boklab\([-\d.])[^\]\s]*\]/gi;
 
+/** A `--track-stream…:` custom-property declaration — the sole purple exemption (issue #104). */
+const STREAM_TOKEN_DECLARATION = /--track-stream[a-z-]*:/;
+
 describe("palette usage across the app", () => {
   it("scans a meaningful number of source files", () => {
     // Guards the guard: a broken walk would make every assertion below vacuous.
@@ -58,9 +61,22 @@ describe("palette usage across the app", () => {
   it("has no purple left anywhere in the app", () => {
     // The retired accent sat at hue ~300 (issue #84). Catches both literal
     // oklch values and any lingering `purple`/`violet` utility class.
+    //
+    // The one exemption is the stream track (issue #104), which *is* Twitch
+    // purple by design. It's scoped as narrowly as it can be: a line in
+    // `app/globals.css` that declares a `--track-stream*` token. Purple
+    // anywhere else — including any other token in that same file — still
+    // fails, which is the point of keeping the guard rather than deleting it.
     const offenders = files.flatMap((path) => {
       const source = readFileSync(join(repoRoot, path), "utf-8");
-      const purpleOklch = [...source.matchAll(/oklch\([^)]*\)/g)]
+      const scannable =
+        path === tokenSource
+          ? source
+              .split("\n")
+              .filter((line) => !STREAM_TOKEN_DECLARATION.test(line))
+              .join("\n")
+          : source;
+      const purpleOklch = [...scannable.matchAll(/oklch\([^)]*\)/g)]
         .map((match) => match[0])
         .filter((raw) => {
           const color = parseOklch(raw);
@@ -76,5 +92,36 @@ describe("palette usage across the app", () => {
       );
     });
     expect(offenders).toEqual([]);
+  });
+
+  it("keeps banning purple in globals.css outside the stream tokens", () => {
+    // Guards the exemption itself: the filter must key on the declared token
+    // name, not merely on the file, or #84's ban would be gone from the one
+    // file that defines every color.
+    const source = readFileSync(join(repoRoot, tokenSource), "utf-8");
+    const streamLines = source
+      .split("\n")
+      .filter((line) => STREAM_TOKEN_DECLARATION.test(line));
+
+    // Three tokens, light and dark.
+    expect(streamLines).toHaveLength(6);
+    for (const line of streamLines) {
+      const color = parseOklch(line.split(":")[1].trim().replace(";", ""));
+      expect(color, line).not.toBeNull();
+      expect(color!.h, line).toBeGreaterThan(270);
+      expect(color!.h, line).toBeLessThan(330);
+    }
+
+    // A purple smuggled onto any other token still trips the scan.
+    const tampered = source.replace(
+      "--track-content: oklch(0.94 0.028 19.1);",
+      "--track-content: oklch(0.94 0.028 300);"
+    );
+    const stillCaught = tampered
+      .split("\n")
+      .filter((line) => !STREAM_TOKEN_DECLARATION.test(line))
+      .join("\n")
+      .match(/oklch\([\d.]+ [\d.]+ 300\)/);
+    expect(stillCaught).not.toBeNull();
   });
 });

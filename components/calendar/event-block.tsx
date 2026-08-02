@@ -18,6 +18,7 @@ import {
   minutesSinceMidnight,
   type DaySegment,
 } from "@/lib/calendar/segments";
+import { trackKindOf } from "@/lib/calendar/track-kind";
 import { formatInAppZone } from "@/lib/time";
 
 import { EventEditor } from "./event-editor";
@@ -75,7 +76,8 @@ export function EventBlock({
   const [gesture, setGesture] = useState<Gesture | null>(null);
   const geometryRef = useRef<Geometry>({ pxPerMinute: 0, columnWidthPx: 0 });
   const { event, start, end } = segment;
-  const Icon = TRACK_ICON[event.track];
+  const trackKind = trackKindOf(event);
+  const Icon = TRACK_ICON[trackKind];
 
   const canResizeStart = segment.start.getTime() === event.startsAt.getTime();
   const canResizeEnd = segment.end.getTime() === event.endsAt.getTime();
@@ -206,7 +208,7 @@ export function EventBlock({
         }}
         className={cn(
           "absolute overflow-hidden rounded-md border px-1.5 py-1 text-left text-caption leading-tight",
-          TRACK_SURFACE_CLASSES[event.track],
+          TRACK_SURFACE_CLASSES[trackKind],
           gesture ? "z-20 shadow-md" : "z-10"
         )}
         style={previewStyle}
@@ -228,7 +230,7 @@ export function EventBlock({
 
         <div className="flex items-center gap-1 font-medium">
           <Icon aria-hidden className="size-3 shrink-0" />
-          <span className="sr-only">{TRACK_LABEL[event.track]}: </span>
+          <span className="sr-only">{TRACK_LABEL[trackKind]}: </span>
           <span className="truncate">{event.title}</span>
           {event.conflictNote ? (
             <span

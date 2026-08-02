@@ -49,6 +49,30 @@ describe("DeleteStreamDialog", () => {
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 
+  it("warns that the calendar block goes too when the stream is scheduled", () => {
+    render(
+      <DeleteStreamDialog
+        stream={makeStream({ eventId: "evt-1", eventTrack: "content" })}
+        open
+        onOpenChange={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.getByText(/block on the calendar will be removed too/i)
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing about the calendar for an unscheduled stream", () => {
+    render(
+      <DeleteStreamDialog stream={makeStream()} open onOpenChange={vi.fn()} />
+    );
+
+    expect(
+      screen.queryByText(/block on the calendar/i)
+    ).not.toBeInTheDocument();
+  });
+
   it("deletes on confirm and navigates back to the list", async () => {
     deleteStream.mockResolvedValue({});
     const onOpenChange = vi.fn();

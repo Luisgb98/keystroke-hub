@@ -7,11 +7,14 @@ import {
   useState,
   useTransition,
 } from "react";
+import Link from "next/link";
+import { ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
 import { createEvent, updateEvent } from "@/lib/calendar/actions";
 import type { QuickAddDefaults } from "@/lib/calendar/quick-add";
-import type { CalendarEvent, Track } from "@/lib/calendar/types";
+import { trackKindOf, type TrackKind } from "@/lib/calendar/track-kind";
+import type { CalendarEvent } from "@/lib/calendar/types";
 import { dismissConflictNote } from "@/lib/sync/actions";
 import { formatAppDateParam, formatAppTimeParam } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -59,7 +62,7 @@ function initialValues(
 ) {
   if (event) {
     return {
-      track: event.track as Track | undefined,
+      track: trackKindOf(event) as TrackKind | undefined,
       title: event.title,
       description: event.description ?? "",
       allDay: event.allDay,
@@ -71,7 +74,7 @@ function initialValues(
   }
 
   return {
-    track: undefined as Track | undefined,
+    track: undefined as TrackKind | undefined,
     title: "",
     description: "",
     allDay: defaults?.allDay ?? false,
@@ -197,7 +200,20 @@ export function EventEditor({
               ) : null}
             </div>
 
-            {mode === "edit" && event && values.track === "content" ? (
+            {mode === "edit" && event?.streamId ? (
+              <Link
+                href={`/content/streams/${event.streamId}`}
+                data-slot="stream-session-link"
+                className="flex min-h-11 items-center justify-between gap-2 rounded-lg border border-track-stream-border bg-track-stream px-3 py-2 text-small font-medium text-track-stream-foreground hover:underline"
+              >
+                Open stream session
+                <ExternalLink aria-hidden className="size-4 shrink-0" />
+              </Link>
+            ) : null}
+
+            {mode === "edit" &&
+            event &&
+            (values.track === "content" || values.track === "stream") ? (
               <EventLinkedIdeas
                 eventId={event.id}
                 linkedIdeas={event.linkedIdeas}
