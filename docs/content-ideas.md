@@ -237,7 +237,12 @@ Mobile-first, one-handed capture is the design center:
   roomier detail page). It commits inline through `updateIdeaStatus` (no
   confirmation); the closed trigger shows the human status label via
   `SelectValue`'s formatter, and the same publish nudge (`uncheckedCount`)
-  applies.
+  applies. The shown value is **optimistic** (`useOptimistic`, the same
+  treatment `PipelineBoard` gives this mutation) — #102 fixed it reading
+  straight off the `status` prop, which left the trigger displaying the old
+  status, greyed out while pending, until the revalidated page landed. A failed
+  action needs no rollback code: the transition settling without a revalidated
+  prop reverts the optimistic value itself.
 - **Filters**: `IdeaFilters` — debounced search plus horizontally-scrollable
   chip rows for format/status/tag. Holds a local optimistic copy of every
   filter (not just search text) so rapid successive chip clicks compose
