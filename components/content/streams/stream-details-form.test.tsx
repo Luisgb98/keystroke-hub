@@ -55,6 +55,33 @@ describe("StreamDetailsForm", () => {
     expect(formData.get("title")).toBe("Renamed stream");
   });
 
+  it("shows the new value, without a Base UI warning, when a save revalidates the page", async () => {
+    const consoleError = vi.spyOn(console, "error");
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <StreamDetailsForm stream={makeStream({ title: "Before" })} />
+    );
+
+    // What the real page does after `updateStreamDetails`: `revalidatePath`
+    // re-renders the server component, so the same client component is handed a
+    // `stream` with the new title (#102).
+    rerender(<StreamDetailsForm stream={makeStream({ title: "After" })} />);
+
+    expect(screen.getByLabelText("Topic")).toHaveValue("After");
+    expect(
+      consoleError.mock.calls.filter(([first]) =>
+        String(first).includes("changing the default value state")
+      )
+    ).toEqual([]);
+
+    // An unrelated revalidation (a checklist toggle refreshes this route too)
+    // must not throw away what's being typed.
+    await user.clear(screen.getByLabelText("Prep notes"));
+    await user.type(screen.getByLabelText("Prep notes"), "Half-typed note");
+    rerender(<StreamDetailsForm stream={makeStream({ title: "After" })} />);
+    expect(screen.getByLabelText("Prep notes")).toHaveValue("Half-typed note");
+  });
+
   it("shows a field error on invalid input", async () => {
     updateStreamDetails.mockResolvedValue({
       error: "Check the highlighted fields.",
