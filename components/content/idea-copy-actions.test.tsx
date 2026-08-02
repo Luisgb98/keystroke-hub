@@ -20,6 +20,7 @@ function makeIdea(overrides: Partial<Idea> = {}): Idea {
     status: "idea",
     tags: ["speedrun", "glitch", "tutorial", "retro", "any%"],
     projectId: null,
+    gameId: null,
     releaseEventId: null,
     releaseEventTrack: null,
     stageEnteredAt: new Date(),

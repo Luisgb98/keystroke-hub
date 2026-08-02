@@ -74,6 +74,7 @@ describe("ideaCaptureSchema", () => {
         description: null,
         format: "either",
         tags: [],
+        gameId: null,
         release: null,
         script: null,
       });

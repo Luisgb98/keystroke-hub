@@ -11,6 +11,9 @@ const toastMock = vi.hoisted(() => ({
 }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
+const createGame = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/content/game-actions", () => ({ createGame }));
+
 import type { Stream } from "@/lib/db/schema";
 import { StreamDetailsForm } from "./stream-details-form";
 
@@ -20,6 +23,7 @@ function makeStream(overrides: Partial<Stream> = {}): Stream {
     title: "Boss rush stream",
     notes: null,
     retroNotes: null,
+    gameId: null,
     eventId: null,
     eventTrack: null,
     createdAt: new Date(),
@@ -28,9 +32,14 @@ function makeStream(overrides: Partial<Stream> = {}): Stream {
   };
 }
 
+const GAMES = [
+  { id: "g-poe", name: "Path of Exile" },
+  { id: "g-hades", name: "Hades" },
+];
+
 function renderForm(stream: Stream = makeStream()) {
   return render(
-    <StreamDetailsForm stream={stream} isPast={false}>
+    <StreamDetailsForm stream={stream} isPast={false} games={GAMES}>
       <div data-testid="between">Scheduled and checklist live here</div>
     </StreamDetailsForm>
   );
@@ -91,6 +100,7 @@ describe("StreamDetailsForm", () => {
       title: "Renamed stream",
       notes: "Check the mic",
       retroNotes: "Went long",
+      gameId: "",
     });
     expect(toastMock.success).toHaveBeenCalledWith("Saved");
   });
@@ -196,5 +206,47 @@ describe("StreamDetailsForm", () => {
     expect(
       document.querySelector('[data-slot="stream-retro-notes"]')
     ).toHaveClass("border-track-content-border");
+  });
+
+  it("prefills the picked game and saves a change to it (#105)", async () => {
+    const user = userEvent.setup();
+    renderForm(makeStream({ gameId: "g-poe" }));
+
+    const picker = screen.getByRole("combobox", { name: "Game" });
+    expect(picker).toHaveTextContent("Path of Exile");
+
+    await user.click(picker);
+    await user.click(await screen.findByText("Hades"));
+
+    await waitFor(() => expect(saveButton()).toBeEnabled());
+    await user.click(saveButton());
+
+    await waitFor(() =>
+      expect(updateStreamDetails).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "stream-1", gameId: "g-hades" })
+      )
+    );
+  });
+
+  it("clears the game, which saves as 'no game' rather than being ignored (#105)", async () => {
+    const user = userEvent.setup();
+    renderForm(makeStream({ gameId: "g-poe" }));
+
+    await user.click(screen.getByRole("combobox", { name: "Game" }));
+    await user.click(await screen.findByText("No game"));
+
+    await waitFor(() => expect(saveButton()).toBeEnabled());
+    await user.click(saveButton());
+
+    await waitFor(() =>
+      expect(updateStreamDetails).toHaveBeenCalledWith(
+        expect.objectContaining({ gameId: "" })
+      )
+    );
+  });
+
+  it("leaves Save disabled until the game actually changes (#105)", () => {
+    renderForm(makeStream({ gameId: "g-poe" }));
+    expect(saveButton()).toBeDisabled();
   });
 });

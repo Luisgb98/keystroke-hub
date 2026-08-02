@@ -9,6 +9,7 @@ function makeStream(overrides: Partial<StreamSummary> = {}): StreamSummary {
     id: "stream-1",
     title: "Boss rush stream",
     retroNotes: null,
+    game: null,
     createdAt: new Date("2026-01-01T00:00:00Z"),
     event: null,
     checklistDone: 0,
@@ -63,6 +64,20 @@ describe("StreamCard", () => {
       />
     );
     expect(screen.queryByText("0/0")).not.toBeInTheDocument();
+  });
+
+  it("shows the game it's about, and nothing when untagged (#105)", () => {
+    const { rerender } = render(
+      <StreamCard
+        stream={makeStream({ game: { id: "g-poe", name: "Path of Exile" } })}
+      />
+    );
+    expect(screen.getByText("Path of Exile")).toBeInTheDocument();
+    // Not a nested link: the whole card is already one.
+    expect(screen.getAllByRole("link")).toHaveLength(1);
+
+    rerender(<StreamCard stream={makeStream({ game: null })} />);
+    expect(screen.queryByText("Path of Exile")).not.toBeInTheDocument();
   });
 
   it("shows a notes indicator only when retro notes exist", () => {

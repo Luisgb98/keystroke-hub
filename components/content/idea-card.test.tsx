@@ -32,6 +32,7 @@ function makeIdea(overrides: Partial<Idea> = {}): Idea {
     status: "idea",
     tags: [],
     projectId: null,
+    gameId: null,
     releaseEventId: null,
     releaseEventTrack: null,
     stageEnteredAt: new Date(),
@@ -200,6 +201,24 @@ describe("IdeaCard", () => {
     );
     const link = screen.getByRole("link", { name: "Keystroke Hub" });
     expect(link).toHaveAttribute("href", "/projects/project-1");
+  });
+
+  it("shows the game it's about, linking to that game's filtered list (#105)", () => {
+    render(
+      <IdeaCard
+        idea={makeIdea({ gameId: "g-poe" })}
+        game={{ id: "g-poe", name: "Path of Exile" }}
+      />
+    );
+    expect(screen.getByRole("link", { name: "Path of Exile" })).toHaveAttribute(
+      "href",
+      "/content/ideas?game=g-poe"
+    );
+  });
+
+  it("omits the game chip when the idea has no game (#105)", () => {
+    render(<IdeaCard idea={makeIdea()} />);
+    expect(screen.queryByText("Path of Exile")).not.toBeInTheDocument();
   });
 
   it("omits the project chip when no project is linked", () => {

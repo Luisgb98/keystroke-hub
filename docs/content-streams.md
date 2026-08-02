@@ -8,11 +8,11 @@ of chaotic.
 
 Three new tables in `lib/db/schema.ts`:
 
-| Table                             | Columns (essence)                                                          | Notes                                                                |
-| --------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `streams`                         | `id`, `title`, `notes`, `retro_notes`, `event_id` null, `event_track` null | one row per planned stream                                           |
-| `stream_checklist_items`          | `id`, `stream_id` FK (cascade), `label`, `done`, `position`                | per-stream, local edits only                                         |
-| `stream_checklist_template_items` | `id`, `label`, `position`                                                  | single global default template — single-user app, no template "sets" |
+| Table                             | Columns (essence)                                                                          | Notes                                                                |
+| --------------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| `streams`                         | `id`, `title`, `notes`, `retro_notes`, `game_id` null, `event_id` null, `event_track` null | one row per planned stream                                           |
+| `stream_checklist_items`          | `id`, `stream_id` FK (cascade), `label`, `done`, `position`                                | per-stream, local edits only                                         |
+| `stream_checklist_template_items` | `id`, `label`, `position`                                                                  | single global default template — single-user app, no template "sets" |
 
 A stream's **"when" is its linked content-track calendar event** — the
 `streams` row itself stores no date. `event_id`/`event_track` are nullable
@@ -32,6 +32,13 @@ its date, it looks up any stream referencing the event before deleting it and
 revalidates `/content/streams` (and that stream's detail page) alongside its
 usual `/calendar` revalidation — the DB-level `SET NULL` alone doesn't tell
 Next.js which cached routes to refresh.
+
+`game_id` (#105) is a nullable FK into the `games` library with
+`ON DELETE SET NULL` — which game the session is about, picked from the library
+rather than typed into the topic, so streams can be grouped and counted by game.
+Deleting a game untags the stream; it never deletes it. The picker sits on both
+the create dialog and the detail page, saved behind the page's single Save like
+every other field. See [content-games](content-games.md).
 
 "Upcoming" vs "past" vs "unscheduled" is derived at query time from the
 linked event's `startsAt`, not stored — **"past" is after the event's start

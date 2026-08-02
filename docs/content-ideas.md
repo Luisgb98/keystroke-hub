@@ -12,19 +12,20 @@ One table, `ideas` (`lib/db/schema.ts`), deliberately independent of
 `events` — an idea only ever _becomes_ content later; it doesn't share the
 calendar's `track` discriminator.
 
-| Column                      | Type                                               | Notes                                                        |
-| --------------------------- | -------------------------------------------------- | ------------------------------------------------------------ |
-| `id`                        | `uuid` PK, default random                          |                                                              |
-| `title`                     | `text` **not null**                                | the only required field                                      |
-| `description`               | `text` null                                        | the publish-facing video description (#88)                   |
-| `format`                    | enum `video \| stream \| either`, default `either` |                                                              |
-| `status`                    | enum, default `idea`                               | pipeline stage — see below                                   |
-| `tags`                      | `text[]` not null default `{}`                     | free-form, GIN-indexed for containment                       |
-| `project_id`                | `uuid` null                                        | forward-compat for #24 (Projects) — no UI yet                |
-| `release_event_id`          | `uuid` null                                        | the idea's release on the calendar — see Release below (#71) |
-| `release_event_track`       | enum `track` null                                  | always `content` when set; composite FK + CHECK (#71)        |
-| `stage_entered_at`          | `timestamptz` not null, default `now()`            | when `status` last changed — powers #16's board (see below)  |
-| `created_at` / `updated_at` | `timestamptz` not null                             |                                                              |
+| Column                      | Type                                               | Notes                                                                      |
+| --------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------- |
+| `id`                        | `uuid` PK, default random                          |                                                                            |
+| `title`                     | `text` **not null**                                | the only required field                                                    |
+| `description`               | `text` null                                        | the publish-facing video description (#88)                                 |
+| `format`                    | enum `video \| stream \| either`, default `either` |                                                                            |
+| `status`                    | enum, default `idea`                               | pipeline stage — see below                                                 |
+| `tags`                      | `text[]` not null default `{}`                     | free-form, GIN-indexed for containment                                     |
+| `project_id`                | `uuid` null                                        | forward-compat for #24 (Projects) — no UI yet                              |
+| `game_id`                   | `uuid` null                                        | the game this idea is about — see [content-games](content-games.md) (#105) |
+| `release_event_id`          | `uuid` null                                        | the idea's release on the calendar — see Release below (#71)               |
+| `release_event_track`       | enum `track` null                                  | always `content` when set; composite FK + CHECK (#71)                      |
+| `stage_entered_at`          | `timestamptz` not null, default `now()`            | when `status` last changed — powers #16's board (see below)                |
+| `created_at` / `updated_at` | `timestamptz` not null                             |                                                                            |
 
 `format`/`status` are Postgres enums (`pgEnum`), matching the `track`/
 `connection_status` precedent in `docs/calendar.md` — adding a pipeline stage
@@ -33,7 +34,12 @@ rewrite. `edited` was added this way by #16. _Removing_ a value is the
 expensive direction — Postgres has no `DROP VALUE`, so #70 swapped the enum
 via a text round-trip (migration `0017`), remapping retired rows in the same
 step. #71 added the two `release_event_*` columns (migration `0018`); no
-backfill was needed since every existing idea is simply unscheduled.
+backfill was needed since every existing idea is simply unscheduled. #105 added
+`game_id` (migration `0020`) the same way — a nullable FK into the new `games`
+library, `ON DELETE SET NULL` so deleting a game untags the idea rather than
+destroying it. It is deliberately **not** another tag: tags describe a video for
+publishing, the game says what the work is about (see
+[content-games](content-games.md)).
 
 ## Pipeline vocabulary
 
