@@ -16,7 +16,7 @@ const skipReason =
 const PALETTE = { name: "Command palette" } as const;
 
 /**
- * Opens the palette with its shortcut, retrying the press. The Cmd/Ctrl-F
+ * Opens the palette with its shortcut, retrying the press. The Cmd/Ctrl-K
  * binding is attached by a client effect, so on a freshly loaded page the very
  * first press can land before hydration — and a lost press looks exactly like
  * a broken shortcut. The loop self-heals if a press does register late: it
@@ -25,14 +25,14 @@ const PALETTE = { name: "Command palette" } as const;
 async function openWithShortcut(page: Page) {
   const dialog = page.getByRole("dialog", PALETTE);
   await expect(async () => {
-    await page.keyboard.press("Control+f");
+    await page.keyboard.press("Control+k");
     await expect(dialog).toBeVisible({ timeout: 2000 });
   }).toPass({ timeout: 20000 });
   return dialog;
 }
 
 test.describe("command palette navigation", () => {
-  test("Ctrl/Cmd-F opens the palette; typing narrows the list and Enter navigates", async ({
+  test("Ctrl/Cmd-K opens the palette; typing narrows the list and Enter navigates", async ({
     page,
   }) => {
     await page.goto("/");
@@ -54,32 +54,37 @@ test.describe("command palette navigation", () => {
     await expect(dialog).not.toBeVisible();
   });
 
-  test("a second Ctrl-F press toggles the palette closed", async ({ page }) => {
+  test("a second Ctrl-K press toggles the palette closed", async ({ page }) => {
     await page.goto("/");
     const dialog = await openWithShortcut(page);
 
-    await page.keyboard.press("Control+f");
+    await page.keyboard.press("Control+k");
     await expect(dialog).not.toBeVisible();
   });
 
-  test("Ctrl-K no longer opens the palette (#85)", async ({ page }) => {
+  // #102 handed this combo back to the browser: the script editor is a page of
+  // prose, and finding a word inside a script needs real find-in-page, which
+  // only Ctrl/Cmd-F opens. The palette must not intercept it.
+  test("Ctrl-F no longer opens the palette, leaving find-in-page to the browser (#102)", async ({
+    page,
+  }) => {
     await page.goto("/");
 
     // Open-then-close with the real shortcut first: that proves the listener is
-    // attached, so the Ctrl-K press below is a genuine no-op rather than a
+    // attached, so the Ctrl-F press below is a genuine no-op rather than a
     // press that merely arrived before hydration.
     const dialog = await openWithShortcut(page);
     await page.keyboard.press("Escape");
     await expect(dialog).not.toBeVisible();
 
-    await page.keyboard.press("Control+k");
+    await page.keyboard.press("Control+f");
     await expect(page.getByRole("dialog", PALETTE)).not.toBeVisible();
   });
 
   test("the sidebar chip advertises the new shortcut", async ({ page }) => {
     await page.goto("/");
     await expect(
-      page.getByRole("button", { name: "Search" }).getByText(/Ctrl\s*F|⌘F/)
+      page.getByRole("button", { name: "Search" }).getByText(/Ctrl\s*K|⌘K/)
     ).toBeVisible();
   });
 

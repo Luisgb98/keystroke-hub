@@ -21,14 +21,16 @@ describe("PaletteTriggerChip", () => {
     expect(setOpen).toHaveBeenCalledWith(true);
   });
 
-  it("shows a Ctrl F hint by default (non-Mac user agent in jsdom)", () => {
+  it("shows a Ctrl K hint by default (non-Mac user agent in jsdom)", () => {
     render(<PaletteTriggerChip />);
-    expect(screen.getByText("CtrlF")).toBeInTheDocument();
+    expect(screen.getByText("CtrlK")).toBeInTheDocument();
   });
 
-  it("no longer advertises the retired Ctrl K shortcut (#85)", () => {
+  // #102 handed Cmd/Ctrl-F back to the browser for find-in-page inside scripts,
+  // so the chip must not keep pointing at a combo the app no longer answers.
+  it("no longer advertises the retired Ctrl F shortcut (#102)", () => {
     render(<PaletteTriggerChip />);
-    expect(screen.queryByText("CtrlK")).not.toBeInTheDocument();
+    expect(screen.queryByText("CtrlF")).not.toBeInTheDocument();
   });
 
   it("renders on the shared button system rather than a one-off surface", () => {
