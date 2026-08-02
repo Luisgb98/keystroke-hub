@@ -67,27 +67,48 @@ stepping down in alpha. An alpha step lightens a solid accent against the page
 and reads as _disabled_; mixing toward the foreground darkens in light mode and
 lightens in dark mode, so the button deepens under the cursor in both themes.
 
-## Dual-track colors
+## Track colors
 
 Keystroke Hub renders two strictly separate worlds — **work** and
 **content** — sometimes side by side (the shared calendar, an agenda, a
-dashboard). Any component that renders an item from either world must use
-only the track tokens, never a raw or semantic color:
+dashboard). Since #104 the content world paints in two shades: an ordinary
+piece of content work, and a **stream** — a live session, which is an
+appointment you have to be there for rather than a deadline you can move.
 
-| Token                                                          | Purpose                         |
-| -------------------------------------------------------------- | ------------------------------- |
-| `bg-track-work` / `bg-track-content`                           | Surface for a work/content item |
-| `text-track-work-foreground` / `text-track-content-foreground` | Text on that surface            |
-| `border-track-work-border` / `border-track-content-border`     | Border/outline for that surface |
+Any component that renders an item from those worlds must use only the track
+tokens, never a raw or semantic color:
 
-Both palettes hold WCAG AA contrast (surface vs. foreground) in both themes —
-verify any new pairing on the Colors section of `/styleguide`.
+| Token                     | Purpose                                |
+| ------------------------- | -------------------------------------- |
+| `bg-track-*`              | Surface for a work/content/stream item |
+| `text-track-*-foreground` | Text on that surface                   |
+| `border-track-*-border`   | Border/outline for that surface        |
+
+All three palettes hold WCAG AA contrast (surface vs. foreground) in both
+themes — verify any new pairing on the Colors section of `/styleguide`, whose
+track showcase shows the three side by side.
 
 **Color is never the only signal.** Every track-colored element pairs the
-color with an icon (`Briefcase` for work, `Clapperboard` for content) and a
-text label, so the distinction survives grayscale, color blindness, or a
-screenshot. See `components/styleguide/dual-track-showcase.tsx` for the
-reference pattern.
+color with an icon (`Briefcase` for work, `Clapperboard` for content, `Radio`
+for stream) and a text label, so the distinction survives grayscale, color
+blindness, or a screenshot. See `components/styleguide/track-showcase.tsx` for
+the reference pattern.
+
+### The one purple
+
+`--track-stream*` sits at hue **296.1** — where Twitch purple (`#9146FF`)
+lands in OKLCH. That is a deliberate exception: #84 retired a purple accent
+and both guards (`app/globals.css.test.ts` and `lib/color/palette-usage.test.ts`)
+ban the whole 270–330 hue window outright. The ban is **relaxed, not removed**
+— the exemption is keyed on the declared token name (`--track-stream…`), so
+purple on any other token, in any other file, or as a `bg-purple-*`-style
+utility still fails the build. Both guards also assert positively that the
+stream tokens _are_ purple, so the carve-out can't quietly stop buying
+anything.
+
+Dark mode is where purple sits nearest the work blue, so the stream track
+carries a little more chroma there than the other two, and
+`app/globals.css.test.ts` holds the two at least 35° apart on hue.
 
 ## Typography
 

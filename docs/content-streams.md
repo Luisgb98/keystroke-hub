@@ -62,7 +62,9 @@ the template.
   or the same day, for all-day — rather than a second end-time picker),
   `updateStreamDetails` (title, prep notes and the retro — every editable
   field on the detail page, in one statement), `deleteStream` (hard delete,
-  checklist cascades, the linked event is left alone), `toggleChecklistItem`/
+  checklist cascades, and — since #104 — the linked event is deleted with it,
+  batched, so no purple calendar block outlives its session; the Google-side
+  delete is pushed exactly as `deleteEvent` pushes it), `toggleChecklistItem`/
   `addChecklistItem`/`removeChecklistItem`, `addTemplateItem`/
   `removeTemplateItem`, and `attachEventToStream`/`detachEventFromStream`
   (attaching an already-claimed event surfaces a friendly error before ever
@@ -70,6 +72,12 @@ the template.
   `verifySession()` first.
 - **`lib/content/stream-schema.ts`**: zod schemas for capture, detail edits
   (topic + prep notes + retro together), and checklist/template item labels.
+- **`lib/content/stream-session.ts`** (`server-only`): `insertStreamSession`,
+  the one place a session and its template snapshot are created. Shared by
+  `createStream` and by the calendar's own `createEvent`/`updateEvent` (#104),
+  so a stream planned from the calendar is seeded identically to one planned
+  here. Its `leading` option puts a caller's event INSERT at the head of the
+  same `db.batch`, keeping "the block and its session" one round trip.
 
 ### Atomicity without transactions
 
@@ -116,6 +124,22 @@ the "stream" idea format):
   keeps painting the old string. Local state is re-seeded from the props only
   when the saved columns actually change, so a revalidation triggered by a
   checklist toggle doesn't discard in-progress typing.
+
+## Streams on the calendar (#104)
+
+A scheduled stream's block is **Twitch purple**, its own track alongside work
+and content — see docs/calendar.md for how that kind is derived (it is not a
+third `events.track` value) and docs/design-system.md for the palette. Two
+consequences land here:
+
+- **Planning is symmetric.** A stream planned from the calendar's track picker
+  is indistinguishable from one planned here, checklist and all.
+- **Delete is symmetric too.** Deleting the linked event still just
+  unschedules the stream (the `ON DELETE SET NULL` above is unchanged), but
+  deleting the _stream_ now also deletes the event. That reverses the original
+  "left alone" choice deliberately: once a block advertises a session, leaving
+  one behind means a purple block promising something that no longer exists.
+  The confirmation dialog says so before it happens.
 
 ## Scope cuts
 

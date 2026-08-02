@@ -67,7 +67,10 @@ export default defineConfig({
       // content-links.spec.ts, streams.spec.ts, publish-checklist.spec.ts,
       // journal.spec.ts, weekly-summary.spec.ts, weekly-assessment.spec.ts,
       // projects.spec.ts, improvements.spec.ts, meetings.spec.ts,
-      // github-links.spec.ts, dashboard.spec.ts, mobile.spec.ts (whose
+      // github-links.spec.ts, dashboard.spec.ts, stream-track.spec.ts (whose
+      // stream sessions share the one global checklist template, so a
+      // concurrent run's cleanup would delete the template item another run
+      // is still asserting on), mobile.spec.ts (whose
       // journal and weekly-summary cases write real rows), and
       // command-palette.spec.ts (whose content-search describe seeds/clears
       // a real project + idea) and timezone.spec.ts (which drives the
@@ -81,7 +84,7 @@ export default defineConfig({
       // project would race against the chromium project's runs against the same
       // shared DB.
       testIgnore:
-        /(calendar|calendar-sync|event-management|drag-reschedule|agenda|board|scripts|content-links|streams|publish-checklist|journal|weekly-summary|weekly-assessment|projects|improvements|meetings|github-links|dashboard|mobile|command-palette|inbox|ideas|idea-detail|timezone)\.spec\.ts$/,
+        /(calendar|calendar-sync|event-management|drag-reschedule|agenda|board|scripts|content-links|streams|publish-checklist|journal|weekly-summary|weekly-assessment|projects|improvements|meetings|github-links|dashboard|stream-track|mobile|command-palette|inbox|ideas|idea-detail|timezone)\.spec\.ts$/,
     },
   ],
   webServer: [

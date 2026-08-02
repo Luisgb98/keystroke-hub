@@ -50,8 +50,53 @@ live in their own modules and are unit-tested directly:
   overflow.
 
 Every event-rendering component (`components/calendar/`) uses only the track
-tokens and pairs color with an icon (`Briefcase`/`Clapperboard`) and a label
-(`track-styles.ts`) — color is never the only signal.
+tokens and pairs color with an icon (`Briefcase`/`Clapperboard`/`Radio`) and a
+label (`track-styles.ts`) — color is never the only signal.
+
+## Three kinds of block, two tracks (#104)
+
+A block reads as one of three things — **Work**, **Content** or **Stream** —
+but `events.track` is still the two-value enum above. `TrackKind`
+(`lib/calendar/track-kind.ts`) is the display-level type, and `stream` is
+**derived**: a content-track event is a Stream block exactly when a `streams`
+row schedules it (`CalendarEvent.streamId`, left-joined in
+`lib/data/events.ts`).
+
+Widening the enum instead would have dragged the whole two-world boundary with
+it — which Google calendar an event syncs through, whether an idea may link to
+it (`idea_event_links`' content-only CHECK), whether a meeting note may attach
+— and needed a backfill to make existing streams read as streams. Deriving it
+buys all of that for free:
+
+- Attaching an event to a stream turns its block purple and detaching turns it
+  back, with no calendar-side write at all.
+- An edit arriving from Google can never change an event's kind: inbound sync
+  writes title/description/times/all-day and never touches `track` or
+  `streams` (`lib/sync/engine.ts`, guarded by a unit test).
+- A stream block syncs through the **content** connection, because that is
+  genuinely its track.
+- Every stream that already existed reads as purple the moment this ships.
+
+`TrackPicker` offers all three. Picking **Stream** stores `track: 'content'`
+and creates the session behind the block, checklist snapshotted from the
+current template (`insertStreamSession`, `lib/content/stream-session.ts`) —
+so a purple block always corresponds to a real session on the planner. The
+editor links straight to it.
+
+Changing an existing block's kind:
+
+| From → to        | What happens                                                                  |
+| ---------------- | ----------------------------------------------------------------------------- |
+| Content → Stream | the session is created behind it                                              |
+| Stream → Content | the session survives as **Unscheduled**, checklist and notes intact           |
+| Stream → Work    | refused — "Unlink the stream first", the same friendly message #67 introduced |
+
+Stream → Work stays a refusal rather than a silent unlink because a work-track
+event can't legally carry the content-pinned link at all; unlinking on the
+user's behalf would be a bigger, less reversible decision than the one they
+asked for. Either way, no purple block is ever left with nothing behind it —
+and the reverse direction is covered too: deleting a stream on the planner now
+takes its calendar block with it (see docs/content-streams.md).
 
 ## Scroll contract
 
