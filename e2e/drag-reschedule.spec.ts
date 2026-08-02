@@ -312,9 +312,21 @@ test.describe("drag-reschedule mobile viewport", () => {
     });
 
     await expect(block).toContainText("10:00–11:00");
+    // `useEventReschedule` moves the block optimistically, so the text above
+    // proves the gesture was read, not that the row moved. The "Moved …" toast
+    // is what the server response drives — every other test in this file waits
+    // for it before reloading, and this one didn't, so its reload could beat
+    // the write and read back the original 09:00 (#102).
+    await expect(
+      page.locator("[data-sonner-toast]", { hasText: title })
+    ).toBeVisible();
+
     await page.reload();
     await expect(page.locator(EVENT_BLOCK, { hasText: title })).toContainText(
       "10:00–11:00"
     );
+    const persisted = await getTestEventTimes(title);
+    expect(persisted?.startsAt).toEqual(at(10));
+    expect(persisted?.endsAt).toEqual(at(11));
   });
 });
