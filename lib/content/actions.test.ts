@@ -155,6 +155,7 @@ describe("createIdea", () => {
       description: null,
       format: "either",
       tags: [],
+      gameId: null,
     });
     expect(revalidatePath).toHaveBeenCalledWith("/content/ideas");
     expect(revalidatePath).toHaveBeenCalledWith("/content/board");
@@ -177,6 +178,7 @@ describe("createIdea", () => {
       description: "Cover the wrong warp",
       format: "video",
       tags: ["speedrun", "glitch"],
+      gameId: null,
     });
   });
 
@@ -290,6 +292,7 @@ describe("updateIdea", () => {
       description: "new description",
       format: "video",
       tags: ["speedrun", "glitch"],
+      gameId: null,
     });
     expect(revalidatePath).toHaveBeenCalledWith("/content/ideas");
     expect(revalidatePath).toHaveBeenCalledWith("/content/board");

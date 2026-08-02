@@ -8,11 +8,13 @@ import { Briefcase, Pencil, ScrollText, Trash2 } from "lucide-react";
 import { IDEA_FORMAT_LABEL } from "@/lib/content/idea-format";
 import { PUBLISHING_TAG_STANDARD } from "@/lib/content/idea-schema";
 import type { Idea } from "@/lib/db/schema";
+import type { GameOption } from "@/lib/data/games";
 import type { ScheduledEventSummary } from "@/lib/data/idea-event-links";
 import type { LinkedProjectSummary } from "@/lib/data/projects";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { GameChip } from "@/components/content/games/game-chip";
 
 import { DeleteIdeaDialog } from "./delete-idea-dialog";
 import { IdeaCopyActions } from "./idea-copy-actions";
@@ -29,6 +31,10 @@ interface IdeaCardProps {
   scheduledEvents?: ScheduledEventSummary[];
   /** The project this idea belongs to, if any — read-only here; linking happens from the project page (see docs/projects.md). */
   project?: LinkedProjectSummary;
+  /** The game this idea is about, if tagged (#105). */
+  game?: GameOption;
+  /** The whole game library, for the edit dialog's picker (#105). */
+  games?: GameOption[];
 }
 
 /**
@@ -54,6 +60,8 @@ export function IdeaCard({
   hasScript = false,
   scheduledEvents = [],
   project,
+  game,
+  games = [],
 }: IdeaCardProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -149,6 +157,12 @@ export function IdeaCard({
             </span>
           )}
 
+          {game ? (
+            <div className="relative z-10">
+              <GameChip game={game} href />
+            </div>
+          ) : null}
+
           <div className="relative z-10">
             <IdeaCopyActions idea={idea} />
           </div>
@@ -184,6 +198,7 @@ export function IdeaCard({
         mode="edit"
         idea={idea}
         releaseStartsAt={releaseEvent?.startsAt ?? null}
+        games={games}
         open={editOpen}
         onOpenChange={setEditOpen}
       />

@@ -3,12 +3,13 @@ import type { Metadata } from "next";
 import { StreamCard } from "@/components/content/streams/stream-card";
 import { StreamCreate } from "@/components/content/streams/stream-create";
 import { TemplateEditor } from "@/components/content/streams/template-editor";
+import { getGames } from "@/lib/data/games";
 import {
   getStreamsOverview,
   getTemplateItems,
   type StreamsOverview,
 } from "@/lib/data/streams";
-import type { StreamChecklistTemplateItem } from "@/lib/db/schema";
+import type { Game, StreamChecklistTemplateItem } from "@/lib/db/schema";
 
 export const metadata: Metadata = {
   title: "Streams",
@@ -19,10 +20,12 @@ export default async function StreamsPage() {
   // as /content/ideas and /calendar (see docs/database.md).
   let overview: StreamsOverview = { upcoming: [], unscheduled: [], past: [] };
   let templateItems: StreamChecklistTemplateItem[] = [];
+  let games: Game[] = [];
   try {
-    [overview, templateItems] = await Promise.all([
+    [overview, templateItems, games] = await Promise.all([
       getStreamsOverview(),
       getTemplateItems(),
+      getGames(),
     ]);
   } catch (error) {
     console.error("Failed to load streams:", error);
@@ -44,7 +47,7 @@ export default async function StreamsPage() {
         </div>
         <div className="flex items-center gap-2">
           <TemplateEditor items={templateItems} />
-          <StreamCreate />
+          <StreamCreate games={games} />
         </div>
       </div>
 

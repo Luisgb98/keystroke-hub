@@ -7,6 +7,9 @@ const createIdea = vi.hoisted(() => vi.fn());
 const updateIdea = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/content/actions", () => ({ createIdea, updateIdea }));
 
+const createGame = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/content/game-actions", () => ({ createGame }));
+
 const toastFn = vi.hoisted(() => vi.fn());
 const toastSuccess = vi.hoisted(() => vi.fn());
 vi.mock("sonner", () => ({
@@ -26,6 +29,7 @@ function makeIdea(overrides: Partial<Idea> = {}): Idea {
     status: "idea",
     tags: [],
     projectId: null,
+    gameId: null,
     releaseEventId: null,
     releaseEventTrack: null,
     stageEnteredAt: new Date(),
@@ -42,6 +46,11 @@ function makeIdea(overrides: Partial<Idea> = {}): Idea {
  * the calendar off today instead, which is always present and always labelled
  * this way.
  */
+const GAMES = [
+  { id: "g-poe", name: "Path of Exile" },
+  { id: "g-hades", name: "Hades" },
+];
+
 function todayCellName(): RegExp {
   return new RegExp(
     `^Today, ${formatInAppZone(new Date(), "EEEE, MMMM do, yyyy")}$`
@@ -316,6 +325,85 @@ describe("IdeaEditor — capture script field", () => {
     expect(scriptField()).toHaveValue("");
     expect(scriptField()).toHaveClass("max-h-40");
     expect(screen.getByText("0 words")).toBeInTheDocument();
+  });
+});
+
+describe("IdeaEditor — the game field (#105)", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("captures with no game by default, submitting an empty id", async () => {
+    createIdea.mockResolvedValue({ success: true });
+    const user = userEvent.setup();
+    render(
+      <IdeaEditor mode="create" games={GAMES} open onOpenChange={vi.fn()} />
+    );
+
+    expect(screen.getByRole("combobox", { name: "Game" })).toHaveTextContent(
+      "No game"
+    );
+    await user.type(screen.getByLabelText("Title"), "Boss rush");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(createIdea).toHaveBeenCalled());
+    const formData = createIdea.mock.calls[0][1] as FormData;
+    expect(formData.get("gameId")).toBe("");
+  });
+
+  it("submits the picked game's id", async () => {
+    createIdea.mockResolvedValue({ success: true });
+    const user = userEvent.setup();
+    render(
+      <IdeaEditor mode="create" games={GAMES} open onOpenChange={vi.fn()} />
+    );
+
+    await user.type(screen.getByLabelText("Title"), "Boss rush");
+    await user.click(screen.getByRole("combobox", { name: "Game" }));
+    await user.click(await screen.findByText("Hades"));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(createIdea).toHaveBeenCalled());
+    const formData = createIdea.mock.calls[0][1] as FormData;
+    expect(formData.get("gameId")).toBe("g-hades");
+  });
+
+  it("prefills the idea's game in edit mode and can clear it", async () => {
+    updateIdea.mockResolvedValue({ success: true });
+    const user = userEvent.setup();
+    render(
+      <IdeaEditor
+        mode="edit"
+        idea={makeIdea({ id: "idea-7", gameId: "g-poe" })}
+        games={GAMES}
+        open
+        onOpenChange={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole("combobox", { name: "Game" })).toHaveTextContent(
+      "Path of Exile"
+    );
+
+    await user.click(screen.getByRole("combobox", { name: "Game" }));
+    await user.click(await screen.findByText("No game"));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(updateIdea).toHaveBeenCalled());
+    // Bound to the idea id, so the FormData is the third argument.
+    const [, , formData] = updateIdea.mock.calls[0] as [
+      string,
+      unknown,
+      FormData,
+    ];
+    expect(formData.get("gameId")).toBe("");
+  });
+
+  it("is a themed popup, not a native select — the game is a real combobox", () => {
+    render(
+      <IdeaEditor mode="create" games={GAMES} open onOpenChange={vi.fn()} />
+    );
+    const picker = screen.getByRole("combobox", { name: "Game" });
+    expect(picker.tagName).toBe("BUTTON");
+    expect(picker).toHaveAttribute("aria-expanded", "false");
   });
 });
 

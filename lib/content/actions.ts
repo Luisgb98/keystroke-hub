@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { verifySession } from "@/lib/auth/session";
+import { resolveGameId } from "@/lib/data/games";
 import { getDb } from "@/lib/db";
 import {
   eventSyncLinks,
@@ -160,6 +161,7 @@ export async function createIdea(
     description: formData.get("description") ?? "",
     format: formData.get("format") || undefined,
     tags: formData.get("tags") ?? "",
+    gameId: formData.get("gameId") ?? "",
     script: formData.get("script") ?? "",
     releaseDate: formData.get("releaseDate") ?? "",
     releaseTime: formData.get("releaseTime") ?? "",
@@ -172,6 +174,9 @@ export async function createIdea(
   }
 
   const { script, release, ...fields } = parsed.data;
+  // A game the client named but that no longer exists degrades to "no game"
+  // rather than failing the capture on a foreign-key violation (#105).
+  fields.gameId = await resolveGameId(fields.gameId);
 
   const db = getDb();
   // Neon's HTTP driver has no transactions, so these run sequentially, idea
@@ -221,6 +226,7 @@ export async function updateIdea(
     description: formData.get("description") ?? "",
     format: formData.get("format") || undefined,
     tags: formData.get("tags") ?? "",
+    gameId: formData.get("gameId") ?? "",
     releaseDate: formData.get("releaseDate") ?? "",
     releaseTime: formData.get("releaseTime") ?? "",
   });
@@ -232,6 +238,7 @@ export async function updateIdea(
   }
 
   const { release, ...fields } = parsed.data;
+  fields.gameId = await resolveGameId(fields.gameId);
 
   const db = getDb();
   const [existing] = await db

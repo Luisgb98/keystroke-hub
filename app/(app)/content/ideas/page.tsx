@@ -13,6 +13,7 @@ import {
   getIdeas,
   type IdeaFilters as IdeaFilterInput,
 } from "@/lib/data/ideas";
+import { getGames } from "@/lib/data/games";
 import { getIdeaIdsWithScripts } from "@/lib/data/scripts";
 import {
   getScheduledEventsForIdeas,
@@ -22,7 +23,7 @@ import {
   getProjectSummariesForIdeas,
   type LinkedProjectSummary,
 } from "@/lib/data/projects";
-import type { Idea } from "@/lib/db/schema";
+import type { Game, Idea } from "@/lib/db/schema";
 
 export const metadata: Metadata = {
   title: "Ideas",
@@ -34,6 +35,7 @@ interface IdeasPageProps {
     format?: string;
     status?: string;
     tag?: string;
+    game?: string;
   }>;
 }
 
@@ -44,6 +46,7 @@ export default async function IdeasPage({ searchParams }: IdeasPageProps) {
     format: isIdeaFormat(params.format) ? params.format : undefined,
     status: isIdeaStatus(params.status) ? params.status : undefined,
     tag: params.tag?.trim() || undefined,
+    game: params.game?.trim() || undefined,
   };
 
   // The ideas list should render even if the database is unreachable — same
@@ -51,14 +54,18 @@ export default async function IdeasPage({ searchParams }: IdeasPageProps) {
   // has no DATABASE_URL, and this route is linked from primary navigation.
   let ideas: Idea[] = [];
   let availableTags: string[] = [];
+  let games: Game[] = [];
   let ideaIdsWithScripts = new Set<string>();
   let scheduledEventsByIdea = new Map<string, ScheduledEventSummary[]>();
   let projectByIdea = new Map<string, LinkedProjectSummary>();
   try {
-    [ideas, availableTags, ideaIdsWithScripts] = await Promise.all([
+    [ideas, availableTags, ideaIdsWithScripts, games] = await Promise.all([
       getIdeas(filters),
       getDistinctIdeaTags(),
       getIdeaIdsWithScripts(),
+      // The whole library — it feeds both the game filter chips and every
+      // card's edit dialog, so it's one query rather than a join per idea.
+      getGames(),
     ]);
     const ideaIds = ideas.map((idea) => idea.id);
     [scheduledEventsByIdea, projectByIdea] = await Promise.all([
@@ -69,8 +76,9 @@ export default async function IdeasPage({ searchParams }: IdeasPageProps) {
     console.error("Failed to load ideas:", error);
   }
 
+  const gamesById = new Map(games.map((game) => [game.id, game]));
   const hasActiveFilters = Boolean(
-    filters.q || filters.format || filters.status || filters.tag
+    filters.q || filters.format || filters.status || filters.tag || filters.game
   );
 
   return (
@@ -86,7 +94,7 @@ export default async function IdeasPage({ searchParams }: IdeasPageProps) {
               <Columns3 aria-hidden className="size-4" />
               Board
             </Link>
-            <IdeaCapture />
+            <IdeaCapture games={games} />
           </div>
         </div>
         <p className="text-small text-muted-foreground">
@@ -94,7 +102,11 @@ export default async function IdeasPage({ searchParams }: IdeasPageProps) {
         </p>
       </div>
 
-      <IdeaFilters value={params} availableTags={availableTags} />
+      <IdeaFilters
+        value={params}
+        availableTags={availableTags}
+        availableGames={games}
+      />
 
       {ideas.length === 0 ? (
         <IdeaEmptyState hasActiveFilters={hasActiveFilters} />
@@ -107,6 +119,8 @@ export default async function IdeasPage({ searchParams }: IdeasPageProps) {
               hasScript={ideaIdsWithScripts.has(idea.id)}
               scheduledEvents={scheduledEventsByIdea.get(idea.id) ?? []}
               project={projectByIdea.get(idea.id)}
+              game={idea.gameId ? gamesById.get(idea.gameId) : undefined}
+              games={games}
             />
           ))}
         </div>

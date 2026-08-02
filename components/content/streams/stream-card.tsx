@@ -4,6 +4,7 @@ import { CheckCircle2, NotebookText, Radio } from "lucide-react";
 import type { StreamSummary } from "@/lib/data/streams";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { GameChip } from "@/components/content/games/game-chip";
 import { formatInAppZone } from "@/lib/time";
 
 interface StreamCardProps {
@@ -31,6 +32,9 @@ export function StreamCard({ stream }: StreamCardProps) {
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <h3 className="font-heading text-h3 font-semibold">{stream.title}</h3>
+          {/* Not a link: the whole card is already one, and nesting anchors is
+              invalid HTML (#105). */}
+          {stream.game ? <GameChip game={stream.game} /> : null}
           <div className="flex flex-wrap items-center gap-1.5">
             {stream.checklistTotal > 0 ? (
               <Badge variant="secondary" className="gap-1 font-mono">

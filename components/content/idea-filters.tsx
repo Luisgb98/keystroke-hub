@@ -6,6 +6,7 @@ import { Search, X } from "lucide-react";
 
 import { IDEA_FORMATS, IDEA_FORMAT_LABEL } from "@/lib/content/idea-format";
 import { IDEA_STATUSES, IDEA_STATUS_LABEL } from "@/lib/content/idea-status";
+import type { GameOption } from "@/lib/data/games";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,11 +19,15 @@ export interface IdeaFiltersValue {
   format?: string;
   status?: string;
   tag?: string;
+  /** A game's id — composes with every filter above (#105). */
+  game?: string;
 }
 
 interface IdeaFiltersProps {
   value: IdeaFiltersValue;
   availableTags: string[];
+  /** The whole library — one chip per game, same shape as the tag row. */
+  availableGames?: GameOption[];
 }
 
 function FilterChip({
@@ -57,7 +62,11 @@ function FilterChip({
  * survive a reload. Search debounces locally before writing to the URL;
  * chip toggles (format/status/tag) navigate immediately.
  */
-export function IdeaFilters({ value, availableTags }: IdeaFiltersProps) {
+export function IdeaFilters({
+  value,
+  availableTags,
+  availableGames = [],
+}: IdeaFiltersProps) {
   const router = useRouter();
   // Local, optimistically-updated copy of every filter — not just `q` — so
   // rapid successive clicks (e.g. a format chip immediately followed by a
@@ -78,7 +87,8 @@ export function IdeaFilters({ value, availableTags }: IdeaFiltersProps) {
     value.q !== prevValue.q ||
     value.format !== prevValue.format ||
     value.status !== prevValue.status ||
-    value.tag !== prevValue.tag
+    value.tag !== prevValue.tag ||
+    value.game !== prevValue.game
   ) {
     setPrevValue(value);
     setFilters(value);
@@ -102,11 +112,12 @@ export function IdeaFilters({ value, availableTags }: IdeaFiltersProps) {
     if (next.format) params.set("format", next.format);
     if (next.status) params.set("status", next.status);
     if (next.tag) params.set("tag", next.tag);
+    if (next.game) params.set("game", next.game);
     const qs = params.toString();
     router.replace(qs ? `${IDEAS_PATH}?${qs}` : IDEAS_PATH);
   }
 
-  function toggle(key: "format" | "status" | "tag", option: string) {
+  function toggle(key: "format" | "status" | "tag" | "game", option: string) {
     navigate({
       ...filters,
       [key]: filters[key] === option ? undefined : option,
@@ -120,7 +131,7 @@ export function IdeaFilters({ value, availableTags }: IdeaFiltersProps) {
   }
 
   const hasActiveFilters = Boolean(
-    filters.q || filters.format || filters.status || filters.tag
+    filters.q || filters.format || filters.status || filters.tag || filters.game
   );
 
   return (
@@ -169,6 +180,23 @@ export function IdeaFilters({ value, availableTags }: IdeaFiltersProps) {
           />
         ))}
       </div>
+
+      {availableGames.length > 0 ? (
+        <div
+          role="group"
+          aria-label="Filter by game"
+          className="flex gap-2 overflow-x-auto pb-1"
+        >
+          {availableGames.map((game) => (
+            <FilterChip
+              key={game.id}
+              label={game.name}
+              selected={filters.game === game.id}
+              onClick={() => toggle("game", game.id)}
+            />
+          ))}
+        </div>
+      ) : null}
 
       {availableTags.length > 0 ? (
         <div

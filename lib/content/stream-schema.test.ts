@@ -25,6 +25,7 @@ describe("streamCaptureSchema", () => {
       expect(result.data).toEqual({
         title: "Boss rush stream",
         notes: null,
+        gameId: null,
         schedule: null,
       });
     }

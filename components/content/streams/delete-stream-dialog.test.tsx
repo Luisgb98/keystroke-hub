@@ -25,6 +25,7 @@ function makeStream(overrides: Partial<Stream> = {}): Stream {
     title: "Boss rush stream",
     notes: null,
     retroNotes: null,
+    gameId: null,
     eventId: null,
     eventTrack: null,
     createdAt: new Date(),

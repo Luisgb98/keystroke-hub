@@ -5,7 +5,9 @@ import { Plus, Radio } from "lucide-react";
 import { toast } from "sonner";
 
 import { createStream } from "@/lib/content/stream-actions";
+import type { GameOption } from "@/lib/data/games";
 import { Button } from "@/components/ui/button";
+import { GamePicker } from "@/components/content/games/game-picker";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +26,7 @@ import { TimePicker } from "@/components/ui/time-picker";
 const EMPTY_VALUES = {
   title: "",
   notes: "",
+  gameId: null as string | null,
   planned: false,
   allDay: false,
   date: "",
@@ -38,7 +41,12 @@ const EMPTY_VALUES = {
  * fixed 2h duration rather than a second end-time picker (see
  * docs/content-streams.md).
  */
-export function StreamCreate() {
+interface StreamCreateProps {
+  /** The whole game library, for the picker (#105). */
+  games?: GameOption[];
+}
+
+export function StreamCreate({ games = [] }: StreamCreateProps) {
   const titleId = useId();
   const [open, setOpen] = useState(false);
   const [values, setValues] = useState(EMPTY_VALUES);
@@ -121,6 +129,19 @@ export function StreamCreate() {
                   {fieldErrors.title[0]}
                 </p>
               ) : null}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              {/* See docs/content-games.md — which game the session is about,
+                  picked from the library rather than typed into the topic. */}
+              <Label>Game</Label>
+              <GamePicker
+                games={games}
+                name="gameId"
+                label="Game"
+                value={values.gameId}
+                onChange={(gameId) => setValues((v) => ({ ...v, gameId }))}
+              />
             </div>
 
             <div className="flex flex-col gap-2">

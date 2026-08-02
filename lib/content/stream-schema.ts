@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import { parseAppDate, parseAppDateTime } from "@/lib/time";
 
+import { gameIdFieldSchema } from "./game-schema";
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -18,6 +20,8 @@ export interface StreamScheduleInput {
 export interface StreamCaptureInput {
   title: string;
   notes: string | null;
+  /** The library entry this stream is about (#105); null for "no game". */
+  gameId: string | null;
   /** `null` means the stream is created unscheduled. */
   schedule: StreamScheduleInput | null;
 }
@@ -33,6 +37,9 @@ const rawStreamCaptureSchema = z.object({
     .trim()
     .max(4000, "Keep notes under 4000 characters")
     .optional(),
+  // See `gameIdFieldSchema` — an id or "", never validated as a real row here
+  // (`resolveGameId` does that at write time).
+  gameId: gameIdFieldSchema,
   // Whether to create a content-track event for this stream at all — the
   // date/time fields below only matter when this is true.
   planned: z.boolean(),
@@ -56,6 +63,7 @@ export const streamCaptureSchema = rawStreamCaptureSchema.transform(
       const result: StreamCaptureInput = {
         title: data.title,
         notes,
+        gameId: data.gameId,
         schedule: null,
       };
       return result;
@@ -102,6 +110,7 @@ export const streamCaptureSchema = rawStreamCaptureSchema.transform(
     const result: StreamCaptureInput = {
       title: data.title,
       notes,
+      gameId: data.gameId,
       schedule: { allDay, startsAt, endsAt },
     };
     return result;
@@ -131,6 +140,7 @@ export const streamDetailsSchema = z.object({
     .trim()
     .max(4000, "Keep notes under 4000 characters")
     .optional(),
+  gameId: gameIdFieldSchema,
 });
 
 const MAX_CHECKLIST_LABEL_LENGTH = 200;

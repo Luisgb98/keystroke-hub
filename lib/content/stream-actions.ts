@@ -14,6 +14,7 @@ import {
   streamChecklistTemplateItems,
   streams,
 } from "@/lib/db/schema";
+import { resolveGameId } from "@/lib/data/games";
 import {
   getTemplateItems,
   searchAttachableEvents as searchAttachableEventsQuery,
@@ -63,6 +64,7 @@ export async function createStream(
   const parsed = streamCaptureSchema.safeParse({
     title: formData.get("title") ?? "",
     notes: formData.get("notes") ?? "",
+    gameId: formData.get("gameId") ?? "",
     planned: formData.get("planned") === "true",
     allDay: formData.get("allDay") === "true",
     date: formData.get("date") || undefined,
@@ -77,6 +79,9 @@ export async function createStream(
 
   const db = getDb();
   const { schedule } = parsed.data;
+  // A game the client named but that no longer exists degrades to "no game"
+  // rather than failing the capture on a foreign-key violation (#105).
+  const gameId = await resolveGameId(parsed.data.gameId);
 
   if (schedule) {
     const eventId = randomUUID();
@@ -84,6 +89,7 @@ export async function createStream(
       eventId,
       title: parsed.data.title,
       notes: parsed.data.notes,
+      gameId,
       leading: db.insert(events).values({
         id: eventId,
         track: "content" as const,
@@ -105,6 +111,7 @@ export async function createStream(
     id: streamId,
     title: parsed.data.title,
     notes: parsed.data.notes,
+    gameId,
     eventId: null,
     eventTrack: null,
   });
@@ -133,6 +140,8 @@ export interface StreamDetailsInput {
   title: string;
   notes: string;
   retroNotes: string;
+  /** The picked library entry, or "" for no game (#105). */
+  gameId: string;
 }
 
 /** Empty text clears the column rather than storing `""` — a blank note is "no note". */
@@ -173,6 +182,7 @@ export async function updateStreamDetails(
       title: parsed.data.title,
       notes: orNull(parsed.data.notes),
       retroNotes: orNull(parsed.data.retroNotes),
+      gameId: await resolveGameId(parsed.data.gameId),
     })
     .where(eq(streams.id, parsed.data.id))
     .returning({ id: streams.id });

@@ -193,6 +193,7 @@ describe("updateStreamDetails", () => {
     title: "Renamed",
     notes: "",
     retroNotes: "",
+    gameId: "",
   };
 
   it("verifies the session before writing", async () => {
@@ -214,6 +215,7 @@ describe("updateStreamDetails", () => {
       title: "Renamed",
       notes: "Check the mic",
       retroNotes: "Chat was active",
+      gameId: null,
     });
     expect(revalidatePath).toHaveBeenCalledWith("/content/streams/stream-1");
   });
@@ -224,6 +226,7 @@ describe("updateStreamDetails", () => {
       title: "Renamed",
       notes: null,
       retroNotes: null,
+      gameId: null,
     });
   });
 

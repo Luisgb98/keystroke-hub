@@ -2,8 +2,10 @@ import "server-only";
 import { and, asc, desc, eq, ilike, inArray, notInArray } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
+import type { GameOption } from "@/lib/data/games";
 import {
   events,
+  games,
   streamChecklistItems,
   streamChecklistTemplateItems,
   streams,
@@ -26,6 +28,8 @@ export interface StreamSummary {
   retroNotes: string | null;
   createdAt: Date;
   event: StreamEventSummary | null;
+  /** The game this stream is about, if tagged (#105). */
+  game: GameOption | null;
   checklistDone: number;
   checklistTotal: number;
 }
@@ -104,6 +108,15 @@ interface JoinedEventRow {
   eventAllDay: boolean | null;
 }
 
+/** Same shape as `toEventSummary` below, for the left-joined game (#105). */
+function toGameSummary(row: {
+  gameId: string | null;
+  gameName: string | null;
+}): GameOption | null {
+  if (!row.gameId || !row.gameName) return null;
+  return { id: row.gameId, name: row.gameName };
+}
+
 /** `eventId` (from `streams`, not the joined table) decides presence — the joined columns are only ever null together with it. */
 function toEventSummary(row: JoinedEventRow): StreamEventSummary | null {
   if (!row.eventId) return null;
@@ -148,9 +161,11 @@ export async function getStreamsOverview(
       eventStartsAt: events.startsAt,
       eventEndsAt: events.endsAt,
       eventAllDay: events.allDay,
+      gameName: games.name,
     })
     .from(streams)
-    .leftJoin(events, eq(streams.eventId, events.id));
+    .leftJoin(events, eq(streams.eventId, events.id))
+    .leftJoin(games, eq(streams.gameId, games.id));
 
   const progressByStream = await getChecklistProgressForStreams(
     rows.map((row) => row.stream.id)
@@ -167,6 +182,7 @@ export async function getStreamsOverview(
       retroNotes: row.stream.retroNotes,
       createdAt: row.stream.createdAt,
       event: toEventSummary({ eventId: row.stream.eventId, ...row }),
+      game: toGameSummary({ gameId: row.stream.gameId, ...row }),
       checklistDone: progress.done,
       checklistTotal: progress.total,
     };
@@ -178,6 +194,7 @@ export async function getStreamsOverview(
 export interface StreamWithChecklist {
   stream: Stream;
   event: StreamEventSummary | null;
+  game: GameOption | null;
   checklist: StreamChecklistItem[];
 }
 
@@ -192,9 +209,11 @@ export async function getStreamWithChecklist(
       eventStartsAt: events.startsAt,
       eventEndsAt: events.endsAt,
       eventAllDay: events.allDay,
+      gameName: games.name,
     })
     .from(streams)
     .leftJoin(events, eq(streams.eventId, events.id))
+    .leftJoin(games, eq(streams.gameId, games.id))
     .where(eq(streams.id, id));
 
   if (!row) return null;
@@ -206,8 +225,9 @@ export async function getStreamWithChecklist(
     .orderBy(asc(streamChecklistItems.position));
 
   const event = toEventSummary({ eventId: row.stream.eventId, ...row });
+  const game = toGameSummary({ gameId: row.stream.gameId, ...row });
 
-  return { stream: row.stream, event, checklist };
+  return { stream: row.stream, event, game, checklist };
 }
 
 export async function getTemplateItems(): Promise<

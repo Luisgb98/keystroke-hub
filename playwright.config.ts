@@ -84,7 +84,7 @@ export default defineConfig({
       // project would race against the chromium project's runs against the same
       // shared DB.
       testIgnore:
-        /(calendar|calendar-sync|event-management|drag-reschedule|agenda|board|scripts|content-links|streams|publish-checklist|journal|weekly-summary|weekly-assessment|projects|improvements|meetings|github-links|dashboard|stream-track|mobile|command-palette|inbox|ideas|idea-detail|timezone)\.spec\.ts$/,
+        /(calendar|calendar-sync|event-management|drag-reschedule|agenda|board|scripts|content-links|streams|publish-checklist|journal|weekly-summary|weekly-assessment|projects|improvements|meetings|github-links|dashboard|stream-track|mobile|command-palette|inbox|ideas|idea-detail|games|timezone)\.spec\.ts$/,
     },
   ],
   webServer: [

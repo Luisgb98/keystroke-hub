@@ -25,6 +25,8 @@ export interface IdeaFilters {
   format?: IdeaFormat;
   status?: IdeaStatus;
   tag?: string;
+  /** A game's id — "show me everything I've made about this game" (#105). */
+  game?: string;
 }
 
 /**
@@ -40,6 +42,7 @@ export function buildIdeaFilterCondition(
   if (filters.format) conditions.push(eq(ideas.format, filters.format));
   if (filters.status) conditions.push(eq(ideas.status, filters.status));
   if (filters.tag) conditions.push(arrayContains(ideas.tags, [filters.tag]));
+  if (filters.game) conditions.push(eq(ideas.gameId, filters.game));
   return conditions.length > 0 ? and(...conditions) : undefined;
 }
 

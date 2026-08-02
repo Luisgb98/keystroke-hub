@@ -7,8 +7,10 @@ import {
   updateStreamDetails,
   type StreamActionState,
 } from "@/lib/content/stream-actions";
+import type { GameOption } from "@/lib/data/games";
 import type { Stream } from "@/lib/db/schema";
 import { Button } from "@/components/ui/button";
+import { GamePicker } from "@/components/content/games/game-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,6 +19,8 @@ interface StreamDetailsFormProps {
   stream: Stream;
   /** True once the linked event's start time has passed — promotes the retro section (see docs/content-streams.md). */
   isPast: boolean;
+  /** The whole game library, for the picker (#105). */
+  games?: GameOption[];
   /**
    * The sections that sit between the prep notes and the retro — "Scheduled"
    * and the pre-stream checklist. They're passed as children rather than left as
@@ -30,6 +34,7 @@ interface DetailValues {
   title: string;
   notes: string;
   retroNotes: string;
+  gameId: string | null;
 }
 
 function savedValuesOf(stream: Stream): DetailValues {
@@ -37,12 +42,16 @@ function savedValuesOf(stream: Stream): DetailValues {
     title: stream.title,
     notes: stream.notes ?? "",
     retroNotes: stream.retroNotes ?? "",
+    gameId: stream.gameId,
   };
 }
 
 function sameValues(a: DetailValues, b: DetailValues): boolean {
   return (
-    a.title === b.title && a.notes === b.notes && a.retroNotes === b.retroNotes
+    a.title === b.title &&
+    a.notes === b.notes &&
+    a.retroNotes === b.retroNotes &&
+    a.gameId === b.gameId
   );
 }
 
@@ -58,6 +67,7 @@ function sameValues(a: DetailValues, b: DetailValues): boolean {
 export function StreamDetailsForm({
   stream,
   isPast,
+  games = [],
   children,
 }: StreamDetailsFormProps) {
   const titleId = useId();
@@ -90,7 +100,11 @@ export function StreamDetailsForm({
     if (!dirty) return;
     const submitted = values;
     startTransition(async () => {
-      const result = await updateStreamDetails({ id: stream.id, ...submitted });
+      const result = await updateStreamDetails({
+        id: stream.id,
+        ...submitted,
+        gameId: submitted.gameId ?? "",
+      });
       setState(result);
       if (!result.success) {
         if (result.error && !result.fieldErrors) toast.error(result.error);
@@ -131,6 +145,16 @@ export function StreamDetailsForm({
               {fieldErrors.title[0]}
             </p>
           ) : null}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label>Game</Label>
+          <GamePicker
+            games={games}
+            label="Game"
+            value={values.gameId}
+            onChange={(gameId) => setValues((v) => ({ ...v, gameId }))}
+          />
         </div>
 
         <div className="flex flex-col gap-2">

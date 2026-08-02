@@ -3,9 +3,11 @@ import { Briefcase, CalendarClock } from "lucide-react";
 
 import { PUBLISHING_TAG_STANDARD } from "@/lib/content/idea-schema";
 import type { Idea, Script } from "@/lib/db/schema";
+import type { GameOption } from "@/lib/data/games";
 import type { ScheduledEventSummary } from "@/lib/data/idea-event-links";
 import type { LinkedProjectSummary } from "@/lib/data/projects";
 import { Badge } from "@/components/ui/badge";
+import { GameChip } from "@/components/content/games/game-chip";
 
 import { IdeaCopyActions } from "../idea-copy-actions";
 import { IdeaScheduledEvents } from "../idea-scheduled-events";
@@ -19,6 +21,10 @@ interface IdeaDetailProps {
   script: Script | null;
   scheduledEvents: ScheduledEventSummary[];
   project?: LinkedProjectSummary;
+  /** The game this idea is about, if tagged (#105). */
+  game?: GameOption;
+  /** The whole game library, for the edit dialog's picker (#105). */
+  games?: GameOption[];
 }
 
 /**
@@ -35,6 +41,8 @@ export function IdeaDetail({
   script,
   scheduledEvents,
   project,
+  game,
+  games = [],
 }: IdeaDetailProps) {
   const hasScript = Boolean(script && script.content.trim() !== "");
   // The release is the linked event the idea points at — the source of truth
@@ -51,6 +59,7 @@ export function IdeaDetail({
         releaseStartsAt={releaseEvent?.startsAt ?? null}
         hasScript={hasScript}
         hasScheduledEvents={scheduledEvents.length > 0}
+        games={games}
       />
 
       <div className="flex flex-col gap-4">
@@ -62,6 +71,7 @@ export function IdeaDetail({
             status={idea.status}
             size="default"
           />
+          {game ? <GameChip game={game} href className="text-small" /> : null}
           {releaseEvent ? (
             <span className="flex items-center gap-1.5 text-small text-muted-foreground">
               <CalendarClock aria-hidden className="size-4 shrink-0" />
