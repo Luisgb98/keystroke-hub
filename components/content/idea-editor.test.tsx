@@ -92,7 +92,9 @@ describe("IdeaEditor — create mode", () => {
 
     await user.type(screen.getByLabelText("Title"), "Glitch tutorial");
     await user.type(screen.getByLabelText("Script (optional)"), "# Intro");
-    await user.type(screen.getByLabelText("Release date"), "2026-08-01");
+    // Typed from the same helper it's asserted against: a literal date here
+    // only agrees with `appTodayParam()` on the one day it was written.
+    await user.type(screen.getByLabelText("Release date"), appTodayParam());
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(createIdea).toHaveBeenCalledTimes(1));
