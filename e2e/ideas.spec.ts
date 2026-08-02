@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 import { formatDateParam } from "../lib/calendar/range";
-import { clearTestIdeas, seedTestIdea } from "./support/ideas-db";
+import {
+  clearTestIdeas,
+  getTestIdeaStatus,
+  seedTestIdea,
+} from "./support/ideas-db";
 
 // The ideas page queries the database on every render, so — like the
 // calendar and health checks — it can only be exercised where DATABASE_URL
@@ -104,6 +108,11 @@ test.describe("idea capture", () => {
       "Scripted"
     );
 
+    // That assertion is satisfied optimistically (#102), so it proves the
+    // control responded, not that the row moved. Gate the reload on the write.
+    await expect
+      .poll(() => getTestIdeaStatus(title), { timeout: 10_000 })
+      .toBe("scripted");
     await page.reload();
     await expect(
       page

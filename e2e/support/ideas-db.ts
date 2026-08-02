@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
-import { like } from "drizzle-orm";
+import { eq, like } from "drizzle-orm";
 
 import { events, ideas } from "../../lib/db/schema";
 import { releaseEventTitle } from "../../lib/content/release";
@@ -27,6 +27,26 @@ export async function clearTestIdeas(prefix: string): Promise<void> {
     .delete(events)
     .where(like(events.title, `${releaseEventTitle(prefix)}%`));
   await db.delete(ideas).where(like(ideas.title, `${prefix}%`));
+}
+
+/**
+ * Reads back an idea's persisted status by exact title — mirrors
+ * `getTestEventTimes` in `events-db.ts`.
+ *
+ * Needed because both status surfaces are optimistic (`PipelineBoard`,
+ * `IdeaStatusSelect`): the UI shows the new stage the instant it's picked, so a
+ * spec that reloads to prove persistence would otherwise be racing the write it
+ * never waited for.
+ */
+export async function getTestIdeaStatus(
+  title: string
+): Promise<string | undefined> {
+  const db = getTestDb();
+  const [row] = await db
+    .select({ status: ideas.status })
+    .from(ideas)
+    .where(eq(ideas.title, title));
+  return row?.status;
 }
 
 /** Inserts a single idea directly, bypassing the capture UI — for specs that need pre-existing rows (filtering, status change, delete). */
