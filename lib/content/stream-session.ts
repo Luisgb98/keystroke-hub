@@ -22,11 +22,14 @@ export async function insertStreamSession({
   eventId,
   title,
   notes = null,
+  gameId = null,
   leading,
 }: {
   eventId: string;
   title: string;
   notes?: string | null;
+  /** Already resolved against the library by the caller (see `resolveGameId`). */
+  gameId?: string | null;
   leading?: BatchItem<"pg">;
 }): Promise<string> {
   const db = getDb();
@@ -37,6 +40,7 @@ export async function insertStreamSession({
     id: streamId,
     title,
     notes,
+    gameId,
     eventId,
     eventTrack: "content" as const,
   });

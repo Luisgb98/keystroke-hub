@@ -5,6 +5,7 @@ import { StreamChecklist } from "@/components/content/streams/stream-checklist";
 import { StreamDetailHeader } from "@/components/content/streams/stream-detail-header";
 import { StreamDetailsForm } from "@/components/content/streams/stream-details-form";
 import { StreamEventSection } from "@/components/content/streams/stream-event-section";
+import { getGames } from "@/lib/data/games";
 import { getStreamWithChecklist } from "@/lib/data/streams";
 
 export const metadata: Metadata = {
@@ -23,6 +24,7 @@ export default async function StreamDetailPage({
   if (!result) notFound();
 
   const { stream, event, checklist } = result;
+  const games = await getGames();
   // "Past" is after the event's start time, not end-of-day (see
   // docs/content-streams.md) — retro notes are always editable but only
   // visually promoted once the stream has actually happened.
@@ -39,7 +41,7 @@ export default async function StreamDetailPage({
         owns the retro section too and takes the sections in between as children
         rather than as siblings.
       */}
-      <StreamDetailsForm stream={stream} isPast={isPast}>
+      <StreamDetailsForm stream={stream} isPast={isPast} games={games}>
         <StreamEventSection streamId={stream.id} event={event} />
 
         <section className="flex flex-col gap-2">

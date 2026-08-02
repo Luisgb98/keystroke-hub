@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { parseAppDateTime } from "@/lib/time";
 
+import { gameIdFieldSchema } from "./game-schema";
 import {
   IDEA_FORMATS,
   INITIAL_IDEA_FORMAT,
@@ -41,6 +42,8 @@ export interface IdeaFields {
   description: string | null;
   format: IdeaFormat;
   tags: string[];
+  /** The library entry this idea is about (#105); null for "no game". */
+  gameId: string | null;
   release: ReleaseInput | null;
 }
 
@@ -128,6 +131,10 @@ const sharedIdeaFields = {
   // Raw comma-separated tag input from a single text field; normalized by the
   // transform below rather than validated shape-first.
   tags: z.string().optional(),
+  // The picked game's id, or "" for none. Deliberately not `z.uuid()`: a stale
+  // id must clear the tag rather than fail the save, which `resolveGameId`
+  // (lib/data/games.ts) handles at write time (see docs/content-games.md).
+  gameId: gameIdFieldSchema,
   releaseDate: z
     .string()
     .regex(DATE_RE, "Enter a valid release date")
@@ -145,6 +152,7 @@ function normalizeSharedFields(data: {
   description?: string;
   format?: string;
   tags?: string;
+  gameId: string | null;
   releaseDate?: string;
   releaseTime?: string;
 }): IdeaFields {
@@ -159,6 +167,7 @@ function normalizeSharedFields(data: {
     description,
     format,
     tags: normalizeTags(data.tags),
+    gameId: data.gameId,
     release: buildReleaseSpan(
       data.releaseDate && data.releaseDate.length > 0
         ? data.releaseDate

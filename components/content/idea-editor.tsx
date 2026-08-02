@@ -31,8 +31,10 @@ import {
   formatScriptSize,
   scriptOverflowsCollapsed,
 } from "@/lib/content/script-stats";
+import type { GameOption } from "@/lib/data/games";
 import type { Idea } from "@/lib/db/schema";
 import { cn } from "@/lib/utils";
+import { GamePicker } from "@/components/content/games/game-picker";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -57,6 +59,8 @@ interface IdeaEditorProps {
   idea?: Idea;
   /** The idea's current release event start, if scheduled — prefills the date/time in edit mode. */
   releaseStartsAt?: Date | null;
+  /** The whole game library, loaded server-side, for the picker (#105). */
+  games?: GameOption[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -75,6 +79,7 @@ interface EditorValues {
   description: string;
   format: IdeaFormat;
   tags: string;
+  gameId: string | null;
   releaseDate: string;
   releaseTime: string;
   script: string;
@@ -91,6 +96,7 @@ function initialValues(
       description: idea.description ?? "",
       format: idea.format,
       tags: idea.tags.join(", "),
+      gameId: idea.gameId,
       releaseDate: releaseStartsAt ? dateParam(releaseStartsAt) : "",
       releaseTime: releaseStartsAt
         ? timeParam(releaseStartsAt)
@@ -103,6 +109,7 @@ function initialValues(
     description: "",
     format: INITIAL_IDEA_FORMAT,
     tags: "",
+    gameId: null,
     releaseDate: "",
     releaseTime: DEFAULT_RELEASE_TIME,
     script: "",
@@ -120,6 +127,7 @@ export function IdeaEditor({
   mode,
   idea,
   releaseStartsAt,
+  games = [],
   open,
   onOpenChange,
 }: IdeaEditorProps) {
@@ -287,6 +295,23 @@ export function IdeaEditor({
                 {fieldErrors.format[0]}
               </p>
             ) : null}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            {/* Its own field, not one of the tags below: tags describe the
+                video for publishing, the game says what the work is about
+                (#105, docs/content-games.md). */}
+            {/* No `htmlFor`: the picker's trigger is a button carrying its own
+                `aria-label`, so the visible label is decoration, not the
+                accessible name. */}
+            <Label>Game</Label>
+            <GamePicker
+              games={games}
+              name="gameId"
+              label="Game"
+              value={values.gameId}
+              onChange={(gameId) => setValues((v) => ({ ...v, gameId }))}
+            />
           </div>
 
           <div className="flex flex-col gap-2">

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
 
 import { IDEA_FORMAT_LABEL } from "@/lib/content/idea-format";
+import type { GameOption } from "@/lib/data/games";
 import type { Idea } from "@/lib/db/schema";
 import { Button } from "@/components/ui/button";
 
@@ -20,6 +21,8 @@ interface IdeaDetailHeaderProps {
   hasScript: boolean;
   /** Whether the idea is linked to any calendar events — drives the delete dialog's warning. */
   hasScheduledEvents: boolean;
+  /** The whole game library, for the edit dialog's picker (#105). */
+  games?: GameOption[];
 }
 
 /**
@@ -33,6 +36,7 @@ export function IdeaDetailHeader({
   releaseStartsAt,
   hasScript,
   hasScheduledEvents,
+  games = [],
 }: IdeaDetailHeaderProps) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
@@ -70,6 +74,7 @@ export function IdeaDetailHeader({
         mode="edit"
         idea={idea}
         releaseStartsAt={releaseStartsAt}
+        games={games}
         open={editOpen}
         onOpenChange={setEditOpen}
       />
