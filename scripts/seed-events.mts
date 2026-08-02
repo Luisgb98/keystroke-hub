@@ -6,6 +6,12 @@ import { config } from "dotenv";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 
+import {
+  appAddDays,
+  formatAppDateParam,
+  parseAppDateTime,
+} from "../lib/time/index.ts";
+
 // Local dev setups vary between `.env` and `.env.local` (see .env.example);
 // load both, without overriding whichever is already set.
 config({ path: ".env.local" });
@@ -24,16 +30,19 @@ const db = drizzle(neon(connectionString));
 
 const { events } = await import("../lib/db/schema.ts");
 
+// Fixtures are anchored to the app timezone, not the shell's: seeding from a
+// UTC shell (or CI) must produce the same wall-clock times the calendar will
+// render, or the fixtures land an offset away from where they read (#95).
 function at(daysFromToday: number, hour: number, minute = 0): Date {
-  const date = new Date();
-  date.setDate(date.getDate() + daysFromToday);
-  date.setHours(hour, minute, 0, 0);
-  return date;
+  const day = formatAppDateParam(appAddDays(new Date(), daysFromToday));
+  const time = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  const parsed = parseAppDateTime(day, time);
+  if (!parsed) throw new Error(`unseedable fixture time: ${day} ${time}`);
+  return parsed;
 }
 
 function dateOnly(daysFromToday: number): Date {
-  const date = at(daysFromToday, 0);
-  return date;
+  return at(daysFromToday, 0);
 }
 
 const fixtures = [

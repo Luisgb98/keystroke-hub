@@ -5,7 +5,7 @@ import { StreamChecklist } from "@/components/content/streams/stream-checklist";
 import { StreamDetailHeader } from "@/components/content/streams/stream-detail-header";
 import { StreamDetailsForm } from "@/components/content/streams/stream-details-form";
 import { StreamEventSection } from "@/components/content/streams/stream-event-section";
-import { StreamRetroNotes } from "@/components/content/streams/stream-retro-notes";
+import { getGames } from "@/lib/data/games";
 import { getStreamWithChecklist } from "@/lib/data/streams";
 
 export const metadata: Metadata = {
@@ -24,6 +24,7 @@ export default async function StreamDetailPage({
   if (!result) notFound();
 
   const { stream, event, checklist } = result;
+  const games = await getGames();
   // "Past" is after the event's start time, not end-of-day (see
   // docs/content-streams.md) — retro notes are always editable but only
   // visually promoted once the stream has actually happened.
@@ -35,25 +36,19 @@ export default async function StreamDetailPage({
     <div className="flex flex-1 flex-col gap-6 px-4 py-6 sm:mx-auto sm:w-full sm:max-w-2xl sm:px-10 sm:py-8">
       <StreamDetailHeader stream={stream} />
 
-      <StreamDetailsForm stream={stream} />
+      {/*
+        Every text field on this page saves from one button (#102), so the form
+        owns the retro section too and takes the sections in between as children
+        rather than as siblings.
+      */}
+      <StreamDetailsForm stream={stream} isPast={isPast} games={games}>
+        <StreamEventSection streamId={stream.id} event={event} />
 
-      <StreamEventSection streamId={stream.id} event={event} />
-
-      <section className="flex flex-col gap-2">
-        <h2 className="text-small font-semibold">Pre-stream checklist</h2>
-        <StreamChecklist streamId={stream.id} items={checklist} />
-      </section>
-
-      <section
-        className={
-          isPast
-            ? "flex flex-col gap-2 rounded-lg border border-track-content-border bg-track-content/40 p-3"
-            : "flex flex-col gap-2"
-        }
-      >
-        <h2 className="text-small font-semibold">Post-stream notes</h2>
-        <StreamRetroNotes streamId={stream.id} retroNotes={stream.retroNotes} />
-      </section>
+        <section className="flex flex-col gap-2">
+          <h2 className="text-small font-semibold">Pre-stream checklist</h2>
+          <StreamChecklist streamId={stream.id} items={checklist} />
+        </section>
+      </StreamDetailsForm>
     </div>
   );
 }

@@ -8,21 +8,25 @@ import { z } from "zod";
 import { verifySession } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import {
+  eventSyncLinks,
   events,
   streamChecklistItems,
   streamChecklistTemplateItems,
   streams,
 } from "@/lib/db/schema";
+import { resolveGameId } from "@/lib/data/games";
 import {
   getTemplateItems,
   searchAttachableEvents as searchAttachableEventsQuery,
   type AttachableEvent,
 } from "@/lib/data/streams";
+import { pushEventDeleted } from "@/lib/sync/push";
+import { schedulePush } from "@/lib/sync/schedule";
 
+import { insertStreamSession } from "./stream-session";
 import {
   attachEventSchema,
   checklistLabelSchema,
-  retroNotesSchema,
   streamCaptureSchema,
   streamDetailsSchema,
 } from "./stream-schema";
@@ -60,6 +64,7 @@ export async function createStream(
   const parsed = streamCaptureSchema.safeParse({
     title: formData.get("title") ?? "",
     notes: formData.get("notes") ?? "",
+    gameId: formData.get("gameId") ?? "",
     planned: formData.get("planned") === "true",
     allDay: formData.get("allDay") === "true",
     date: formData.get("date") || undefined,
@@ -73,19 +78,43 @@ export async function createStream(
   }
 
   const db = getDb();
+  const { schedule } = parsed.data;
+  // A game the client named but that no longer exists degrades to "no game"
+  // rather than failing the capture on a foreign-key violation (#105).
+  const gameId = await resolveGameId(parsed.data.gameId);
+
+  if (schedule) {
+    const eventId = randomUUID();
+    const streamId = await insertStreamSession({
+      eventId,
+      title: parsed.data.title,
+      notes: parsed.data.notes,
+      gameId,
+      leading: db.insert(events).values({
+        id: eventId,
+        track: "content" as const,
+        title: parsed.data.title,
+        allDay: schedule.allDay,
+        startsAt: schedule.startsAt,
+        endsAt: schedule.endsAt,
+      }),
+    });
+    revalidateStreamPaths(streamId);
+    return { success: true, streamId };
+  }
+
+  // Unscheduled: no event to point at, so the template snapshot is the only
+  // thing batched alongside the stream row.
   const templateItems = await getTemplateItems();
-
   const streamId = randomUUID();
-  const eventId = parsed.data.schedule ? randomUUID() : null;
-
   const streamInsert = db.insert(streams).values({
     id: streamId,
     title: parsed.data.title,
     notes: parsed.data.notes,
-    eventId,
-    eventTrack: eventId ? ("content" as const) : null,
+    gameId,
+    eventId: null,
+    eventTrack: null,
   });
-
   const checklistValues = templateItems.map((item) => ({
     id: randomUUID(),
     streamId,
@@ -93,25 +122,7 @@ export async function createStream(
     position: item.position,
   }));
 
-  if (parsed.data.schedule && eventId) {
-    const eventInsert = db.insert(events).values({
-      id: eventId,
-      track: "content" as const,
-      title: parsed.data.title,
-      allDay: parsed.data.schedule.allDay,
-      startsAt: parsed.data.schedule.startsAt,
-      endsAt: parsed.data.schedule.endsAt,
-    });
-    if (checklistValues.length > 0) {
-      await db.batch([
-        eventInsert,
-        streamInsert,
-        db.insert(streamChecklistItems).values(checklistValues),
-      ]);
-    } else {
-      await db.batch([eventInsert, streamInsert]);
-    }
-  } else if (checklistValues.length > 0) {
+  if (checklistValues.length > 0) {
     await db.batch([
       streamInsert,
       db.insert(streamChecklistItems).values(checklistValues),
@@ -124,18 +135,39 @@ export async function createStream(
   return { success: true, streamId };
 }
 
-/** Title + prep notes are the only fields editable after capture (mirrors `docs/content-ideas.md`'s minimal-edit precedent). */
+export interface StreamDetailsInput {
+  id: string;
+  title: string;
+  notes: string;
+  retroNotes: string;
+  /** The picked library entry, or "" for no game (#105). */
+  gameId: string;
+}
+
+/** Empty text clears the column rather than storing `""` — a blank note is "no note". */
+function orNull(value: string | undefined): string | null {
+  return value && value.length > 0 ? value : null;
+}
+
+/**
+ * Writes every editable field on the stream detail page in one statement.
+ *
+ * The page used to carry two Save buttons — one for topic/prep notes, one for
+ * the retro — which #102 collapsed into a single one. That makes a single
+ * round trip mandatory rather than merely tidy: two sequential writes behind one
+ * button could half-land, and the neon-http driver has no interactive
+ * transaction to wrap them in (see docs/database.md).
+ *
+ * Takes a plain object, not `FormData`: the caller `await`s it inside a
+ * transition instead of going through `useActionState`, so nothing has to be
+ * serialized through a form (see docs/design-system.md).
+ */
 export async function updateStreamDetails(
-  _prevState: StreamActionState | undefined,
-  formData: FormData
+  input: StreamDetailsInput
 ): Promise<StreamActionState> {
   await verifySession();
 
-  const parsed = streamDetailsSchema.safeParse({
-    id: formData.get("id") ?? "",
-    title: formData.get("title") ?? "",
-    notes: formData.get("notes") ?? "",
-  });
+  const parsed = streamDetailsSchema.safeParse(input);
   if (!parsed.success) {
     return {
       error: VALIDATION_ERROR,
@@ -144,13 +176,14 @@ export async function updateStreamDetails(
   }
 
   const db = getDb();
-  const notes =
-    parsed.data.notes && parsed.data.notes.length > 0
-      ? parsed.data.notes
-      : null;
   const updated = await db
     .update(streams)
-    .set({ title: parsed.data.title, notes })
+    .set({
+      title: parsed.data.title,
+      notes: orNull(parsed.data.notes),
+      retroNotes: orNull(parsed.data.retroNotes),
+      gameId: await resolveGameId(parsed.data.gameId),
+    })
     .where(eq(streams.id, parsed.data.id))
     .returning({ id: streams.id });
 
@@ -162,59 +195,59 @@ export async function updateStreamDetails(
   return { success: true, streamId: parsed.data.id };
 }
 
-export interface SaveRetroNotesResult {
-  error?: string;
-}
-
-export async function saveRetroNotes(
-  id: string,
-  retroNotes: string
-): Promise<SaveRetroNotesResult> {
-  await verifySession();
-
-  const parsed = retroNotesSchema.safeParse({ id, retroNotes });
-  if (!parsed.success) {
-    return {
-      error: parsed.error.issues[0]?.message ?? "That note couldn't be saved.",
-    };
-  }
-
-  const db = getDb();
-  const value =
-    parsed.data.retroNotes.length > 0 ? parsed.data.retroNotes : null;
-  const updated = await db
-    .update(streams)
-    .set({ retroNotes: value })
-    .where(eq(streams.id, parsed.data.id))
-    .returning({ id: streams.id });
-
-  if (updated.length === 0) {
-    return { error: "That stream no longer exists." };
-  }
-
-  revalidateStreamPaths(parsed.data.id);
-  return {};
-}
-
 export interface DeleteStreamResult {
   error?: string;
 }
 
-/** Hard delete, no soft-archive — matches #15/#11's precedent. Checklist items cascade; the linked event, if any, is left alone. */
+/**
+ * Hard delete, no soft-archive — matches #15/#11's precedent. Checklist items
+ * cascade.
+ *
+ * The linked calendar event goes with it (issue #104). It used to be left
+ * alone, which was defensible while a stream's block was an ordinary content
+ * chip; now that the block advertises a session in Twitch purple, an orphan
+ * left behind would be a block promising a session that no longer exists. The
+ * two deletes are batched so the block can't outlive the session, and the
+ * Google-side delete is pushed the same way `deleteEvent` pushes it.
+ */
 export async function deleteStream(id: string): Promise<DeleteStreamResult> {
   await verifySession();
 
   const db = getDb();
-  const deleted = await db
-    .delete(streams)
-    .where(eq(streams.id, id))
-    .returning({ id: streams.id });
+  const [stream] = await db
+    .select({ id: streams.id, eventId: streams.eventId })
+    .from(streams)
+    .where(eq(streams.id, id));
 
-  if (deleted.length === 0) {
+  if (!stream) {
     return { error: "That stream no longer exists." };
   }
 
+  const eventId = stream.eventId;
+  // Captured before the delete: `event_sync_links.event_id` auto-nulls via
+  // `ON DELETE SET NULL` the moment the event row is gone (lib/db/schema.ts).
+  const [link] = eventId
+    ? await db
+        .select()
+        .from(eventSyncLinks)
+        .where(eq(eventSyncLinks.eventId, eventId))
+    : [];
+
+  if (eventId) {
+    await db.batch([
+      db.delete(streams).where(eq(streams.id, id)),
+      db.delete(events).where(eq(events.id, eventId)),
+    ]);
+  } else {
+    await db.delete(streams).where(eq(streams.id, id));
+  }
+
   revalidateStreamPaths();
+  if (link) {
+    schedulePush(() =>
+      pushEventDeleted(link.id, link.googleEventId, "content")
+    );
+  }
   return {};
 }
 

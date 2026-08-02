@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useOptimistic, useTransition } from "react";
 import { toast } from "sonner";
 
 import { updateIdeaStatus } from "@/lib/content/actions";
@@ -32,16 +32,31 @@ interface IdeaStatusSelectProps {
  * docs/content-ideas.md), and publishing with unchecked checklist items nudges
  * with a plain toast rather than the board card's chip/dialog, which this
  * surface doesn't own.
+ *
+ * The shown value is optimistic, matching `PipelineBoard`'s handling of this
+ * same mutation. Reading it straight off the `status` prop meant the trigger
+ * kept displaying the *old* status — greyed out, since it disables while
+ * pending — until the revalidated page arrived, which on `/content/ideas`
+ * (two sequential waves of queries) is seconds. "Commits inline" has to look
+ * like it committed. A failed action needs no rollback code: the transition
+ * settling without a revalidated `status` prop reverts the optimistic value on
+ * its own (#102).
  */
 export function IdeaStatusSelect({
   ideaId,
   status,
   size = "sm",
 }: IdeaStatusSelectProps) {
+  const [optimisticStatus, setOptimisticStatus] = useOptimistic(status);
   const [pending, startTransition] = useTransition();
 
   function handleStatusChange(next: string) {
+    // Narrowed rather than cast: the optimistic value has to be a real status,
+    // and `SelectItem` can only ever offer one, so this never rejects in
+    // practice — the server re-validates regardless.
+    if (!isIdeaStatus(next)) return;
     startTransition(async () => {
+      setOptimisticStatus(next);
       const result = await updateIdeaStatus(ideaId, next);
       if (result.error) {
         toast.error(result.error);
@@ -58,7 +73,7 @@ export function IdeaStatusSelect({
 
   return (
     <Select
-      value={status}
+      value={optimisticStatus}
       onValueChange={(value) => {
         if (value) handleStatusChange(value);
       }}

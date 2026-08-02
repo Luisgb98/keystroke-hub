@@ -39,6 +39,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -51,6 +52,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TimePicker } from "@/components/ui/time-picker";
 import {
   Tooltip,
   TooltipContent,
@@ -67,13 +69,35 @@ const demoNavItems: NavItem[] = [
 export function ComponentsGallery() {
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button>Default</Button>
-        <Button variant="outline">Outline</Button>
-        <Button variant="secondary">Secondary</Button>
-        <Button variant="ghost">Ghost</Button>
-        <Button variant="destructive">Destructive</Button>
-        <Button variant="link">Link</Button>
+      <div className="flex flex-col gap-3">
+        <p className="text-caption text-muted-foreground">
+          Every variant carries its own hover, pressed and focus state — hover
+          or tab through them. Destructive stays a tint, never a solid fill, so
+          it can&apos;t be mistaken for the default action.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button>Default</Button>
+          <Button variant="outline">Outline</Button>
+          <Button variant="secondary">Secondary</Button>
+          <Button variant="ghost">Ghost</Button>
+          <Button variant="destructive">Destructive</Button>
+          <Button variant="link">Link</Button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button disabled>Default disabled</Button>
+          <Button variant="outline" disabled>
+            Outline disabled
+          </Button>
+          <Button variant="destructive" disabled>
+            Destructive disabled
+          </Button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="xs">Extra small</Button>
+          <Button size="sm">Small</Button>
+          <Button size="default">Default size</Button>
+          <Button size="lg">Large</Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -102,6 +126,24 @@ export function ComponentsGallery() {
               <SelectItem value="content">Content</SelectItem>
             </SelectContent>
           </Select>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="styleguide-date">Date</Label>
+              <DatePicker
+                id="styleguide-date"
+                defaultValue="2026-07-30"
+                triggerLabel="Open styleguide calendar"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="styleguide-time">Time</Label>
+              <TimePicker
+                id="styleguide-time"
+                defaultValue="19:00"
+                triggerLabel="Choose styleguide time"
+              />
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -185,6 +227,7 @@ export function ComponentsGallery() {
             allDay: false,
             conflictNote: null,
             linkedIdeas: [],
+            streamId: null,
           }}
         />
         <EventChip
@@ -198,6 +241,7 @@ export function ComponentsGallery() {
             allDay: false,
             conflictNote: null,
             linkedIdeas: [],
+            streamId: null,
           }}
         />
       </div>
@@ -215,6 +259,7 @@ export function ComponentsGallery() {
               allDay: false,
               conflictNote: null,
               linkedIdeas: [],
+              streamId: null,
             },
             timeLabel: "Now",
             inProgress: true,
@@ -232,6 +277,7 @@ export function ComponentsGallery() {
               allDay: true,
               conflictNote: null,
               linkedIdeas: [],
+              streamId: null,
             },
             timeLabel: "All day",
             inProgress: false,

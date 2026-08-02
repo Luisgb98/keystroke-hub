@@ -1,11 +1,21 @@
 "use client";
 
-import { useActionState, useEffect, useId, useState } from "react";
+import { useId, useState, useTransition } from "react";
 import Link from "next/link";
-import { Clapperboard, ScrollText, X } from "lucide-react";
+import {
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Clapperboard,
+  ScrollText,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 
-import { createIdea, updateIdea } from "@/lib/content/actions";
+import {
+  createIdea,
+  updateIdea,
+  type IdeaActionState,
+} from "@/lib/content/actions";
 import {
   IDEA_FORMATS,
   INITIAL_IDEA_FORMAT,
@@ -17,8 +27,14 @@ import {
   PUBLISHING_TAG_STANDARD,
 } from "@/lib/content/idea-schema";
 import { DEFAULT_RELEASE_TIME } from "@/lib/content/release";
+import {
+  formatScriptSize,
+  scriptOverflowsCollapsed,
+} from "@/lib/content/script-stats";
+import type { GameOption } from "@/lib/data/games";
 import type { Idea } from "@/lib/db/schema";
 import { cn } from "@/lib/utils";
+import { GamePicker } from "@/components/content/games/game-picker";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,9 +44,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { TimePicker } from "@/components/ui/time-picker";
+import { formatAppDateParam, formatAppTimeParam } from "@/lib/time";
 
 import { IDEA_FORMAT_ICON } from "./idea-format-styles";
 
@@ -40,28 +59,27 @@ interface IdeaEditorProps {
   idea?: Idea;
   /** The idea's current release event start, if scheduled — prefills the date/time in edit mode. */
   releaseStartsAt?: Date | null;
+  /** The whole game library, loaded server-side, for the picker (#105). */
+  games?: GameOption[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-function dateParam(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function timeParam(date: Date): string {
-  return `${String(date.getHours()).padStart(2, "0")}:${String(
-    date.getMinutes()
-  ).padStart(2, "0")}`;
-}
+/**
+ * Prefill reads the stored instant back as app-timezone wall clock (see
+ * lib/time). Using the raw `getFullYear`/`getHours` getters here would render
+ * the server's own zone during SSR and the device's after hydration — the
+ * form would show a different time than the calendar behind it (issue #95).
+ */
+const dateParam = formatAppDateParam;
+const timeParam = formatAppTimeParam;
 
 interface EditorValues {
   title: string;
-  notes: string;
+  description: string;
   format: IdeaFormat;
   tags: string;
+  gameId: string | null;
   releaseDate: string;
   releaseTime: string;
   script: string;
@@ -75,9 +93,10 @@ function initialValues(
   if (mode === "edit" && idea) {
     return {
       title: idea.title,
-      notes: idea.notes ?? "",
+      description: idea.description ?? "",
       format: idea.format,
       tags: idea.tags.join(", "),
+      gameId: idea.gameId,
       releaseDate: releaseStartsAt ? dateParam(releaseStartsAt) : "",
       releaseTime: releaseStartsAt
         ? timeParam(releaseStartsAt)
@@ -87,9 +106,10 @@ function initialValues(
   }
   return {
     title: "",
-    notes: "",
+    description: "",
     format: INITIAL_IDEA_FORMAT,
     tags: "",
+    gameId: null,
     releaseDate: "",
     releaseTime: DEFAULT_RELEASE_TIME,
     script: "",
@@ -107,57 +127,91 @@ export function IdeaEditor({
   mode,
   idea,
   releaseStartsAt,
+  games = [],
   open,
   onOpenChange,
 }: IdeaEditorProps) {
   const titleId = useId();
   const action =
     mode === "edit" && idea ? updateIdea.bind(null, idea.id) : createIdea;
-  const [state, formAction, pending] = useActionState(action, undefined);
+  const [state, setState] = useState<IdeaActionState | undefined>(undefined);
+  const [pending, startTransition] = useTransition();
   const [values, setValues] = useState(() =>
     initialValues(mode, idea, releaseStartsAt)
   );
-  const [capturedTitle, setCapturedTitle] = useState("");
+  const [scriptExpanded, setScriptExpanded] = useState(false);
 
   // Recompute field values on each open (the instance stays mounted, only
-  // `open` toggles) and detect a successful submit — the same "adjust state
-  // during render" pattern as EventEditor, avoiding an extra render pass.
+  // `open` toggles) — the same "adjust state during render" pattern as
+  // EventEditor, avoiding an extra render pass.
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
-    if (open) setValues(initialValues(mode, idea, releaseStartsAt));
+    if (open) {
+      setValues(initialValues(mode, idea, releaseStartsAt));
+      setScriptExpanded(false);
+      // A fresh open starts clean — errors from a previous attempt would
+      // otherwise be attached to fields that have just been re-seeded.
+      setState(undefined);
+    }
   }
 
-  const [prevState, setPrevState] = useState(state);
-  if (state !== prevState) {
-    setPrevState(state);
-    if (state?.success) {
-      setCapturedTitle(values.title);
+  /**
+   * Submit, then react to the result — the `useTransition` + direct-call idiom
+   * every other dialog in the app uses (`TriageDialog`, `RecordOutcomeDialog`,
+   * `AttachPicker`). This deliberately replaced `useActionState` (#102).
+   *
+   * Two problems came from driving the outcome off the action *state*. The
+   * `state.success` branch used to run during render and called `onOpenChange`
+   * there, which writes the parent card's state — React logged "Cannot update a
+   * component (IdeaCard) while rendering a different component (IdeaEditor)" on
+   * every save. Moving that to a post-commit effect silenced the warning but
+   * traded it for a worse bug: the action state only commits once the router has
+   * applied the refresh that `revalidatePath` triggers, and the ideas page's
+   * refresh is slow enough (a remote Postgres, several queries) that the dialog
+   * sat on "Saving…" long after the row had landed.
+   *
+   * Awaiting the action here settles as soon as the server responds, and a
+   * transition callback is an ordinary post-event context — so the close is both
+   * legal and immediate.
+   */
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const savedTitle = values.title;
+    startTransition(async () => {
+      const result = await action(undefined, formData);
+      setState(result);
+      if (!result.success) {
+        // An over-cap paste has to be both visible and reachable to trim, so a
+        // rejected script opens the field up (#93).
+        if (result.fieldErrors?.script) setScriptExpanded(true);
+        return;
+      }
       onOpenChange(false);
-    }
+      if (mode === "create") {
+        toast.custom(() => (
+          <div
+            data-slot="idea-toast"
+            className="flex items-center gap-2 rounded-lg border border-track-content-border bg-track-content px-3 py-2 text-sm text-track-content-foreground shadow-sm"
+          >
+            <Clapperboard aria-hidden className="size-4 shrink-0" />
+            <span>
+              Idea captured: <strong>{savedTitle}</strong>
+            </span>
+          </div>
+        ));
+      } else {
+        toast.success("Idea updated");
+      }
+    });
   }
-
-  useEffect(() => {
-    if (!state?.success) return;
-    if (mode === "create") {
-      toast.custom(() => (
-        <div
-          data-slot="idea-toast"
-          className="flex items-center gap-2 rounded-lg border border-track-content-border bg-track-content px-3 py-2 text-sm text-track-content-foreground shadow-sm"
-        >
-          <Clapperboard aria-hidden className="size-4 shrink-0" />
-          <span>
-            Idea captured: <strong>{capturedTitle}</strong>
-          </span>
-        </div>
-      ));
-    } else {
-      toast.success("Idea updated");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
 
   const fieldErrors = state?.fieldErrors ?? {};
+  const scriptError = fieldErrors.script?.[0];
+  // Only worth offering "Expand" once there's more script than the collapsed
+  // field can show — otherwise it's a control that does nothing.
+  const scriptTooTall = scriptOverflowsCollapsed(values.script);
   const tagCount = normalizeTags(values.tags).length;
   const tagsComplete = tagCount === PUBLISHING_TAG_STANDARD;
   const tagsOver = tagCount > PUBLISHING_TAG_STANDARD;
@@ -165,7 +219,11 @@ export function IdeaEditor({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md">
-        <form action={formAction} className="flex flex-col gap-4" noValidate>
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col gap-4"
+          noValidate
+        >
           <input type="hidden" name="format" value={values.format} />
 
           <DialogHeader>
@@ -209,22 +267,26 @@ export function IdeaEditor({
                 const Icon = IDEA_FORMAT_ICON[format];
                 const selected = values.format === format;
                 return (
-                  <button
+                  // Shared button system for geometry, focus ring and press
+                  // feedback; the checked state overrides only the surface, so
+                  // a picked format stays content-track colored (docs/design-system.md).
+                  <Button
                     key={format}
                     type="button"
                     role="radio"
                     aria-checked={selected}
+                    variant="outline"
                     onClick={() => setValues((v) => ({ ...v, format }))}
                     className={cn(
-                      "flex h-11 items-center justify-center gap-1.5 rounded-lg border text-sm font-medium transition-all",
+                      "h-11 w-full",
                       selected
-                        ? "border-track-content-border bg-track-content text-track-content-foreground"
-                        : "border-border bg-background text-muted-foreground hover:bg-muted"
+                        ? "border-track-content-border bg-track-content text-track-content-foreground hover:bg-track-content hover:text-track-content-foreground dark:bg-track-content dark:hover:bg-track-content"
+                        : "text-muted-foreground"
                     )}
                   >
                     <Icon aria-hidden className="size-4 shrink-0" />
                     {IDEA_FORMAT_LABEL[format]}
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -236,15 +298,43 @@ export function IdeaEditor({
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="idea-notes">Notes</Label>
-            <Textarea
-              id="idea-notes"
-              name="notes"
-              value={values.notes}
-              onChange={(e) =>
-                setValues((v) => ({ ...v, notes: e.target.value }))
-              }
+            {/* Its own field, not one of the tags below: tags describe the
+                video for publishing, the game says what the work is about
+                (#105, docs/content-games.md). */}
+            {/* No `htmlFor`: the picker's trigger is a button carrying its own
+                `aria-label`, so the visible label is decoration, not the
+                accessible name. */}
+            <Label>Game</Label>
+            <GamePicker
+              games={games}
+              name="gameId"
+              label="Game"
+              value={values.gameId}
+              onChange={(gameId) => setValues((v) => ({ ...v, gameId }))}
             />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="idea-description">Description</Label>
+            {/* Capped like the script field below: `field-sizing-content` would
+                otherwise let a pasted description stretch the dialog off-screen
+                (#93). */}
+            <Textarea
+              id="idea-description"
+              name="description"
+              value={values.description}
+              placeholder="The description you'll publish with the video"
+              className="max-h-32 resize-none overflow-y-auto overscroll-contain"
+              onChange={(e) =>
+                setValues((v) => ({ ...v, description: e.target.value }))
+              }
+              aria-invalid={fieldErrors.description ? true : undefined}
+            />
+            {fieldErrors.description ? (
+              <p role="alert" className="text-small text-destructive">
+                {fieldErrors.description[0]}
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-2">
@@ -303,24 +393,24 @@ export function IdeaEditor({
               ) : null}
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <Input
+              <DatePicker
                 id="idea-release-date"
                 name="releaseDate"
-                type="date"
+                triggerLabel="Open publish day calendar"
                 value={values.releaseDate}
-                onChange={(e) =>
-                  setValues((v) => ({ ...v, releaseDate: e.target.value }))
+                onChange={(releaseDate) =>
+                  setValues((v) => ({ ...v, releaseDate }))
                 }
                 aria-invalid={fieldErrors.releaseDate ? true : undefined}
               />
-              <Input
+              <TimePicker
                 name="releaseTime"
-                type="time"
                 aria-label="Release time"
+                triggerLabel="Choose publish time"
                 disabled={!values.releaseDate}
                 value={values.releaseTime}
-                onChange={(e) =>
-                  setValues((v) => ({ ...v, releaseTime: e.target.value }))
+                onChange={(releaseTime) =>
+                  setValues((v) => ({ ...v, releaseTime }))
                 }
                 aria-invalid={fieldErrors.releaseTime ? true : undefined}
               />
@@ -339,17 +429,65 @@ export function IdeaEditor({
 
           {mode === "create" ? (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="idea-script">Script (optional)</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="idea-script">Script (optional)</Label>
+                <div className="flex items-center gap-3">
+                  {/* Same counter idiom as Tags above: the dialog never shows
+                      the whole script, so this is how you know the paste
+                      landed. */}
+                  <span
+                    data-slot="script-counter"
+                    aria-live="polite"
+                    className={cn(
+                      "font-mono text-caption",
+                      scriptError ? "text-destructive" : "text-muted-foreground"
+                    )}
+                  >
+                    {formatScriptSize(values.script)}
+                  </span>
+                  {scriptTooTall ? (
+                    <button
+                      type="button"
+                      onClick={() => setScriptExpanded((expanded) => !expanded)}
+                      aria-expanded={scriptExpanded}
+                      aria-controls="idea-script"
+                      className="flex items-center gap-1 text-caption text-muted-foreground hover:text-foreground"
+                    >
+                      {scriptExpanded ? (
+                        <ChevronsDownUp aria-hidden className="size-3.5" />
+                      ) : (
+                        <ChevronsUpDown aria-hidden className="size-3.5" />
+                      )}
+                      {scriptExpanded ? "Collapse" : "Expand"}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+              {/* Capture surface, not the editing surface (that's the script
+                  page): the field grows to a cap and then scrolls internally,
+                  so pasting a thousand-line Markdown script leaves the dialog
+                  exactly as tall as it was. `overscroll-contain` keeps a touch
+                  scroll inside the script from chaining to the dialog's own
+                  `overflow-y-auto` body. */}
               <Textarea
                 id="idea-script"
                 name="script"
-                rows={4}
-                placeholder="Write the Markdown script now, or add it later."
+                placeholder="Paste or write the Markdown script — or add it later."
+                className={cn(
+                  "resize-none overflow-y-auto overscroll-contain font-mono leading-relaxed",
+                  scriptExpanded ? "max-h-[45dvh]" : "max-h-40"
+                )}
                 value={values.script}
                 onChange={(e) =>
                   setValues((v) => ({ ...v, script: e.target.value }))
                 }
+                aria-invalid={scriptError ? true : undefined}
               />
+              {scriptError ? (
+                <p role="alert" className="text-small text-destructive">
+                  {scriptError}
+                </p>
+              ) : null}
             </div>
           ) : idea ? (
             <Button

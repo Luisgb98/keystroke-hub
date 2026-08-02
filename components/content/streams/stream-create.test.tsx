@@ -1,38 +1,23 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
-import {
-  DockActionProvider,
-  useDockAction,
-} from "@/components/shell/dock-action-provider";
 
 const createStream = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/content/stream-actions", () => ({ createStream }));
 
 import { StreamCreate } from "./stream-create";
+import { appTodayParam, formatInAppZone } from "@/lib/time";
 
-/** Surfaces the dock action StreamCreate registers so tests can trigger it. */
-function DockActionSurface() {
-  const action = useDockAction();
-  if (!action) return null;
-  const Icon = action.icon;
-  return (
-    <button type="button" onClick={action.onSelect}>
-      <Icon aria-hidden />
-      {action.label}
-    </button>
-  );
-}
-
-/** StreamCreate has no button of its own — it registers with the shared dock. */
-function renderWithDock(ui: ReactNode) {
-  return render(
-    <DockActionProvider>
-      {ui}
-      <DockActionSurface />
-    </DockActionProvider>
+/**
+ * react-day-picker labels the current day "Today, Saturday, August 1st, 2026"
+ * and every other day without the prefix, and the popover opens on the current
+ * month — so a hardcoded date only resolves on some days of some months. Drive
+ * the calendar off today instead, which is always present and always labelled
+ * this way.
+ */
+function todayCellName(): RegExp {
+  return new RegExp(
+    `^Today, ${formatInAppZone(new Date(), "EEEE, MMMM do, yyyy")}$`
   );
 }
 
@@ -41,8 +26,8 @@ describe("StreamCreate", () => {
     vi.clearAllMocks();
   });
 
-  it("registers a 'New stream' dock action, dialog closed by default", () => {
-    renderWithDock(<StreamCreate />);
+  it("renders its own 'New stream' button, dialog closed by default", () => {
+    render(<StreamCreate />);
     expect(
       screen.getByRole("button", { name: "New stream" })
     ).toBeInTheDocument();
@@ -51,7 +36,7 @@ describe("StreamCreate", () => {
 
   it("opens the capture dialog with the topic auto-focused", async () => {
     const user = userEvent.setup();
-    renderWithDock(<StreamCreate />);
+    render(<StreamCreate />);
     await user.click(screen.getByRole("button", { name: "New stream" }));
 
     const dialog = screen.getByRole("dialog", { name: "New stream" });
@@ -61,7 +46,7 @@ describe("StreamCreate", () => {
 
   it("hides the date/time fields until 'Plan a date' is switched on", async () => {
     const user = userEvent.setup();
-    renderWithDock(<StreamCreate />);
+    render(<StreamCreate />);
     await user.click(screen.getByRole("button", { name: "New stream" }));
 
     expect(screen.queryByLabelText("Date")).not.toBeInTheDocument();
@@ -73,7 +58,7 @@ describe("StreamCreate", () => {
 
   it("hides the start time field when All day is on", async () => {
     const user = userEvent.setup();
-    renderWithDock(<StreamCreate />);
+    render(<StreamCreate />);
     await user.click(screen.getByRole("button", { name: "New stream" }));
     await user.click(screen.getByRole("switch", { name: "Plan a date" }));
     await user.click(screen.getByRole("switch", { name: "All day" }));
@@ -84,7 +69,7 @@ describe("StreamCreate", () => {
   it("submits a title-only, unplanned capture", async () => {
     createStream.mockResolvedValue({ success: true });
     const user = userEvent.setup();
-    renderWithDock(<StreamCreate />);
+    render(<StreamCreate />);
     await user.click(screen.getByRole("button", { name: "New stream" }));
 
     await user.type(screen.getByLabelText("Topic"), "Boss rush stream");
@@ -99,7 +84,7 @@ describe("StreamCreate", () => {
   it("submits planned date/time fields when planning a date", async () => {
     createStream.mockResolvedValue({ success: true });
     const user = userEvent.setup();
-    renderWithDock(<StreamCreate />);
+    render(<StreamCreate />);
     await user.click(screen.getByRole("button", { name: "New stream" }));
     await user.type(screen.getByLabelText("Topic"), "Boss rush stream");
     await user.click(screen.getByRole("switch", { name: "Plan a date" }));
@@ -112,10 +97,38 @@ describe("StreamCreate", () => {
     expect(formData.get("date")).toBe("2026-08-01");
   });
 
+  it("submits a date and time chosen from the pickers", async () => {
+    createStream.mockResolvedValue({ success: true });
+    const user = userEvent.setup();
+    render(<StreamCreate />);
+    await user.click(screen.getByRole("button", { name: "New stream" }));
+    await user.type(screen.getByLabelText("Topic"), "Boss rush stream");
+    await user.click(screen.getByRole("switch", { name: "Plan a date" }));
+
+    await user.click(
+      screen.getByRole("button", { name: "Open stream day calendar" })
+    );
+    await user.click(
+      await screen.findByRole("button", { name: todayCellName() })
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Choose stream starting time" })
+    );
+    await user.click(await screen.findByRole("option", { name: "20:00" }));
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(createStream).toHaveBeenCalledTimes(1));
+    const [, formData] = createStream.mock.calls[0] as [unknown, FormData];
+    expect(formData.get("date")).toBe(appTodayParam());
+    expect(formData.get("time")).toBe("20:00");
+  });
+
   it("closes and resets after a successful capture", async () => {
     createStream.mockResolvedValue({ success: true });
     const user = userEvent.setup();
-    renderWithDock(<StreamCreate />);
+    render(<StreamCreate />);
     await user.click(screen.getByRole("button", { name: "New stream" }));
     await user.type(screen.getByLabelText("Topic"), "Boss rush stream");
     await user.click(screen.getByRole("button", { name: "Save" }));
@@ -131,7 +144,7 @@ describe("StreamCreate", () => {
       fieldErrors: { title: ["Title is required"] },
     });
     const user = userEvent.setup();
-    renderWithDock(<StreamCreate />);
+    render(<StreamCreate />);
     await user.click(screen.getByRole("button", { name: "New stream" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
 

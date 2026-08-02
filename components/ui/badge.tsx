@@ -9,7 +9,10 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
+        // Same hover idiom as Button's `default` — mix toward --foreground so
+        // the accent deepens rather than washing out (see components/ui/button.tsx).
+        default:
+          "bg-primary text-primary-foreground [a]:hover:bg-[color-mix(in_oklch,var(--primary),var(--foreground)_14%)]",
         secondary:
           "bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80",
         destructive:

@@ -38,7 +38,7 @@ test.describe("idea detail page", () => {
     const title = `${PREFIX} Wrong warp tutorial`;
     await seedTestIdea({
       title,
-      notes: "Cover the credits warp",
+      description: "Cover the credits warp",
       format: "video",
       status: "scripted",
       tags: ["speedrun", "glitch"],

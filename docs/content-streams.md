@@ -8,11 +8,11 @@ of chaotic.
 
 Three new tables in `lib/db/schema.ts`:
 
-| Table                             | Columns (essence)                                                          | Notes                                                                |
-| --------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `streams`                         | `id`, `title`, `notes`, `retro_notes`, `event_id` null, `event_track` null | one row per planned stream                                           |
-| `stream_checklist_items`          | `id`, `stream_id` FK (cascade), `label`, `done`, `position`                | per-stream, local edits only                                         |
-| `stream_checklist_template_items` | `id`, `label`, `position`                                                  | single global default template — single-user app, no template "sets" |
+| Table                             | Columns (essence)                                                                          | Notes                                                                |
+| --------------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| `streams`                         | `id`, `title`, `notes`, `retro_notes`, `game_id` null, `event_id` null, `event_track` null | one row per planned stream                                           |
+| `stream_checklist_items`          | `id`, `stream_id` FK (cascade), `label`, `done`, `position`                                | per-stream, local edits only                                         |
+| `stream_checklist_template_items` | `id`, `label`, `position`                                                                  | single global default template — single-user app, no template "sets" |
 
 A stream's **"when" is its linked content-track calendar event** — the
 `streams` row itself stores no date. `event_id`/`event_track` are nullable
@@ -32,6 +32,13 @@ its date, it looks up any stream referencing the event before deleting it and
 revalidates `/content/streams` (and that stream's detail page) alongside its
 usual `/calendar` revalidation — the DB-level `SET NULL` alone doesn't tell
 Next.js which cached routes to refresh.
+
+`game_id` (#105) is a nullable FK into the `games` library with
+`ON DELETE SET NULL` — which game the session is about, picked from the library
+rather than typed into the topic, so streams can be grouped and counted by game.
+Deleting a game untags the stream; it never deletes it. The picker sits on both
+the create dialog and the detail page, saved behind the page's single Save like
+every other field. See [content-games](content-games.md).
 
 "Upcoming" vs "past" vs "unscheduled" is derived at query time from the
 linked event's `startsAt`, not stored — **"past" is after the event's start
@@ -60,16 +67,24 @@ the template.
 - **`lib/content/stream-actions.ts`**: `createStream` (title required;
   planning a date creates a content-track event with a fixed 2h duration —
   or the same day, for all-day — rather than a second end-time picker),
-  `updateStreamDetails` (title/notes, the only fields editable after
-  capture), `deleteStream` (hard delete, checklist cascades, the linked
-  event is left alone), `saveRetroNotes`, `toggleChecklistItem`/
+  `updateStreamDetails` (title, prep notes and the retro — every editable
+  field on the detail page, in one statement), `deleteStream` (hard delete,
+  checklist cascades, and — since #104 — the linked event is deleted with it,
+  batched, so no purple calendar block outlives its session; the Google-side
+  delete is pushed exactly as `deleteEvent` pushes it), `toggleChecklistItem`/
   `addChecklistItem`/`removeChecklistItem`, `addTemplateItem`/
   `removeTemplateItem`, and `attachEventToStream`/`detachEventFromStream`
   (attaching an already-claimed event surfaces a friendly error before ever
   reaching the DB's `unique(event_id)` constraint). Every action calls
   `verifySession()` first.
-- **`lib/content/stream-schema.ts`**: zod schemas for capture, detail edits,
-  retro notes, and checklist/template item labels.
+- **`lib/content/stream-schema.ts`**: zod schemas for capture, detail edits
+  (topic + prep notes + retro together), and checklist/template item labels.
+- **`lib/content/stream-session.ts`** (`server-only`): `insertStreamSession`,
+  the one place a session and its template snapshot are created. Shared by
+  `createStream` and by the calendar's own `createEvent`/`updateEvent` (#104),
+  so a stream planned from the calendar is seeded identically to one planned
+  here. Its `leading` option puts a caller's event INSERT at the head of the
+  same `db.batch`, keeping "the block and its session" one round trip.
 
 ### Atomicity without transactions
 
@@ -92,16 +107,46 @@ the "stream" idea format):
   "Unscheduled", then "Past" (most recent first). `StreamCard` shows title, a
   date chip (or "Unscheduled"), a checklist progress badge (`3/5`), and a
   notes indicator once a retro exists. `StreamCreate` owns the capture dialog
-  but registers a "New stream" action with the shared capture dock rather than
-  rendering its own floating button (same pattern as `IdeaCapture`, see
-  docs/inbox.md). `TemplateEditor` (a dialog reachable from the list header)
-  edits the default checklist.
-- **Detail** (`/content/streams/[id]`): `StreamDetailsForm` (title/notes),
-  `StreamEventSection` (shows the linked event or an "Attach an event"
-  action backed by `EventAttachPicker` — the inverse of `IdeaLinkPicker`),
-  `StreamChecklist` (large tap targets, inline add/remove), and
-  `StreamRetroNotes` (always editable, visually promoted once the stream's
-  event has passed).
+  and its own "New stream" button, inline in the list header next to
+  `TemplateEditor` (same pattern as `IdeaCapture`; #85 retired the floating dock
+  that used to render it, see docs/inbox.md). `TemplateEditor` (a dialog
+  reachable from the list header) edits the default checklist.
+- **Detail** (`/content/streams/[id]`): `StreamDetailsForm` owns every text
+  field on the page — topic, prep notes and the retro (always editable,
+  visually promoted once the stream's event has passed) — behind a **single
+  "Save changes" button**, disabled until something differs from what's
+  stored. #102 collapsed what used to be two Save buttons, one per section: it
+  was never clear which one committed what. Because the fields are separated on
+  screen by `StreamEventSection` (the linked event, or an "Attach an event"
+  action backed by `EventAttachPicker` — the inverse of `IdeaLinkPicker`) and
+  `StreamChecklist` (large tap targets, inline add/remove), those two sections
+  are passed to `StreamDetailsForm` as **children**, which keeps the reading
+  order while letting one component hold all three values. Both keep their own
+  instant-save actions — a checklist tick or an attach shouldn't wait for a
+  Save.
+
+  The fields are **controlled**, never `defaultValue`: a save revalidates this
+  route, so the server hands back a fresh `stream` on the next render, and an
+  uncontrolled Base UI field both warns about the changed `defaultValue` and
+  keeps painting the old string. Local state is re-seeded from the props only
+  when the saved columns actually change, so a revalidation triggered by a
+  checklist toggle doesn't discard in-progress typing.
+
+## Streams on the calendar (#104)
+
+A scheduled stream's block is **Twitch purple**, its own track alongside work
+and content — see docs/calendar.md for how that kind is derived (it is not a
+third `events.track` value) and docs/design-system.md for the palette. Two
+consequences land here:
+
+- **Planning is symmetric.** A stream planned from the calendar's track picker
+  is indistinguishable from one planned here, checklist and all.
+- **Delete is symmetric too.** Deleting the linked event still just
+  unschedules the stream (the `ON DELETE SET NULL` above is unchanged), but
+  deleting the _stream_ now also deletes the event. That reverses the original
+  "left alone" choice deliberately: once a block advertises a session, leaving
+  one behind means a purple block promising something that no longer exists.
+  The confirmation dialog says so before it happens.
 
 ## Scope cuts
 
@@ -120,8 +165,8 @@ the "stream" idea format):
 
 ## Testing
 
-Unit (Vitest + RTL): `stream-schema` (capture/detail/retro/checklist-label
-validation), `lib/data/streams` (`bucketStreams`'s upcoming/past/unscheduled
+Unit (Vitest + RTL): `stream-schema` (capture/detail/checklist-label
+validation, incl. an over-long retro failing the whole save), `lib/data/streams` (`bucketStreams`'s upcoming/past/unscheduled
 split incl. the same-day "past is after start time, not end of day" boundary,
 `aggregateChecklistProgress`, and the DB-mocked queries), `stream-actions`
 (auth gate on every action, template snapshot on create, the batch-vs-direct-
@@ -134,7 +179,8 @@ e2e (`e2e/streams.spec.ts`, real DB via `e2e/support/streams-db.ts` with
 the default checklist seeds those items onto a newly created stream; planning
 a date creates a content-track event visible under Upcoming and on the
 calendar; toggling/adding per-stream checklist items persists across reload;
-writing retro notes persists across reload; deleting the linked calendar
+one Save commits topic + prep notes + retro together and they survive a
+reload, with exactly one save control on the page; deleting the linked calendar
 event leaves the stream unscheduled; a mobile-viewport capture flow. The
 delete-leaves-unscheduled check retries the whole navigation (not just the
 assertion) via `expect(...).toPass()`, since a single `page.goto` can race

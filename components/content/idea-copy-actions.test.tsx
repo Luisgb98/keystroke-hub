@@ -15,11 +15,12 @@ function makeIdea(overrides: Partial<Idea> = {}): Idea {
   return {
     id: "idea-1",
     title: "Glitch tutorial",
-    notes: "First paragraph.\n\nSecond paragraph.",
+    description: "First paragraph.\n\nSecond paragraph.",
     format: "either",
     status: "idea",
     tags: ["speedrun", "glitch", "tutorial", "retro", "any%"],
     projectId: null,
+    gameId: null,
     releaseEventId: null,
     releaseEventTrack: null,
     stageEnteredAt: new Date(),
@@ -84,7 +85,7 @@ describe("IdeaCopyActions", () => {
 
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     expect(writeText.mock.calls[0][0]).toBe(
-      "Glitch tutorial\n\nspeedrun, glitch, tutorial, retro, any%"
+      "Glitch tutorial\n\n#speedrun #glitch #tutorial #retro #any%"
     );
   });
 
@@ -100,7 +101,7 @@ describe("IdeaCopyActions", () => {
 
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     expect(writeText.mock.calls[0][0]).toBe(
-      "First paragraph.\n\nSecond paragraph.\n\nspeedrun, glitch, tutorial, retro, any%"
+      "First paragraph.\n\nSecond paragraph.\n\n#speedrun #glitch #tutorial #retro #any%"
     );
   });
 
@@ -114,7 +115,7 @@ describe("IdeaCopyActions", () => {
 
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     expect(writeText.mock.calls[0][0]).toBe(
-      "speedrun, glitch, tutorial, retro, any%"
+      "#speedrun #glitch #tutorial #retro #any%"
     );
   });
 
@@ -133,7 +134,7 @@ describe("IdeaCopyActions", () => {
   });
 
   it("disables description + tags when the idea has no description", () => {
-    render(<IdeaCopyActions idea={makeIdea({ notes: null })} />);
+    render(<IdeaCopyActions idea={makeIdea({ description: null })} />);
     expect(
       screen.getByRole("button", { name: "Copy Description + tags" })
     ).toBeDisabled();

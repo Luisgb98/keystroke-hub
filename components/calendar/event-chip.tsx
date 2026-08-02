@@ -5,12 +5,13 @@ import { AlertTriangle } from "lucide-react";
 import type { CSSProperties } from "react";
 
 import { cn } from "@/lib/utils";
+import { usePointerDrag } from "@/hooks/use-pointer-drag";
 import { moveEventByDays, type TimeShift } from "@/lib/calendar/drag";
+import { trackKindOf } from "@/lib/calendar/track-kind";
 import type { CalendarEvent } from "@/lib/calendar/types";
 
 import { EventEditor } from "./event-editor";
 import { TRACK_ICON, TRACK_LABEL, TRACK_SURFACE_CLASSES } from "./track-styles";
-import { useEventDrag } from "./use-event-drag";
 
 interface EventChipProps {
   event: CalendarEvent;
@@ -37,7 +38,8 @@ export function EventChip({ event, className, onReschedule }: EventChipProps) {
     dy: number;
   } | null>(null);
   const geometryRef = useRef<CellGeometry>({ width: 0, height: 0 });
-  const Icon = TRACK_ICON[event.track];
+  const kind = trackKindOf(event);
+  const Icon = TRACK_ICON[kind];
 
   function deltaDaysFrom(dx: number, dy: number): number {
     const { width, height } = geometryRef.current;
@@ -46,9 +48,9 @@ export function EventChip({ event, className, onReschedule }: EventChipProps) {
     return Math.round(dy / height) * 7 + Math.round(dx / width);
   }
 
-  const drag = useEventDrag({
+  const drag = usePointerDrag({
     disabled: !onReschedule,
-    onDragMove: (delta) => setGestureDelta(delta),
+    onDragMove: ({ dx, dy }) => setGestureDelta({ dx, dy }),
     onDragEnd: ({ dx, dy }) => {
       setGestureDelta(null);
       onReschedule?.(moveEventByDays(event, deltaDaysFrom(dx, dy)));
@@ -83,13 +85,13 @@ export function EventChip({ event, className, onReschedule }: EventChipProps) {
         style={previewStyle}
         className={cn(
           "flex min-h-[1.75rem] min-w-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-left text-caption",
-          TRACK_SURFACE_CLASSES[event.track],
+          TRACK_SURFACE_CLASSES[kind],
           gestureDelta && "shadow-md",
           className
         )}
       >
         <Icon aria-hidden className="size-3 shrink-0" />
-        <span className="sr-only">{TRACK_LABEL[event.track]}: </span>
+        <span className="sr-only">{TRACK_LABEL[kind]}: </span>
         <span className="truncate">{event.title}</span>
         {event.conflictNote ? (
           <span

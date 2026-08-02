@@ -5,10 +5,12 @@ import type { Idea } from "@/lib/db/schema";
  * creator the exact four text blocks they assemble when publishing a video, so
  * publishing is copy-paste rather than retype.
  *
- * Tags render **comma-separated** (`speedrun, glitch`) everywhere — this matches
- * a video platform's tags field exactly, and unlike hashtag form it stays intact
- * for multi-word tags (`normalizeTags` only splits on commas, so a tag can carry
- * internal spaces — see docs/content-ideas.md).
+ * Tags render as **hashtags** (`#speedrun #glitch`) everywhere (#94) — that is the
+ * form the creator actually pastes when publishing, so comma-separated output meant
+ * hand-editing every tag on every publish. A hashtag can't carry spaces, so a
+ * multi-word tag collapses into one (`boss rush` → `#bossrush`); entry and storage
+ * are untouched (`normalizeTags` still splits only on commas, spaces allowed — see
+ * docs/content-ideas.md).
  */
 
 /** The four copyable blocks, in the order the card renders their buttons. */
@@ -27,9 +29,9 @@ export interface IdeaCopyBlock {
   text: string | null;
 }
 
-/** Comma-separated tags, matching the platform tags field. */
+/** Space-separated hashtags, the form pasted when publishing. */
 export function formatIdeaTags(tags: readonly string[]): string {
-  return tags.join(", ");
+  return tags.map((tag) => `#${tag.replace(/\s+/g, "")}`).join(" ");
 }
 
 /** Joins present parts with a single blank line between them, dropping absent ones. */
@@ -38,18 +40,19 @@ function joinWithBlankLine(...parts: (string | null)[]): string {
 }
 
 /**
- * Builds the idea's four publish blocks. `notes` is the description; the
- * author's line breaks are preserved verbatim (no reflowing). A block whose
- * source is empty resolves to `text: null` so the UI can disable it:
- * "Title + tags" and "Tags" need tags; "Description + tags" needs a
- * description (its tags are optional — the description is always copied
- * together with whatever tags exist).
+ * Builds the idea's four publish blocks. The author's line breaks in the
+ * description are preserved verbatim (no reflowing). A block whose source is
+ * empty resolves to `text: null` so the UI can disable it: "Title + tags" and
+ * "Tags" need tags; "Description + tags" needs a description (its tags are
+ * optional — the description is always copied together with whatever tags
+ * exist).
  */
 export function formatIdeaCopyBlocks(
-  idea: Pick<Idea, "title" | "notes" | "tags">
+  idea: Pick<Idea, "title" | "description" | "tags">
 ): IdeaCopyBlock[] {
   const tagsText = idea.tags.length > 0 ? formatIdeaTags(idea.tags) : null;
-  const description = idea.notes && idea.notes.length > 0 ? idea.notes : null;
+  const description =
+    idea.description && idea.description.length > 0 ? idea.description : null;
 
   return [
     { key: "title", label: "Title", text: idea.title },

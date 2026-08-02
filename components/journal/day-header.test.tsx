@@ -57,4 +57,34 @@ describe("DayHeader", () => {
 
     expect(push).toHaveBeenCalledWith("/journal?date=2026-08-15");
   });
+
+  it("a half-typed date does not navigate anywhere", () => {
+    push.mockClear();
+    render(<DayHeader logDate="2026-07-08" />);
+
+    const input = screen.getByLabelText("Jump to date");
+    for (const partial of ["2026-08", "2026-08-", "2026-08-1"]) {
+      fireEvent.change(input, { target: { value: partial } });
+    }
+
+    expect(push).not.toHaveBeenCalled();
+    // The draft is still shown, so the next keystroke completes the date.
+    expect(input).toHaveValue("2026-08-1");
+
+    fireEvent.change(input, { target: { value: "2026-08-15" } });
+    expect(push).toHaveBeenCalledWith("/journal?date=2026-08-15");
+  });
+
+  it("selecting a day in the calendar navigates immediately", async () => {
+    push.mockClear();
+    const user = userEvent.setup();
+    render(<DayHeader logDate="2026-07-08" />);
+
+    await user.click(screen.getByRole("button", { name: "Open day calendar" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Monday, July 20th, 2026" })
+    );
+
+    expect(push).toHaveBeenCalledWith("/journal?date=2026-07-20");
+  });
 });

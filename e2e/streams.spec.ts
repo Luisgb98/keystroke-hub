@@ -117,19 +117,35 @@ test.describe("stream session planner", () => {
     await expect(page.getByRole("checkbox", { name: itemLabel })).toBeChecked();
   });
 
-  test("writing retro notes saves and survives a reload", async ({ page }) => {
+  test("one Save commits the topic, prep notes and retro together and survives a reload", async ({
+    page,
+  }) => {
     const title = `${PREFIX} Past stream`;
     await createStream(page, title);
 
     await page.locator(STREAM_CARD_SELECTOR, { hasText: title }).click();
-    const retroNotes = page.locator('[data-slot="stream-retro-notes"]');
-    const notes = "Great energy, chat was active.";
-    await page.getByLabel("How did it go?").fill(notes);
-    await retroNotes.getByRole("button", { name: "Save" }).click();
+
+    // The whole point of #102: the detail page has exactly one save control,
+    // not one per section.
+    const save = page.getByRole("button", { name: "Save changes" });
+    await expect(page.getByRole("button", { name: /^Save/ })).toHaveCount(1);
+    await expect(save).toBeDisabled();
+
+    const renamed = `${title} (edited)`;
+    const prep = "Test the capture card.";
+    const retro = "Great energy, chat was active.";
+    await page.getByLabel("Topic").fill(renamed);
+    await page.getByLabel("Prep notes").fill(prep);
+    await page.getByLabel("How did it go?").fill(retro);
+    await expect(save).toBeEnabled();
+    await save.click();
     await expect(page.getByText("Saved")).toBeVisible();
+    await expect(save).toBeDisabled();
 
     await page.reload();
-    await expect(page.getByLabel("How did it go?")).toHaveValue(notes);
+    await expect(page.getByLabel("Topic")).toHaveValue(renamed);
+    await expect(page.getByLabel("Prep notes")).toHaveValue(prep);
+    await expect(page.getByLabel("How did it go?")).toHaveValue(retro);
   });
 
   test("deleting the linked calendar event leaves the stream unscheduled", async ({
@@ -178,7 +194,7 @@ test.describe("stream session planner mobile viewport", () => {
     await clearTestStreams(MOBILE_PREFIX);
   });
 
-  test("the floating 'New stream' button opens the dialog for one-handed capture", async ({
+  test("the header's 'New stream' button opens the dialog for one-handed capture", async ({
     page,
   }) => {
     const title = `${MOBILE_PREFIX} Mobile capture`;

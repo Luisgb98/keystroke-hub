@@ -19,9 +19,14 @@ export function DayView({ day, events, now }: DayViewProps) {
   const timedEvents = liveEvents.filter((event) => !event.allDay);
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-border">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border">
       <AllDayRow days={[day]} events={allDayEvents} />
-      <div className="flex flex-1 overflow-y-auto">
+      {/* The only scrollport in this view — the all-day row above stays pinned
+          (issue #87, see docs/calendar.md#scroll-contract). */}
+      <div
+        data-slot="calendar-scroll"
+        className="flex min-h-0 flex-1 overflow-y-auto"
+      >
         <TimeGutter />
         <div className="flex-1">
           <DayColumn

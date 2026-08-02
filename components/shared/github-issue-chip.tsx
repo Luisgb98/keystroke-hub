@@ -23,9 +23,11 @@ interface GithubIssueChipProps {
 
 const STATE_CONFIG = {
   open: { Icon: CircleDot, label: "Open", className: "text-success" },
-  // Closed reuses `--primary` (already a purple hue) rather than adding a
-  // second color token for the same meaning (see docs/design-system.md).
-  closed: { Icon: CircleCheck, label: "Closed", className: "text-primary" },
+  // Closed is `--foreground`, not `--primary`: the accent is now a red, and a
+  // red check would read as a failure. The three states instead form an
+  // attention ramp — green (open, actionable), full-strength neutral (closed,
+  // settled), muted (unknown, no data) — see docs/design-system.md.
+  closed: { Icon: CircleCheck, label: "Closed", className: "text-foreground" },
 } as const;
 
 /**

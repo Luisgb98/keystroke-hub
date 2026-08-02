@@ -30,11 +30,12 @@ function makeIdea(overrides: Partial<Idea> = {}): Idea {
   return {
     id: "idea-1",
     title: "Speedrun any% commentary",
-    notes: null,
+    description: null,
     format: "video",
     status: "idea",
     tags: [],
     projectId: null,
+    gameId: null,
     releaseEventId: null,
     releaseEventTrack: null,
     stageEnteredAt: new Date(),

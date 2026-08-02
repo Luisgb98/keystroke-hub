@@ -40,9 +40,10 @@ export function requestOpenCapture(): void {
 /**
  * Owns the single, app-wide capture dialog so a thought can be filed from any
  * screen (see docs/inbox.md). Mounted inside the auth-gated shell only —
- * capture must not exist on `/login`. Exposes `openCapture` for the floating
- * capture button, and also opens on the global `OPEN_CAPTURE_EVENT` so the
- * command palette can trigger capture without a context dependency.
+ * capture must not exist on `/login`. Exposes `openCapture` to any client
+ * descendant, and also opens on the global `OPEN_CAPTURE_EVENT` so surfaces
+ * with no context dependency — the command palette's "Capture a thought"
+ * action and the Inbox page's capture button — can trigger it too.
  */
 export function InboxCaptureProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);

@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 const CONFIRMATION_DELAY_MS = 2000;
 
 interface IdeaCopyActionsProps {
-  idea: Pick<Idea, "title" | "notes" | "tags">;
+  idea: Pick<Idea, "title" | "description" | "tags">;
 }
 
 /**

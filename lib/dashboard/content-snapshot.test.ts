@@ -13,11 +13,12 @@ function makeIdea(
   return {
     id,
     title: `Idea ${id}`,
-    notes: null,
+    description: null,
     format: "either",
     status,
     tags: [],
     projectId: null,
+    gameId: null,
     releaseEventId: null,
     releaseEventTrack: null,
     stageEnteredAt,

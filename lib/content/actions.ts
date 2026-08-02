@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { verifySession } from "@/lib/auth/session";
+import { resolveGameId } from "@/lib/data/games";
 import { getDb } from "@/lib/db";
 import {
   eventSyncLinks,
@@ -22,8 +23,10 @@ import {
 } from "@/lib/sync/push";
 
 import {
+  buildReleaseSpan,
   ideaCaptureSchema,
   ideaEditSchema,
+  ideaRescheduleSchema,
   ideaStatusSchema,
   type ReleaseInput,
 } from "./idea-schema";
@@ -155,9 +158,10 @@ export async function createIdea(
 
   const parsed = ideaCaptureSchema.safeParse({
     title: formData.get("title") ?? "",
-    notes: formData.get("notes") ?? "",
+    description: formData.get("description") ?? "",
     format: formData.get("format") || undefined,
     tags: formData.get("tags") ?? "",
+    gameId: formData.get("gameId") ?? "",
     script: formData.get("script") ?? "",
     releaseDate: formData.get("releaseDate") ?? "",
     releaseTime: formData.get("releaseTime") ?? "",
@@ -170,6 +174,9 @@ export async function createIdea(
   }
 
   const { script, release, ...fields } = parsed.data;
+  // A game the client named but that no longer exists degrades to "no game"
+  // rather than failing the capture on a foreign-key violation (#105).
+  fields.gameId = await resolveGameId(fields.gameId);
 
   const db = getDb();
   // Neon's HTTP driver has no transactions, so these run sequentially, idea
@@ -196,8 +203,8 @@ export async function createIdea(
 
 /**
  * Edit every field of an existing idea except the script (which keeps its own
- * dedicated editor page — see docs/scripts.md): title, notes, format, tags,
- * and the release date/time. Status/`stageEnteredAt` are owned by
+ * dedicated editor page — see docs/scripts.md): title, description, format,
+ * tags, and the release date/time. Status/`stageEnteredAt` are owned by
  * `updateIdeaStatus` and left untouched here.
  *
  * The release transition is derived by comparing the desired release against
@@ -216,9 +223,10 @@ export async function updateIdea(
 
   const parsed = ideaEditSchema.safeParse({
     title: formData.get("title") ?? "",
-    notes: formData.get("notes") ?? "",
+    description: formData.get("description") ?? "",
     format: formData.get("format") || undefined,
     tags: formData.get("tags") ?? "",
+    gameId: formData.get("gameId") ?? "",
     releaseDate: formData.get("releaseDate") ?? "",
     releaseTime: formData.get("releaseTime") ?? "",
   });
@@ -230,6 +238,7 @@ export async function updateIdea(
   }
 
   const { release, ...fields } = parsed.data;
+  fields.gameId = await resolveGameId(fields.gameId);
 
   const db = getDb();
   const [existing] = await db
@@ -259,6 +268,81 @@ export async function updateIdea(
   revalidatePath("/content/board");
   if (releaseChanged) revalidatePath("/calendar");
   return { success: true };
+}
+
+export interface RescheduleIdeaReleaseResult {
+  error?: string;
+}
+
+const INVALID_RELEASE = "Pick a real day and time.";
+
+/**
+ * Moves an idea's release to a new day/time and nothing else — the one-tap
+ * reschedule behind the release chip on the idea card (#102). A narrow mutation
+ * in the shape of `updateIdeaStatus`/`rescheduleEvent`, deliberately not a
+ * shortcut into `updateIdea`: shifting a publish slot must not require sending
+ * (and re-validating, and re-saving) the title, tags and description the user
+ * never opened.
+ *
+ * The event id is re-read from the idea rather than accepted from the caller,
+ * per the server-actions data-security guide — the client only names the idea,
+ * so this can never be pointed at an arbitrary `events` row. The release's
+ * title is left alone; only `updateIdea` owns that, and it's derived from the
+ * idea's title, which a reschedule doesn't touch.
+ */
+export async function rescheduleIdeaRelease(
+  ideaId: string,
+  releaseDate: string,
+  releaseTime: string
+): Promise<RescheduleIdeaReleaseResult> {
+  await verifySession();
+
+  const parsed = ideaRescheduleSchema.safeParse({
+    ideaId,
+    releaseDate,
+    releaseTime,
+  });
+  if (!parsed.success) {
+    return { error: INVALID_RELEASE };
+  }
+
+  // The regexes above only check the shape, so a well-formed but nonexistent
+  // day (2026-02-30) still gets here and yields no span.
+  const release = buildReleaseSpan(
+    parsed.data.releaseDate,
+    parsed.data.releaseTime
+  );
+  if (!release) {
+    return { error: INVALID_RELEASE };
+  }
+
+  const db = getDb();
+  const [existing] = await db
+    .select({ releaseEventId: ideas.releaseEventId })
+    .from(ideas)
+    .where(eq(ideas.id, parsed.data.ideaId));
+  if (!existing) {
+    return { error: "That idea no longer exists." };
+  }
+  if (!existing.releaseEventId) {
+    return { error: "That idea has no release to move." };
+  }
+
+  const updated = await db
+    .update(events)
+    .set({ startsAt: release.startsAt, endsAt: release.endsAt })
+    .where(eq(events.id, existing.releaseEventId))
+    .returning({ id: events.id, track: events.track });
+  if (updated.length === 0) {
+    return { error: "That release no longer exists." };
+  }
+
+  revalidatePath("/content/ideas");
+  revalidatePath(`/content/ideas/${parsed.data.ideaId}`);
+  revalidatePath("/content/board");
+  revalidatePath("/calendar");
+  schedulePush(() => pushEventUpdated(updated[0].id, updated[0].track));
+  return {};
 }
 
 export interface UpdateIdeaStatusResult {

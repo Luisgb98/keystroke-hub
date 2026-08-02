@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -10,7 +11,7 @@ import {
   todayParam,
 } from "@/lib/journal/dates";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DatePicker, parseDateValue } from "@/components/ui/date-picker";
 
 interface DayHeaderProps {
   logDate: string;
@@ -20,6 +21,15 @@ interface DayHeaderProps {
 export function DayHeader({ logDate }: DayHeaderProps) {
   const router = useRouter();
   const isToday = isTodayParam(logDate);
+
+  // The field holds a draft so a date can be typed digit by digit; prev/next
+  // and Today change `logDate` from the outside, which resets it.
+  const [draft, setDraft] = useState(logDate);
+  const [prevLogDate, setPrevLogDate] = useState(logDate);
+  if (logDate !== prevLogDate) {
+    setPrevLogDate(logDate);
+    setDraft(logDate);
+  }
 
   function navigate(date: string) {
     router.push(`/journal?date=${date}`);
@@ -54,14 +64,17 @@ export function DayHeader({ logDate }: DayHeaderProps) {
         <span className="font-mono text-small text-muted-foreground">
           {formatDayLabel(logDate)}
         </span>
-        <Input
-          type="date"
+        <DatePicker
           aria-label="Jump to date"
-          value={logDate}
-          onChange={(e) => {
-            if (e.target.value) navigate(e.target.value);
+          triggerLabel="Open day calendar"
+          value={draft}
+          onChange={(next) => {
+            setDraft(next);
+            // Half-typed days ("2026-08-1") would otherwise push a route for
+            // every keystroke; only a complete, real date navigates.
+            if (parseDateValue(next)) navigate(next);
           }}
-          className="w-auto"
+          className="w-40"
         />
       </div>
     </div>

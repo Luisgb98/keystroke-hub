@@ -8,11 +8,13 @@ import { Briefcase, Pencil, ScrollText, Trash2 } from "lucide-react";
 import { IDEA_FORMAT_LABEL } from "@/lib/content/idea-format";
 import { PUBLISHING_TAG_STANDARD } from "@/lib/content/idea-schema";
 import type { Idea } from "@/lib/db/schema";
+import type { GameOption } from "@/lib/data/games";
 import type { ScheduledEventSummary } from "@/lib/data/idea-event-links";
 import type { LinkedProjectSummary } from "@/lib/data/projects";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { GameChip } from "@/components/content/games/game-chip";
 
 import { DeleteIdeaDialog } from "./delete-idea-dialog";
 import { IdeaCopyActions } from "./idea-copy-actions";
@@ -29,6 +31,10 @@ interface IdeaCardProps {
   scheduledEvents?: ScheduledEventSummary[];
   /** The project this idea belongs to, if any — read-only here; linking happens from the project page (see docs/projects.md). */
   project?: LinkedProjectSummary;
+  /** The game this idea is about, if tagged (#105). */
+  game?: GameOption;
+  /** The whole game library, for the edit dialog's picker (#105). */
+  games?: GameOption[];
 }
 
 /**
@@ -46,13 +52,16 @@ interface IdeaCardProps {
  * to change back) via the shared `IdeaStatusSelect` (#73 extracted it so the
  * detail page shares one implementation) — a themed shadcn `Select` (#72)
  * rather than a native `<select>`, so its trigger and option popup follow the
- * app theme in both modes.
+ * app theme in both modes. The release chip commits inline the same way (#102)
+ * — see `IdeaScheduledEvents`.
  */
 export function IdeaCard({
   idea,
   hasScript = false,
   scheduledEvents = [],
   project,
+  game,
+  games = [],
 }: IdeaCardProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -123,9 +132,9 @@ export function IdeaCard({
               {idea.title}
             </Link>
           </h3>
-          {idea.notes ? (
+          {idea.description ? (
             <p className="line-clamp-3 text-small whitespace-pre-line text-muted-foreground">
-              {idea.notes}
+              {idea.description}
             </p>
           ) : null}
 
@@ -148,6 +157,12 @@ export function IdeaCard({
             </span>
           )}
 
+          {game ? (
+            <div className="relative z-10">
+              <GameChip game={game} href />
+            </div>
+          ) : null}
+
           <div className="relative z-10">
             <IdeaCopyActions idea={idea} />
           </div>
@@ -166,6 +181,7 @@ export function IdeaCard({
             <IdeaScheduledEvents
               ideaId={idea.id}
               scheduledEvents={scheduledEvents}
+              releaseEventId={idea.releaseEventId}
             />
           </div>
 
@@ -182,6 +198,7 @@ export function IdeaCard({
         mode="edit"
         idea={idea}
         releaseStartsAt={releaseEvent?.startsAt ?? null}
+        games={games}
         open={editOpen}
         onOpenChange={setEditOpen}
       />

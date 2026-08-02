@@ -27,11 +27,12 @@ function makeIdea(overrides: Partial<Idea> = {}): Idea {
   return {
     id: "idea-1",
     title: "Speedrun any% commentary",
-    notes: null,
+    description: null,
     format: "either",
     status: "idea",
     tags: [],
     projectId: null,
+    gameId: null,
     releaseEventId: null,
     releaseEventTrack: null,
     stageEnteredAt: new Date(),
@@ -85,13 +86,13 @@ describe("IdeaCard", () => {
     expect(screen.getByText("glitch")).toBeInTheDocument();
   });
 
-  it("renders notes when present, and omits the block when absent", () => {
+  it("renders the description when present, and omits the block when absent", () => {
     const { rerender } = render(
-      <IdeaCard idea={makeIdea({ notes: "Cover the wrong warp" })} />
+      <IdeaCard idea={makeIdea({ description: "Cover the wrong warp" })} />
     );
     expect(screen.getByText("Cover the wrong warp")).toBeInTheDocument();
 
-    rerender(<IdeaCard idea={makeIdea({ notes: null })} />);
+    rerender(<IdeaCard idea={makeIdea({ description: null })} />);
     expect(screen.queryByText("Cover the wrong warp")).not.toBeInTheDocument();
   });
 
@@ -200,6 +201,24 @@ describe("IdeaCard", () => {
     );
     const link = screen.getByRole("link", { name: "Keystroke Hub" });
     expect(link).toHaveAttribute("href", "/projects/project-1");
+  });
+
+  it("shows the game it's about, linking to that game's filtered list (#105)", () => {
+    render(
+      <IdeaCard
+        idea={makeIdea({ gameId: "g-poe" })}
+        game={{ id: "g-poe", name: "Path of Exile" }}
+      />
+    );
+    expect(screen.getByRole("link", { name: "Path of Exile" })).toHaveAttribute(
+      "href",
+      "/content/ideas?game=g-poe"
+    );
+  });
+
+  it("omits the game chip when the idea has no game (#105)", () => {
+    render(<IdeaCard idea={makeIdea()} />);
+    expect(screen.queryByText("Path of Exile")).not.toBeInTheDocument();
   });
 
   it("omits the project chip when no project is linked", () => {

@@ -12,6 +12,10 @@ vi.mock("next/navigation", () => ({
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
+vi.mock("next/server", () => ({ after: vi.fn((fn: () => unknown) => fn()) }));
+vi.mock("@/lib/sync/push", () => ({
+  pushEventDeleted: vi.fn(),
+}));
 
 const dbMock = vi.hoisted(() => {
   // A `select().from()` chain is awaitable with or without a `.where()` in
@@ -74,6 +78,7 @@ vi.mock("@/lib/data/streams", () => ({
 import { revalidatePath } from "next/cache";
 
 import { verifySession } from "@/lib/auth/session";
+import { pushEventDeleted } from "@/lib/sync/push";
 import {
   addChecklistItem,
   addTemplateItem,
@@ -83,7 +88,6 @@ import {
   detachEventFromStream,
   removeChecklistItem,
   removeTemplateItem,
-  saveRetroNotes,
   searchAttachableEvents,
   toggleChecklistItem,
   updateStreamDetails,
@@ -184,67 +188,113 @@ describe("createStream", () => {
 });
 
 describe("updateStreamDetails", () => {
-  const validForm = { id: "stream-1", title: "Renamed", notes: "" };
+  const validInput = {
+    id: "stream-1",
+    title: "Renamed",
+    notes: "",
+    retroNotes: "",
+    gameId: "",
+  };
 
   it("verifies the session before writing", async () => {
-    await updateStreamDetails(undefined, form(validForm));
+    await updateStreamDetails(validInput);
     expect(verifySession).toHaveBeenCalledTimes(1);
   });
 
-  it("updates title and notes and revalidates", async () => {
-    const result = await updateStreamDetails(undefined, form(validForm));
+  it("writes topic, prep notes and the retro in one statement", async () => {
+    const result = await updateStreamDetails({
+      ...validInput,
+      notes: "Check the mic",
+      retroNotes: "Chat was active",
+    });
     expect(result).toEqual({ success: true, streamId: "stream-1" });
+    // One `update`, not two — the single Save button (#102) can't half-land,
+    // and neon-http has no transaction to wrap a pair in.
+    expect(dbMock.update).toHaveBeenCalledTimes(1);
+    expect(dbMock.updateSet).toHaveBeenCalledWith({
+      title: "Renamed",
+      notes: "Check the mic",
+      retroNotes: "Chat was active",
+      gameId: null,
+    });
     expect(revalidatePath).toHaveBeenCalledWith("/content/streams/stream-1");
+  });
+
+  it("clears emptied notes rather than storing an empty string", async () => {
+    await updateStreamDetails(validInput);
+    expect(dbMock.updateSet).toHaveBeenCalledWith({
+      title: "Renamed",
+      notes: null,
+      retroNotes: null,
+      gameId: null,
+    });
+  });
+
+  it("rejects the whole save when one field is invalid, writing nothing", async () => {
+    const result = await updateStreamDetails({
+      ...validInput,
+      title: "",
+      retroNotes: "Worth keeping",
+    });
+    expect(result.fieldErrors?.title).toEqual(["Title is required"]);
+    expect(dbMock.update).not.toHaveBeenCalled();
   });
 
   it("returns an error (not a throw) when the stream no longer exists", async () => {
     dbMock.updateReturning.mockResolvedValueOnce([]);
-    const result = await updateStreamDetails(undefined, form(validForm));
+    const result = await updateStreamDetails(validInput);
     expect(result.error).toBe("That stream no longer exists.");
   });
 });
 
-describe("saveRetroNotes", () => {
-  it("verifies the session before writing", async () => {
-    await saveRetroNotes("stream-1", "Went well");
-    expect(verifySession).toHaveBeenCalledTimes(1);
-  });
-
-  it("saves retro notes and revalidates the stream page", async () => {
-    const result = await saveRetroNotes("stream-1", "Went well");
-    expect(result).toEqual({});
-    expect(dbMock.updateSet).toHaveBeenCalledWith({ retroNotes: "Went well" });
-    expect(revalidatePath).toHaveBeenCalledWith("/content/streams/stream-1");
-  });
-
-  it("clears retro notes with an empty string", async () => {
-    await saveRetroNotes("stream-1", "");
-    expect(dbMock.updateSet).toHaveBeenCalledWith({ retroNotes: null });
-  });
-
-  it("returns an error when the stream no longer exists", async () => {
-    dbMock.updateReturning.mockResolvedValueOnce([]);
-    const result = await saveRetroNotes("missing", "note");
-    expect(result).toEqual({ error: "That stream no longer exists." });
-  });
-});
-
 describe("deleteStream", () => {
+  /** The stream lookup `deleteStream` now does first, plus its sync-link lookup. */
+  function seedStream(eventId: string | null, link?: unknown) {
+    dbMock.selectQueue.push([{ id: "stream-1", eventId }]);
+    if (eventId) dbMock.selectQueue.push(link ? [link] : []);
+  }
+
   it("verifies the session before deleting", async () => {
+    seedStream(null);
     await deleteStream("stream-1");
     expect(verifySession).toHaveBeenCalledTimes(1);
   });
 
-  it("deletes and revalidates the list", async () => {
+  it("deletes an unscheduled stream on its own and revalidates the list", async () => {
+    seedStream(null);
     const result = await deleteStream("stream-1");
     expect(result).toEqual({});
+    expect(dbMock.batch).not.toHaveBeenCalled();
+    expect(dbMock.delete).toHaveBeenCalledTimes(1);
     expect(revalidatePath).toHaveBeenCalledWith("/content/streams");
   });
 
+  it("deletes the linked calendar event alongside the stream, in one batch", async () => {
+    // #104: the block advertises a session, so it must not outlive one.
+    seedStream("evt-1");
+    const result = await deleteStream("stream-1");
+    expect(result).toEqual({});
+    expect(dbMock.batch).toHaveBeenCalledTimes(1);
+    expect(dbMock.batch.mock.calls[0][0]).toHaveLength(2);
+    expect(revalidatePath).toHaveBeenCalledWith("/calendar");
+  });
+
+  it("pushes the Google-side delete for a synced linked event", async () => {
+    seedStream("evt-1", { id: "link-1", googleEventId: "g-1" });
+    await deleteStream("stream-1");
+    expect(pushEventDeleted).toHaveBeenCalledWith("link-1", "g-1", "content");
+  });
+
+  it("skips the push when the linked event was never synced", async () => {
+    seedStream("evt-1");
+    await deleteStream("stream-1");
+    expect(pushEventDeleted).not.toHaveBeenCalled();
+  });
+
   it("returns an error when the stream no longer exists", async () => {
-    dbMock.deleteReturning.mockResolvedValueOnce([]);
     const result = await deleteStream("missing");
     expect(result).toEqual({ error: "That stream no longer exists." });
+    expect(dbMock.delete).not.toHaveBeenCalled();
   });
 });
 

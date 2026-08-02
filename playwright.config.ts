@@ -20,6 +20,22 @@ import {
 config({ path: ".env.local" });
 config({ path: ".env" });
 
+/**
+ * The Next server runs in UTC and the browsers in Europe/Madrid — the exact
+ * split that made issue #95 invisible locally (a developer machine agrees
+ * with itself; Vercel does not). Every spec therefore exercises a real
+ * server/browser timezone mismatch, and any renderer-local date handling
+ * shows up as a shifted time or a hydration mismatch.
+ */
+const APP_TIMEZONE = "Europe/Madrid";
+
+// The runner stands in for the owner, so it shares the browser's zone: a spec
+// that builds a fixture with `setHours(9)` means 09:00 Madrid, which is what
+// the browser will render — while the server under test is in UTC and has to
+// do the conversion correctly for the assertion to hold. Set here, at config
+// load, because Node caches its zone on first use.
+process.env.TZ = APP_TIMEZONE;
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
@@ -29,6 +45,7 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:3000",
     trace: "on-first-retry",
+    timezoneId: APP_TIMEZONE,
   },
   projects: [
     {
@@ -50,10 +67,15 @@ export default defineConfig({
       // content-links.spec.ts, streams.spec.ts, publish-checklist.spec.ts,
       // journal.spec.ts, weekly-summary.spec.ts, weekly-assessment.spec.ts,
       // projects.spec.ts, improvements.spec.ts, meetings.spec.ts,
-      // github-links.spec.ts, dashboard.spec.ts, mobile.spec.ts (whose
+      // github-links.spec.ts, dashboard.spec.ts, stream-track.spec.ts (whose
+      // stream sessions share the one global checklist template, so a
+      // concurrent run's cleanup would delete the template item another run
+      // is still asserting on), mobile.spec.ts (whose
       // journal and weekly-summary cases write real rows), and
       // command-palette.spec.ts (whose content-search describe seeds/clears
-      // a real project + idea) and ideas.spec.ts (capture/filters/release
+      // a real project + idea) and timezone.spec.ts (which drives the
+      // desktop-only week/month time grid and writes real rows) and
+      // ideas.spec.ts (capture/filters/release
       // seed/create/clear real rows) and idea-detail.spec.ts (seeds ideas and
       // writes scripts, with its own mobile-viewport check) seed/create/clear
       // real rows (calendar-sync.spec.ts's connection rows are also
@@ -62,7 +84,7 @@ export default defineConfig({
       // project would race against the chromium project's runs against the same
       // shared DB.
       testIgnore:
-        /(calendar|calendar-sync|event-management|drag-reschedule|agenda|board|scripts|content-links|streams|publish-checklist|journal|weekly-summary|weekly-assessment|projects|improvements|meetings|github-links|dashboard|mobile|command-palette|inbox|ideas|idea-detail)\.spec\.ts$/,
+        /(calendar|calendar-sync|event-management|drag-reschedule|agenda|board|scripts|content-links|streams|publish-checklist|journal|weekly-summary|weekly-assessment|projects|improvements|meetings|github-links|dashboard|stream-track|mobile|command-palette|inbox|ideas|idea-detail|games|timezone)\.spec\.ts$/,
     },
   ],
   webServer: [
@@ -103,6 +125,11 @@ export default defineConfig({
         GOOGLE_OAUTH_TOKEN_BASE_URL: FAKE_GOOGLE_BASE_URL,
         CRON_SECRET: E2E_CRON_SECRET,
         GITHUB_API_BASE_URL: FAKE_GITHUB_BASE_URL,
+        // Match production: Vercel runs in UTC. Without this the server would
+        // inherit the developer's own zone and the browser/server split above
+        // would collapse (issue #95).
+        TZ: "UTC",
+        NEXT_PUBLIC_APP_TIMEZONE: APP_TIMEZONE,
       },
     },
   ],

@@ -1,9 +1,25 @@
 import { describe, expect, it } from "vitest";
 
+import { parseAppDateTime } from "@/lib/time";
+
 import { buildAgenda } from "./agenda";
 import type { CalendarEvent } from "./types";
 
-const NOW = new Date("2026-07-08T12:00:00");
+/**
+ * Runs under `TZ=UTC` (vitest.config.ts) while the app zone is Europe/Madrid.
+ * Fixtures are built in the app zone so "Today"/"Tomorrow" bucketing and the
+ * `HH:mm` labels are asserted against the wall clock the owner actually sees,
+ * not the server's (issue #95).
+ */
+
+/** The instant of a wall-clock time in the app zone. */
+function at(date: string, time: string): Date {
+  const parsed = parseAppDateTime(date, time);
+  if (!parsed) throw new Error(`bad test fixture: ${date} ${time}`);
+  return parsed;
+}
+
+const NOW = at("2026-07-08", "12:00");
 
 function makeEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
   return {
@@ -11,11 +27,12 @@ function makeEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     track: "work",
     title: "Test event",
     description: null,
-    startsAt: new Date("2026-07-08T14:00:00"),
-    endsAt: new Date("2026-07-08T15:00:00"),
+    startsAt: at("2026-07-08", "14:00"),
+    endsAt: at("2026-07-08", "15:00"),
     allDay: false,
     conflictNote: null,
     linkedIdeas: [],
+    streamId: null,
     ...overrides,
   };
 }
@@ -28,13 +45,13 @@ describe("buildAgenda", () => {
   it("buckets events into Today and Tomorrow", () => {
     const today = makeEvent({
       id: "today",
-      startsAt: new Date("2026-07-08T14:00:00"),
-      endsAt: new Date("2026-07-08T15:00:00"),
+      startsAt: at("2026-07-08", "14:00"),
+      endsAt: at("2026-07-08", "15:00"),
     });
     const tomorrow = makeEvent({
       id: "tomorrow",
-      startsAt: new Date("2026-07-09T09:00:00"),
-      endsAt: new Date("2026-07-09T10:00:00"),
+      startsAt: at("2026-07-09", "09:00"),
+      endsAt: at("2026-07-09", "10:00"),
     });
 
     const groups = buildAgenda([today, tomorrow], NOW);
@@ -48,8 +65,8 @@ describe("buildAgenda", () => {
 
   it("excludes events entirely outside the today+tomorrow horizon", () => {
     const dayAfterTomorrow = makeEvent({
-      startsAt: new Date("2026-07-10T09:00:00"),
-      endsAt: new Date("2026-07-10T10:00:00"),
+      startsAt: at("2026-07-10", "09:00"),
+      endsAt: at("2026-07-10", "10:00"),
     });
 
     expect(buildAgenda([dayAfterTomorrow], NOW)).toEqual([]);
@@ -58,13 +75,13 @@ describe("buildAgenda", () => {
   it("pins all-day events before timed events within the same day", () => {
     const timed = makeEvent({
       id: "timed",
-      startsAt: new Date("2026-07-08T13:00:00"),
-      endsAt: new Date("2026-07-08T13:30:00"),
+      startsAt: at("2026-07-08", "13:00"),
+      endsAt: at("2026-07-08", "13:30"),
     });
     const allDay = makeEvent({
       id: "all-day",
-      startsAt: new Date("2026-07-08T00:00:00"),
-      endsAt: new Date("2026-07-08T00:00:00"),
+      startsAt: at("2026-07-08", "00:00"),
+      endsAt: at("2026-07-08", "00:00"),
       allDay: true,
     });
 
@@ -79,8 +96,8 @@ describe("buildAgenda", () => {
 
   it("labels an in-progress event 'Now' and marks inProgress", () => {
     const inProgress = makeEvent({
-      startsAt: new Date("2026-07-08T11:00:00"),
-      endsAt: new Date("2026-07-08T13:00:00"),
+      startsAt: at("2026-07-08", "11:00"),
+      endsAt: at("2026-07-08", "13:00"),
     });
 
     const groups = buildAgenda([inProgress], NOW);
@@ -98,8 +115,8 @@ describe("buildAgenda", () => {
 
   it("excludes a timed event that has already ended", () => {
     const ended = makeEvent({
-      startsAt: new Date("2026-07-08T09:00:00"),
-      endsAt: new Date("2026-07-08T10:00:00"),
+      startsAt: at("2026-07-08", "09:00"),
+      endsAt: at("2026-07-08", "10:00"),
     });
 
     expect(buildAgenda([ended], NOW)).toEqual([]);
@@ -107,7 +124,7 @@ describe("buildAgenda", () => {
 
   it("excludes a timed event ending exactly at now", () => {
     const endsNow = makeEvent({
-      startsAt: new Date("2026-07-08T11:00:00"),
+      startsAt: at("2026-07-08", "11:00"),
       endsAt: NOW,
     });
 
@@ -116,8 +133,8 @@ describe("buildAgenda", () => {
 
   it("keeps today's all-day event visible even after its literal endsAt midnight has passed", () => {
     const allDayToday = makeEvent({
-      startsAt: new Date("2026-07-08T00:00:00"),
-      endsAt: new Date("2026-07-08T00:00:00"),
+      startsAt: at("2026-07-08", "00:00"),
+      endsAt: at("2026-07-08", "00:00"),
       allDay: true,
     });
 
@@ -128,8 +145,8 @@ describe("buildAgenda", () => {
 
   it("excludes an all-day event from a previous day", () => {
     const allDayYesterday = makeEvent({
-      startsAt: new Date("2026-07-07T00:00:00"),
-      endsAt: new Date("2026-07-07T00:00:00"),
+      startsAt: at("2026-07-07", "00:00"),
+      endsAt: at("2026-07-07", "00:00"),
       allDay: true,
     });
 
@@ -139,8 +156,8 @@ describe("buildAgenda", () => {
   it("shows a timed cross-midnight event once, under Today with its start-time label (issue #58)", () => {
     const crossMidnight = makeEvent({
       id: "cross-midnight",
-      startsAt: new Date("2026-07-08T23:45:00"),
-      endsAt: new Date("2026-07-09T00:15:00"),
+      startsAt: at("2026-07-08", "23:45"),
+      endsAt: at("2026-07-09", "00:15"),
     });
 
     const groups = buildAgenda([crossMidnight], NOW);
@@ -157,8 +174,8 @@ describe("buildAgenda", () => {
   it("shows a timed event ending exactly at midnight once, under Today", () => {
     const endsAtMidnight = makeEvent({
       id: "ends-midnight",
-      startsAt: new Date("2026-07-08T22:00:00"),
-      endsAt: new Date("2026-07-09T00:00:00"),
+      startsAt: at("2026-07-08", "22:00"),
+      endsAt: at("2026-07-09", "00:00"),
     });
 
     const groups = buildAgenda([endsAtMidnight], NOW);
@@ -172,11 +189,11 @@ describe("buildAgenda", () => {
   });
 
   it("shows a timed event in progress since yesterday once, under Today, labeled 'Now'", () => {
-    const now = new Date("2026-07-08T00:30:00");
+    const now = at("2026-07-08", "00:30");
     const overnight = makeEvent({
       id: "overnight",
-      startsAt: new Date("2026-07-07T23:00:00"),
-      endsAt: new Date("2026-07-08T01:00:00"),
+      startsAt: at("2026-07-07", "23:00"),
+      endsAt: at("2026-07-08", "01:00"),
     });
 
     const groups = buildAgenda([overnight], now);
@@ -193,8 +210,8 @@ describe("buildAgenda", () => {
   it("shows a timed event starting tomorrow and ending the day after once, under Tomorrow", () => {
     const tomorrowNight = makeEvent({
       id: "tomorrow-night",
-      startsAt: new Date("2026-07-09T23:30:00"),
-      endsAt: new Date("2026-07-10T00:30:00"),
+      startsAt: at("2026-07-09", "23:30"),
+      endsAt: at("2026-07-10", "00:30"),
     });
 
     const groups = buildAgenda([tomorrowNight], NOW);
@@ -211,16 +228,14 @@ describe("buildAgenda", () => {
   it("counts a cross-midnight timed event as a single row against maxItems", () => {
     const crossMidnight = makeEvent({
       id: "cross-midnight",
-      startsAt: new Date("2026-07-08T23:45:00"),
-      endsAt: new Date("2026-07-09T00:15:00"),
+      startsAt: at("2026-07-08", "23:45"),
+      endsAt: at("2026-07-09", "00:15"),
     });
     const tomorrowEvents = Array.from({ length: 3 }, (_, i) =>
       makeEvent({
         id: `tomorrow-${i}`,
-        startsAt: new Date(
-          `2026-07-09T${String(9 + i).padStart(2, "0")}:00:00`
-        ),
-        endsAt: new Date(`2026-07-09T${String(9 + i).padStart(2, "0")}:30:00`),
+        startsAt: at("2026-07-09", `${String(9 + i).padStart(2, "0")}:00`),
+        endsAt: at("2026-07-09", `${String(9 + i).padStart(2, "0")}:30`),
       })
     );
 
@@ -235,8 +250,8 @@ describe("buildAgenda", () => {
   it("shows a multi-day all-day event once per day bucket it covers", () => {
     const spanning = makeEvent({
       id: "spanning",
-      startsAt: new Date("2026-07-08T00:00:00"),
-      endsAt: new Date("2026-07-09T00:00:00"),
+      startsAt: at("2026-07-08", "00:00"),
+      endsAt: at("2026-07-09", "00:00"),
       allDay: true,
     });
 
@@ -251,19 +266,15 @@ describe("buildAgenda", () => {
     const events = Array.from({ length: 5 }, (_, i) =>
       makeEvent({
         id: `today-${i}`,
-        startsAt: new Date(
-          `2026-07-08T${String(13 + i).padStart(2, "0")}:00:00`
-        ),
-        endsAt: new Date(`2026-07-08T${String(13 + i).padStart(2, "0")}:30:00`),
+        startsAt: at("2026-07-08", `${String(13 + i).padStart(2, "0")}:00`),
+        endsAt: at("2026-07-08", `${String(13 + i).padStart(2, "0")}:30`),
       })
     );
     const tomorrowEvents = Array.from({ length: 5 }, (_, i) =>
       makeEvent({
         id: `tomorrow-${i}`,
-        startsAt: new Date(
-          `2026-07-09T${String(9 + i).padStart(2, "0")}:00:00`
-        ),
-        endsAt: new Date(`2026-07-09T${String(9 + i).padStart(2, "0")}:30:00`),
+        startsAt: at("2026-07-09", `${String(9 + i).padStart(2, "0")}:00`),
+        endsAt: at("2026-07-09", `${String(9 + i).padStart(2, "0")}:30`),
       })
     );
 
@@ -275,8 +286,8 @@ describe("buildAgenda", () => {
 
   it("drops an empty day bucket entirely rather than rendering a headerless gap", () => {
     const tomorrowOnly = makeEvent({
-      startsAt: new Date("2026-07-09T09:00:00"),
-      endsAt: new Date("2026-07-09T10:00:00"),
+      startsAt: at("2026-07-09", "09:00"),
+      endsAt: at("2026-07-09", "10:00"),
     });
 
     const groups = buildAgenda([tomorrowOnly], NOW);

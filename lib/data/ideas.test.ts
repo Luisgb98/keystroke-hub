@@ -37,6 +37,12 @@ describe("buildIdeaFilterCondition", () => {
     expect(params).toEqual(["scripted"]);
   });
 
+  it("maps `game` to an equality check on the library id (#105)", () => {
+    const { sql, params } = render({ game: "game-1" });
+    expect(sql).toContain('"game_id" = $1');
+    expect(params).toEqual(["game-1"]);
+  });
+
   it("maps `tag` to an array containment check", () => {
     const { sql, params } = render({ tag: "vod" });
     expect(sql).toContain("@>");
@@ -49,8 +55,21 @@ describe("buildIdeaFilterCondition", () => {
       format: "video",
       status: "idea",
       tag: "speedrun",
+      game: "game-1",
     });
     expect(sql).toContain(" and ");
-    expect(params).toEqual(["%glitch%", "video", "idea", '{"speedrun"}']);
+    expect(params).toEqual([
+      "%glitch%",
+      "video",
+      "idea",
+      '{"speedrun"}',
+      "game-1",
+    ]);
+  });
+
+  it("composes the game filter with the existing ones (#105)", () => {
+    const { sql, params } = render({ status: "published", game: "game-1" });
+    expect(sql).toContain(" and ");
+    expect(params).toEqual(["published", "game-1"]);
   });
 });

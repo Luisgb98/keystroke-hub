@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
 
 import type { AgendaItem } from "@/lib/calendar/agenda";
+import { trackKindOf } from "@/lib/calendar/track-kind";
 import { cn } from "@/lib/utils";
 
 import { EventEditor } from "@/components/calendar/event-editor";
@@ -21,7 +22,8 @@ interface AgendaItemRowProps {
 export function AgendaItemRow({ item }: AgendaItemRowProps) {
   const [open, setOpen] = useState(false);
   const { event, timeLabel, inProgress } = item;
-  const Icon = TRACK_ICON[event.track];
+  const kind = trackKindOf(event);
+  const Icon = TRACK_ICON[kind];
 
   return (
     <>
@@ -31,11 +33,11 @@ export function AgendaItemRow({ item }: AgendaItemRowProps) {
         onClick={() => setOpen(true)}
         className={cn(
           "flex min-h-11 w-full min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-left text-small",
-          TRACK_SURFACE_CLASSES[event.track]
+          TRACK_SURFACE_CLASSES[kind]
         )}
       >
         <Icon aria-hidden className="size-4 shrink-0" />
-        <span className="sr-only">{TRACK_LABEL[event.track]}: </span>
+        <span className="sr-only">{TRACK_LABEL[kind]}: </span>
         <span className="min-w-0 flex-1 truncate font-medium">
           {event.title}
         </span>

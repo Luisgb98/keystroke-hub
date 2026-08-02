@@ -119,9 +119,16 @@ label match as nav items.
 - **`CommandPaletteProvider`** (`components/command-palette/`) — a client
   context mounted in `app/(app)/layout.tsx`, inside the auth-gated shell
   only (the palette must not exist on `/login`). Owns `open` state and the
-  global `keydown` listener for Cmd/Ctrl-K, calling `preventDefault` before
-  a browser's own binding (e.g. Chrome's address-bar focus) can act.
-  `useCommandPalette()` exposes `{ open, setOpen }` to any trigger.
+  global `keydown` listener for Cmd/Ctrl-K, calling `preventDefault` first
+  because Chrome and Firefox both bind that combo to the address bar's search
+  mode, which would pull focus out of the app. The shortcut has moved twice:
+  #85 took it off Cmd/Ctrl-K onto Cmd/Ctrl-F so that "search" inside the app
+  meant the palette, and #102 put it back on K. Reason for the reversal: the
+  script editor is a page of prose, and finding a word inside a script needs
+  the browser's own find-in-page, which only Cmd/Ctrl-F opens — swallowing it
+  cost more than the palette gained. F is now left strictly alone (no
+  listener, no `preventDefault`). `useCommandPalette()` exposes
+  `{ open, setOpen }` to any trigger.
 - **`CommandPalette`** — the dialog itself, built on shadcn's `command.tsx`
   (`cmdk`, added via `pnpm dlx shadcn@latest add command`) rendered inside
   our existing `Dialog`. Before typing: a **Recent** group (fetched once per
@@ -168,7 +175,9 @@ Unit (Vitest + RTL, colocated):
   short-circuits without calling `searchEntities`, a real query is trimmed
   and forwarded.
 - `command-palette-provider.test.tsx` — Cmd-K and Ctrl-K both toggle open,
-  `preventDefault` is called, the listener is removed on unmount.
+  `preventDefault` is called, the listener is removed on unmount, and
+  Cmd/Ctrl-F neither opens the palette nor has its default prevented, so
+  find-in-page survives (#102).
 - `command-palette.test.tsx` — groups render with world label + icon per
   result, selecting an item closes the dialog and calls `router.push` with
   its href (mocked `next/navigation` and `lib/search/actions`), a
@@ -181,6 +190,8 @@ e2e (`e2e/command-palette.spec.ts`, Playwright, `chromium` + a
 
 - Ctrl/Cmd-K opens the palette; typing a nav label filters to it; Enter
   navigates. Doesn't need `DATABASE_URL` (pure navigation).
+- Ctrl-F no longer opens it (find-in-page is the browser's again), and the
+  sidebar chip advertises the new shortcut (#102).
 - Esc closes the palette and returns focus to the trigger that opened it.
 - Empty query shows the Navigate group immediately.
 - Tapping the bottom-nav Search button (mobile viewport) opens the palette

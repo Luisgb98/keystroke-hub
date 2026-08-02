@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { format } from "date-fns";
 
 import type { MeetingNoteSummaryForProject } from "@/lib/data/meeting-notes";
+import { formatAppDateString } from "@/lib/time";
 
 interface ProjectMeetingNotesProps {
   meetingNotes: MeetingNoteSummaryForProject[];
@@ -48,7 +48,7 @@ export function ProjectMeetingNotes({
                 className="flex flex-1 items-center gap-2 overflow-hidden text-small hover:underline"
               >
                 <span className="font-mono text-caption text-muted-foreground">
-                  {format(new Date(`${meetingNote.date}T00:00:00`), "MMM d")}
+                  {formatAppDateString(meetingNote.date, "MMM d")}
                 </span>
                 <span className="truncate">{meetingNote.title}</span>
               </Link>

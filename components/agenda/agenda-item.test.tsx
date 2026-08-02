@@ -17,6 +17,7 @@ function makeEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     allDay: false,
     conflictNote: null,
     linkedIdeas: [],
+    streamId: null,
     ...overrides,
   };
 }
@@ -57,6 +58,25 @@ describe("AgendaItemRow", () => {
     const row = screen.getByText("Record voiceover").closest("button");
     expect(row).toHaveClass("bg-track-content");
     expect(row).toHaveClass("border-track-content-border");
+  });
+
+  it("renders a scheduled stream as a Stream row (issue #104)", () => {
+    render(
+      <AgendaItemRow
+        item={makeItem({
+          event: makeEvent({
+            track: "content",
+            title: "Ranked run",
+            streamId: "stream-1",
+          }),
+        })}
+      />
+    );
+
+    expect(screen.getByText("Stream:")).toBeInTheDocument();
+    const row = screen.getByText("Ranked run").closest("button");
+    expect(row).toHaveClass("bg-track-stream");
+    expect(row).toHaveClass("border-track-stream-border");
   });
 
   it("shows 'All day' for an all-day event", () => {

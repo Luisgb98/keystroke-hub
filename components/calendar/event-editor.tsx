@@ -7,12 +7,16 @@ import {
   useState,
   useTransition,
 } from "react";
+import Link from "next/link";
+import { ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
 import { createEvent, updateEvent } from "@/lib/calendar/actions";
 import type { QuickAddDefaults } from "@/lib/calendar/quick-add";
-import type { CalendarEvent, Track } from "@/lib/calendar/types";
+import { trackKindOf, type TrackKind } from "@/lib/calendar/track-kind";
+import type { CalendarEvent } from "@/lib/calendar/types";
 import { dismissConflictNote } from "@/lib/sync/actions";
+import { formatAppDateParam, formatAppTimeParam } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { EventLinkedIdeas } from "@/components/content/event-linked-ideas";
 import { Button } from "@/components/ui/button";
@@ -24,10 +28,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { TimePicker } from "@/components/ui/time-picker";
 
 import { DeleteEventDialog } from "./delete-event-dialog";
 import { TRACK_ICON, TRACK_LABEL, TRACK_SURFACE_CLASSES } from "./track-styles";
@@ -41,18 +47,14 @@ interface EventEditorProps {
   onOpenChange: (open: boolean) => void;
 }
 
-function dateParam(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function timeParam(date: Date): string {
-  return `${String(date.getHours()).padStart(2, "0")}:${String(
-    date.getMinutes()
-  ).padStart(2, "0")}`;
-}
+/**
+ * Prefill reads the stored instant back as app-timezone wall clock (see
+ * lib/time). Using the raw `getFullYear`/`getHours` getters here would render
+ * the server's own zone during SSR and the device's after hydration — the
+ * form would show a different time than the calendar behind it (issue #95).
+ */
+const dateParam = formatAppDateParam;
+const timeParam = formatAppTimeParam;
 
 function initialValues(
   event: CalendarEvent | undefined,
@@ -60,7 +62,7 @@ function initialValues(
 ) {
   if (event) {
     return {
-      track: event.track as Track | undefined,
+      track: trackKindOf(event) as TrackKind | undefined,
       title: event.title,
       description: event.description ?? "",
       allDay: event.allDay,
@@ -72,7 +74,7 @@ function initialValues(
   }
 
   return {
-    track: undefined as Track | undefined,
+    track: undefined as TrackKind | undefined,
     title: "",
     description: "",
     allDay: defaults?.allDay ?? false,
@@ -198,7 +200,20 @@ export function EventEditor({
               ) : null}
             </div>
 
-            {mode === "edit" && event && values.track === "content" ? (
+            {mode === "edit" && event?.streamId ? (
+              <Link
+                href={`/content/streams/${event.streamId}`}
+                data-slot="stream-session-link"
+                className="flex min-h-11 items-center justify-between gap-2 rounded-lg border border-track-stream-border bg-track-stream px-3 py-2 text-small font-medium text-track-stream-foreground hover:underline"
+              >
+                Open stream session
+                <ExternalLink aria-hidden className="size-4 shrink-0" />
+              </Link>
+            ) : null}
+
+            {mode === "edit" &&
+            event &&
+            (values.track === "content" || values.track === "stream") ? (
               <EventLinkedIdeas
                 eventId={event.id}
                 linkedIdeas={event.linkedIdeas}
@@ -238,48 +253,46 @@ export function EventEditor({
             <div className="grid grid-cols-2 gap-2">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="event-start-date">Start</Label>
-                <Input
+                <DatePicker
                   id="event-start-date"
                   name="startDate"
-                  type="date"
+                  triggerLabel="Open starting day calendar"
                   value={values.startDate}
-                  onChange={(e) =>
-                    setValues((v) => ({ ...v, startDate: e.target.value }))
+                  onChange={(startDate) =>
+                    setValues((v) => ({ ...v, startDate }))
                   }
                 />
                 {!values.allDay ? (
-                  <Input
+                  <TimePicker
                     name="startTime"
-                    type="time"
                     aria-label="Start time"
+                    triggerLabel="Choose starting time"
                     required
                     value={values.startTime}
-                    onChange={(e) =>
-                      setValues((v) => ({ ...v, startTime: e.target.value }))
+                    onChange={(startTime) =>
+                      setValues((v) => ({ ...v, startTime }))
                     }
                   />
                 ) : null}
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="event-end-date">End</Label>
-                <Input
+                <DatePicker
                   id="event-end-date"
                   name="endDate"
-                  type="date"
+                  triggerLabel="Open ending day calendar"
                   value={values.endDate}
-                  onChange={(e) =>
-                    setValues((v) => ({ ...v, endDate: e.target.value }))
-                  }
+                  onChange={(endDate) => setValues((v) => ({ ...v, endDate }))}
                 />
                 {!values.allDay ? (
-                  <Input
+                  <TimePicker
                     name="endTime"
-                    type="time"
                     aria-label="End time"
+                    triggerLabel="Choose ending time"
                     required
                     value={values.endTime}
-                    onChange={(e) =>
-                      setValues((v) => ({ ...v, endTime: e.target.value }))
+                    onChange={(endTime) =>
+                      setValues((v) => ({ ...v, endTime }))
                     }
                   />
                 ) : null}

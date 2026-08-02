@@ -46,7 +46,7 @@ describe("singleLineFromBody", () => {
 describe("prefillForDestination", () => {
   const today = "2026-07-18";
 
-  it("splits an idea into title + notes", () => {
+  it("splits an idea into title + description", () => {
     const result = prefillForDestination(
       "New series idea\ncover the whole arc",
       "content_idea",

@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useId, useState } from "react";
-import { format } from "date-fns";
 import { Plus } from "lucide-react";
 
 import { createMeetingNote } from "@/lib/meetings/actions";
@@ -13,6 +12,7 @@ import {
 } from "@/lib/meetings/meeting-type";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { appTodayParam } from "@/lib/time";
 
 interface MeetingNoteCaptureProps {
   projects: LinkableProjectOption[];
@@ -30,7 +31,7 @@ interface MeetingNoteCaptureProps {
 
 function emptyValues() {
   return {
-    date: format(new Date(), "yyyy-MM-dd"),
+    date: appTodayParam(),
     title: "",
     notes: "",
     meetingType: INITIAL_MEETING_TYPE as string,
@@ -76,15 +77,13 @@ export function MeetingNoteCapture({ projects }: MeetingNoteCaptureProps) {
           <div className="flex flex-col gap-3 sm:flex-row">
             <div className="flex flex-col gap-2">
               <Label htmlFor="meeting-capture-date">Date</Label>
-              <Input
+              <DatePicker
                 id="meeting-capture-date"
-                type="date"
                 name="date"
+                triggerLabel="Open new meeting day calendar"
                 value={values.date}
-                onChange={(e) =>
-                  setValues((v) => ({ ...v, date: e.target.value }))
-                }
-                className="w-auto"
+                onChange={(date) => setValues((v) => ({ ...v, date }))}
+                className="sm:w-44"
               />
             </div>
             <div className="flex flex-1 flex-col gap-2">

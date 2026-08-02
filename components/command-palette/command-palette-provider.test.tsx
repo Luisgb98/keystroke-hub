@@ -71,7 +71,31 @@ describe("CommandPaletteProvider", () => {
     expect(screen.getByTestId("consumer-open")).toHaveTextContent("false");
   });
 
-  it("calls preventDefault on the triggering keydown, beating a browser's own Ctrl-K binding", () => {
+  // #102 handed Cmd/Ctrl-F back to the browser: finding a word inside a script
+  // needs real find-in-page, and only F opens it. The palette must keep its
+  // hands off that combo — this is the guard, replacing #85's mirror image.
+  it("leaves Cmd/Ctrl-F alone so find-in-page still works (#102)", () => {
+    render(
+      <CommandPaletteProvider>
+        <Consumer />
+      </CommandPaletteProvider>
+    );
+
+    const event = new KeyboardEvent("keydown", {
+      key: "f",
+      metaKey: true,
+      cancelable: true,
+    });
+    const preventDefaultSpy = vi.spyOn(event, "preventDefault");
+    window.dispatchEvent(event);
+    fireEvent.keyDown(window, { key: "f", ctrlKey: true });
+
+    expect(screen.getByTestId("consumer-open")).toHaveTextContent("false");
+    // Not merely ignored — the browser's default must survive untouched.
+    expect(preventDefaultSpy).not.toHaveBeenCalled();
+  });
+
+  it("calls preventDefault on the triggering keydown, so the browser can't steal focus to its address bar", () => {
     render(
       <CommandPaletteProvider>
         <Consumer />

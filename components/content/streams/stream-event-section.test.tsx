@@ -36,8 +36,9 @@ describe("StreamEventSection", () => {
         event={{
           id: "evt-1",
           title: "Stream night",
-          startsAt: new Date("2026-08-01T19:00:00"),
-          endsAt: new Date("2026-08-01T21:00:00"),
+          // 19:00 in Madrid (CEST, +2) as an absolute instant — see #95.
+          startsAt: new Date("2026-08-01T17:00:00.000Z"),
+          endsAt: new Date("2026-08-01T19:00:00.000Z"),
           allDay: false,
         }}
       />
@@ -67,8 +68,8 @@ describe("StreamEventSection", () => {
         event={{
           id: "evt-1",
           title: "Stream night",
-          startsAt: new Date("2026-08-01T19:00:00"),
-          endsAt: new Date("2026-08-01T21:00:00"),
+          startsAt: new Date("2026-08-01T17:00:00.000Z"),
+          endsAt: new Date("2026-08-01T19:00:00.000Z"),
           allDay: false,
         }}
       />
@@ -94,8 +95,8 @@ describe("StreamEventSection", () => {
         event={{
           id: "evt-1",
           title: "Stream night",
-          startsAt: new Date("2026-08-01T19:00:00"),
-          endsAt: new Date("2026-08-01T21:00:00"),
+          startsAt: new Date("2026-08-01T17:00:00.000Z"),
+          endsAt: new Date("2026-08-01T19:00:00.000Z"),
           allDay: false,
         }}
       />

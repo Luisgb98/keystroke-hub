@@ -1,11 +1,12 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { verifySession } from "@/lib/auth/session";
+import { insertStreamSession } from "@/lib/content/stream-session";
 import { getDb } from "@/lib/db";
 import {
   eventSyncLinks,
@@ -19,23 +20,9 @@ import {
   pushEventDeleted,
   pushEventUpdated,
 } from "@/lib/sync/push";
+import { schedulePush } from "@/lib/sync/schedule";
 
 import { eventFormSchema, rescheduleSchema } from "./event-schema";
-
-/**
- * Schedules `fn` via `after()`, swallowing a synchronous throw from `after`
- * itself (rather than the callback) — matches the "push failures never
- * block or fail the mutation" contract in docs/google-sync.md, extended to
- * the scheduling call itself in case the request-scope `after` needs isn't
- * available for some reason.
- */
-function schedulePush(fn: () => Promise<void>): void {
-  try {
-    after(fn);
-  } catch (error) {
-    console.error("Failed to schedule Google Calendar push:", error);
-  }
-}
 
 export interface EventActionState {
   error?: string;
@@ -58,6 +45,12 @@ function parseEventForm(formData: FormData) {
 
 const VALIDATION_ERROR = "Check the highlighted fields.";
 
+/** Both stream-planner routes, refreshed whenever a calendar write moves a session. */
+function revalidateStreamPaths(streamId?: string): void {
+  revalidatePath("/content/streams");
+  if (streamId) revalidatePath(`/content/streams/${streamId}`);
+}
+
 export async function createEvent(
   _prevState: EventActionState | undefined,
   formData: FormData
@@ -73,9 +66,28 @@ export async function createEvent(
   }
 
   const db = getDb();
+  const { kind, ...values } = parsed.data;
+
+  // Picking Stream creates the session behind the block in the same request,
+  // checklist seeded from the current template (issue #104) — a purple block
+  // always corresponds to a real session on the planner.
+  if (kind === "stream") {
+    const eventId = randomUUID();
+    const streamId = await insertStreamSession({
+      eventId,
+      title: values.title,
+      notes: values.description,
+      leading: db.insert(events).values({ ...values, id: eventId }),
+    });
+    revalidatePath("/calendar");
+    revalidateStreamPaths(streamId);
+    schedulePush(() => pushEventCreated(eventId, values.track));
+    return { success: true };
+  }
+
   const [inserted] = await db
     .insert(events)
-    .values(parsed.data)
+    .values(values)
     .returning({ id: events.id, track: events.track });
   revalidatePath("/calendar");
   // Push to Google after the response is sent (see docs/google-sync.md) —
@@ -100,6 +112,7 @@ export async function updateEvent(
   }
 
   const db = getDb();
+  const { kind, ...values } = parsed.data;
 
   // A track flip breaks any composite FK a child row holds against
   // `events (id, track)` (idea links + streams are content-pinned, meeting
@@ -108,7 +121,7 @@ export async function updateEvent(
   // Content-pinned children (ideas, streams) can only exist on a content
   // event, and work-pinned children (meeting notes) only on a work event, so
   // the target track alone tells us which to guard (issue #67, finding C8).
-  if (parsed.data.track === "work") {
+  if (values.track === "work") {
     const [ideaLink] = await db
       .select({ ideaId: ideaEventLinks.ideaId })
       .from(ideaEventLinks)
@@ -129,7 +142,7 @@ export async function updateEvent(
     }
   }
 
-  if (parsed.data.track === "content") {
+  if (values.track === "content") {
     const [meetingNote] = await db
       .select({ id: meetingNotes.id })
       .from(meetingNotes)
@@ -142,9 +155,17 @@ export async function updateEvent(
     }
   }
 
+  // Both content-track kinds store the same `track`, so the *kind* change is
+  // the one the `events` UPDATE can't express — it's a stream link being
+  // added or dropped (issue #104).
+  const [session] = await db
+    .select({ id: streams.id })
+    .from(streams)
+    .where(eq(streams.eventId, id));
+
   const updated = await db
     .update(events)
-    .set(parsed.data)
+    .set(values)
     .where(eq(events.id, id))
     .returning({ id: events.id, track: events.track });
 
@@ -152,7 +173,26 @@ export async function updateEvent(
     return { error: "That event no longer exists." };
   }
 
+  let touchedStreamId = session?.id;
+  if (kind === "stream" && !session) {
+    // Promoting an existing content event to a Stream block.
+    touchedStreamId = await insertStreamSession({
+      eventId: id,
+      title: values.title,
+    });
+  } else if (kind === "content" && session) {
+    // Demoting: the session survives as Unscheduled, checklist and notes
+    // intact — never silently destroyed (issue #104). Flipping the same event
+    // all the way to Work is refused above instead, since a work-track event
+    // can't legally carry the content-pinned link at all.
+    await db
+      .update(streams)
+      .set({ eventId: null, eventTrack: null })
+      .where(eq(streams.id, session.id));
+  }
+
   revalidatePath("/calendar");
+  if (touchedStreamId) revalidateStreamPaths(touchedStreamId);
   schedulePush(() => pushEventUpdated(updated[0].id, updated[0].track));
   return { success: true };
 }

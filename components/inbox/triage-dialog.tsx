@@ -20,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -80,7 +81,7 @@ export function TriageDialog({
         return {
           type: destination,
           title: values.title,
-          notes: values.secondary,
+          description: values.secondary,
         };
       case "improvement":
         return {
@@ -137,13 +138,11 @@ export function TriageDialog({
           {destination === "meeting_note" ? (
             <div className="flex flex-col gap-2">
               <Label htmlFor="triage-date">Date</Label>
-              <Input
+              <DatePicker
                 id="triage-date"
-                type="date"
+                triggerLabel="Open meeting day calendar"
                 value={values.date}
-                onChange={(e) =>
-                  setValues((v) => ({ ...v, date: e.target.value }))
-                }
+                onChange={(date) => setValues((v) => ({ ...v, date }))}
               />
             </div>
           ) : null}
@@ -169,7 +168,7 @@ export function TriageDialog({
             <div className="flex flex-col gap-2">
               <Label htmlFor="triage-secondary">
                 {destination === "content_idea"
-                  ? "Notes"
+                  ? "Description"
                   : destination === "improvement"
                     ? "Rationale"
                     : "Notes"}

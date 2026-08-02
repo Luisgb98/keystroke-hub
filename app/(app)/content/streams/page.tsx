@@ -3,12 +3,13 @@ import type { Metadata } from "next";
 import { StreamCard } from "@/components/content/streams/stream-card";
 import { StreamCreate } from "@/components/content/streams/stream-create";
 import { TemplateEditor } from "@/components/content/streams/template-editor";
+import { getGames } from "@/lib/data/games";
 import {
   getStreamsOverview,
   getTemplateItems,
   type StreamsOverview,
 } from "@/lib/data/streams";
-import type { StreamChecklistTemplateItem } from "@/lib/db/schema";
+import type { Game, StreamChecklistTemplateItem } from "@/lib/db/schema";
 
 export const metadata: Metadata = {
   title: "Streams",
@@ -19,10 +20,12 @@ export default async function StreamsPage() {
   // as /content/ideas and /calendar (see docs/database.md).
   let overview: StreamsOverview = { upcoming: [], unscheduled: [], past: [] };
   let templateItems: StreamChecklistTemplateItem[] = [];
+  let games: Game[] = [];
   try {
-    [overview, templateItems] = await Promise.all([
+    [overview, templateItems, games] = await Promise.all([
       getStreamsOverview(),
       getTemplateItems(),
+      getGames(),
     ]);
   } catch (error) {
     console.error("Failed to load streams:", error);
@@ -35,14 +38,17 @@ export default async function StreamsPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-4 px-4 py-6 sm:px-10 sm:py-8">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-col gap-1">
           <h1 className="font-heading text-h1 font-semibold">Streams</h1>
           <p className="text-small text-muted-foreground">
             Plan the topic, prep the checklist, go live calmly.
           </p>
         </div>
-        <TemplateEditor items={templateItems} />
+        <div className="flex items-center gap-2">
+          <TemplateEditor items={templateItems} />
+          <StreamCreate games={games} />
+        </div>
       </div>
 
       {isEmpty ? (
@@ -91,8 +97,6 @@ export default async function StreamsPage() {
           ) : null}
         </>
       )}
-
-      <StreamCreate />
     </div>
   );
 }

@@ -1,28 +1,29 @@
 import { z } from "zod";
 
+import { parseAppDate, parseAppDateTime } from "@/lib/time";
+
+import { isTrackKind, trackForKind, type TrackKind } from "./track-kind";
 import type { Track } from "./types";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-/** The final, DB-ready shape produced by `eventFormSchema` on success. */
+/**
+ * The final, DB-ready shape produced by `eventFormSchema` on success.
+ *
+ * `track` is the column value; `kind` is what the user picked. They differ
+ * only for `stream`, which stores `content` and is told apart by its linked
+ * session (see `./track-kind.ts`) — so the actions destructure `kind` off
+ * before handing the rest straight to Drizzle.
+ */
 export interface EventInput {
   title: string;
   track: Track;
+  kind: TrackKind;
   description: string | null;
   allDay: boolean;
   startsAt: Date;
   endsAt: Date;
-}
-
-/** Local midnight for a `yyyy-MM-dd` string — matches `parseDateParam` in `range.ts`. */
-function parseLocalDate(date: string): Date {
-  return new Date(`${date}T00:00:00`);
-}
-
-/** Local date+time for `yyyy-MM-dd` + `HH:mm` strings. */
-function combineDateAndTime(date: string, time: string): Date {
-  return new Date(`${date}T${time}:00`);
 }
 
 const rawEventSchema = z.object({
@@ -33,13 +34,7 @@ const rawEventSchema = z.object({
     .max(200, "Keep the title under 200 characters"),
   // Validated manually (not z.enum) so the "never ambiguous" requirement gets
   // a specific, UI-facing message rather than zod's generic invalid-value one.
-  track: z
-    .string()
-    .optional()
-    .refine(
-      (value): value is Track => value === "work" || value === "content",
-      "Choose a track"
-    ),
+  track: z.string().optional().refine(isTrackKind, "Choose a track"),
   description: z
     .string()
     .trim()
@@ -56,20 +51,23 @@ const rawEventSchema = z.object({
 
 /**
  * Shared by the create/edit form and both server actions: parses raw
- * form-shaped input into the final `{ startsAt, endsAt }` DB shape. All-day
- * events are normalized to local-midnight date boundaries (see
- * docs/calendar.md) — a single-day all-day event has `startsAt === endsAt`.
+ * form-shaped input into the final `{ startsAt, endsAt }` DB shape. The
+ * wall-clock strings are read in the app timezone (see lib/time), never in
+ * the server's own zone — that is what keeps a 19:00 event 19:00 after a save
+ * on Vercel (issue #95). All-day events are normalized to app-timezone
+ * midnight date boundaries (see docs/calendar.md) — a single-day all-day event
+ * has `startsAt === endsAt`.
  */
 export const eventFormSchema = rawEventSchema.transform((data, ctx) => {
   const description =
     data.description && data.description.length > 0 ? data.description : null;
 
-  let startsAt: Date;
-  let endsAt: Date;
+  let startsAt: Date | null;
+  let endsAt: Date | null;
 
   if (data.allDay) {
-    startsAt = parseLocalDate(data.startDate);
-    endsAt = parseLocalDate(data.endDate);
+    startsAt = parseAppDate(data.startDate);
+    endsAt = parseAppDate(data.endDate);
   } else {
     if (!data.startTime) {
       ctx.addIssue({
@@ -87,9 +85,28 @@ export const eventFormSchema = rawEventSchema.transform((data, ctx) => {
     }
     if (!data.startTime || !data.endTime) return z.NEVER;
 
-    startsAt = combineDateAndTime(data.startDate, data.startTime);
-    endsAt = combineDateAndTime(data.endDate, data.endTime);
+    startsAt = parseAppDateTime(data.startDate, data.startTime);
+    endsAt = parseAppDateTime(data.endDate, data.endTime);
   }
+
+  // `DATE_RE` only checks the shape, so a well-formed but nonexistent day
+  // (2026-02-30) still reaches here — reject it rather than storing an
+  // Invalid Date.
+  if (!startsAt) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["startDate"],
+      message: "Enter a valid start date",
+    });
+  }
+  if (!endsAt) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["endDate"],
+      message: "Enter a valid end date",
+    });
+  }
+  if (!startsAt || !endsAt) return z.NEVER;
 
   if (endsAt.getTime() < startsAt.getTime()) {
     ctx.addIssue({
@@ -102,9 +119,11 @@ export const eventFormSchema = rawEventSchema.transform((data, ctx) => {
 
   // Guaranteed valid here: a failed `track` refine short-circuits parsing
   // before this transform ever runs.
+  const kind = data.track as TrackKind;
   const result: EventInput = {
     title: data.title,
-    track: data.track as Track,
+    track: trackForKind(kind),
+    kind,
     description,
     allDay: data.allDay,
     startsAt,

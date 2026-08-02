@@ -191,7 +191,10 @@ export const ideas = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     title: text("title").notNull(),
-    notes: text("notes"),
+    // The publish-facing video description, drafted at capture time (#88).
+    // Renamed from `notes` — capture asks for the real description rather than
+    // scribbled notes, and the copy-to-clipboard blocks paste it verbatim.
+    description: text("description"),
     format: ideaFormatEnum("format").notNull().default("either"),
     status: ideaStatusEnum("status").notNull().default("idea"),
     // Free-form, single-user tags — filter options are derived from tags in
@@ -203,6 +206,15 @@ export const ideas = pgTable(
     // bare nullable uuid with no FK before #24 landed; every existing value
     // was NULL, so wiring up the FK needed no backfill.
     projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "set null",
+    }),
+    // The game this idea is about (#105) — its own field, not one of the
+    // free-form `tags` above: tags describe a video for publishing, the game
+    // says what the work is about. Nullable (an idea without a game stays
+    // valid, and every row predating this column has none) with
+    // `onDelete: "set null"`, which is what makes deleting a game *untag* its
+    // ideas rather than delete them (see docs/content-games.md).
+    gameId: uuid("game_id").references(() => games.id, {
       onDelete: "set null",
     }),
     // The idea's release on the calendar (#71). Rather than a bare `release_at`
@@ -239,6 +251,7 @@ export const ideas = pgTable(
     index("ideas_tags_idx").using("gin", table.tags),
     index("ideas_stage_entered_at_idx").on(table.stageEnteredAt),
     index("ideas_project_id_idx").on(table.projectId),
+    index("ideas_game_id_idx").on(table.gameId),
     // Same belt-and-braces composite-FK + content-only CHECK pattern as
     // `streams` (see below): the release event can only ever be a content-track
     // event, enforced at the DB level, and `unique(release_event_id)` keeps
@@ -344,6 +357,10 @@ export const streams = pgTable(
     title: text("title").notNull(),
     notes: text("notes"),
     retroNotes: text("retro_notes"),
+    // Same shape and rationale as `ideas.gameId` above (#105).
+    gameId: uuid("game_id").references(() => games.id, {
+      onDelete: "set null",
+    }),
     eventId: uuid("event_id"),
     eventTrack: trackEnum("event_track"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -355,6 +372,7 @@ export const streams = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [
+    index("streams_game_id_idx").on(table.gameId),
     unique("streams_event_id_unique").on(table.eventId),
     foreignKey({
       columns: [table.eventId, table.eventTrack],
@@ -915,3 +933,39 @@ export const inboxEntries = pgTable(
 
 export type InboxEntry = typeof inboxEntries.$inferSelect;
 export type NewInboxEntry = typeof inboxEntries.$inferInsert;
+
+// --- Game library (issue #105) ---
+//
+// See docs/content-games.md. Almost every video and stream is *about* a game,
+// but the game only ever existed as words inside a title, so nothing could be
+// grouped or counted by it. This is the normalized library the picker on
+// `ideas`/`streams` selects from — unlike `ideas.tags` (free-form `text[]`,
+// options derived from what's in use), a game is a real row with a stable id,
+// which is what makes renaming propagate everywhere for free.
+//
+// `name` is stored trimmed and whitespace-collapsed exactly as typed (casing
+// preserved — "Path of Exile", not "path of exile"), while the unique index is
+// on `lower(name)`: that's what makes "poe league" and "  PoE League " collide
+// at the DB level and not just in the action, so a second copy of a game is
+// impossible however it's spelled.
+
+export const games = pgTable(
+  "games",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("games_name_lower_unique").on(sql`lower(${table.name})`),
+  ]
+);
+
+export type Game = typeof games.$inferSelect;
+export type NewGame = typeof games.$inferInsert;

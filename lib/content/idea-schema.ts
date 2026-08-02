@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+import { parseAppDateTime } from "@/lib/time";
+
+import { gameIdFieldSchema } from "./game-schema";
 import {
   IDEA_FORMATS,
   INITIAL_IDEA_FORMAT,
@@ -36,9 +39,11 @@ export interface ReleaseInput {
 /** The DB-ready shape shared by capture and edit; `release` is null for an unscheduled idea. */
 export interface IdeaFields {
   title: string;
-  notes: string | null;
+  description: string | null;
   format: IdeaFormat;
   tags: string[];
+  /** The library entry this idea is about (#105); null for "no game". */
+  gameId: string | null;
   release: ReleaseInput | null;
 }
 
@@ -67,26 +72,31 @@ export function normalizeTags(raw: string | undefined | null): string[] {
   return tags;
 }
 
-/** Local date+time for `yyyy-MM-dd` + `HH:mm` strings — matches `event-schema.ts`'s parsing. */
-function combineDateAndTime(date: string, time: string): Date {
-  return new Date(`${date}T${time}:00`);
-}
-
 /**
  * Builds the release span from a form's `releaseDate`/`releaseTime`. No date →
  * no release. A date without a time defaults to 19:00 (`DEFAULT_RELEASE_TIME`),
  * the channel's standard publish slot. The end is a nominal
  * `RELEASE_EVENT_DURATION_MINUTES` block after the start (the calendar has no
  * zero-length events).
+ *
+ * The wall clock is read in the app timezone (see lib/time), so the 19:00
+ * default lands at 19:00 on the calendar whether the parse runs on Vercel's
+ * UTC servers or in local dev (issue #95). An unparseable date yields no
+ * release rather than an Invalid Date — the caller adds the validation issue.
+ *
+ * Exported for `rescheduleIdeaRelease`, which moves an existing release without
+ * touching any other field and so has no full form to transform (#102) — one
+ * date/time → instant rule for every release, however it was set.
  */
-function buildRelease(
+export function buildReleaseSpan(
   releaseDate: string | undefined,
   releaseTime: string | undefined
 ): ReleaseInput | null {
   if (!releaseDate) return null;
   const time =
     releaseTime && releaseTime.length > 0 ? releaseTime : DEFAULT_RELEASE_TIME;
-  const startsAt = combineDateAndTime(releaseDate, time);
+  const startsAt = parseAppDateTime(releaseDate, time);
+  if (!startsAt) return null;
   const endsAt = new Date(
     startsAt.getTime() + RELEASE_EVENT_DURATION_MINUTES * 60_000
   );
@@ -96,17 +106,17 @@ function buildRelease(
 // Shared raw fields for capture and edit. `format` is validated manually (not
 // z.enum) for a UI-facing message, mirroring lib/calendar/event-schema.ts's
 // `track`. `releaseTime` is only meaningful alongside `releaseDate`; a stray
-// time without a date is ignored by `buildRelease` rather than erroring.
+// time without a date is ignored by `buildReleaseSpan` rather than erroring.
 const sharedIdeaFields = {
   title: z
     .string()
     .trim()
     .min(1, "Title is required")
     .max(200, "Keep the title under 200 characters"),
-  notes: z
+  description: z
     .string()
     .trim()
-    .max(4000, "Keep notes under 4000 characters")
+    .max(4000, "Keep the description under 4000 characters")
     .optional(),
   format: z
     .string()
@@ -121,6 +131,10 @@ const sharedIdeaFields = {
   // Raw comma-separated tag input from a single text field; normalized by the
   // transform below rather than validated shape-first.
   tags: z.string().optional(),
+  // The picked game's id, or "" for none. Deliberately not `z.uuid()`: a stale
+  // id must clear the tag rather than fail the save, which `resolveGameId`
+  // (lib/data/games.ts) handles at write time (see docs/content-games.md).
+  gameId: gameIdFieldSchema,
   releaseDate: z
     .string()
     .regex(DATE_RE, "Enter a valid release date")
@@ -135,23 +149,26 @@ const sharedIdeaFields = {
 
 function normalizeSharedFields(data: {
   title: string;
-  notes?: string;
+  description?: string;
   format?: string;
   tags?: string;
+  gameId: string | null;
   releaseDate?: string;
   releaseTime?: string;
 }): IdeaFields {
-  const notes = data.notes && data.notes.length > 0 ? data.notes : null;
+  const description =
+    data.description && data.description.length > 0 ? data.description : null;
   const format: IdeaFormat =
     data.format && data.format.length > 0
       ? (data.format as IdeaFormat)
       : INITIAL_IDEA_FORMAT;
   return {
     title: data.title,
-    notes,
+    description,
     format,
     tags: normalizeTags(data.tags),
-    release: buildRelease(
+    gameId: data.gameId,
+    release: buildReleaseSpan(
       data.releaseDate && data.releaseDate.length > 0
         ? data.releaseDate
         : undefined,
@@ -174,6 +191,29 @@ function refineTagCount(
   }
 }
 
+/**
+ * `DATE_RE` only checks the shape, so a well-formed but nonexistent day
+ * (2026-02-30) passes it and `buildReleaseSpan` returns null. Surface that as a
+ * field error instead of silently dropping the release.
+ */
+function refineRelease(
+  raw: { releaseDate?: string },
+  fields: IdeaFields,
+  ctx: z.RefinementCtx
+): void {
+  if (
+    raw.releaseDate &&
+    raw.releaseDate.length > 0 &&
+    fields.release === null
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["releaseDate"],
+      message: "Enter a valid release date",
+    });
+  }
+}
+
 /** Shared by the capture form and `createIdea`: parses raw form-shaped input into the DB-ready shape. */
 export const ideaCaptureSchema = z
   .object({
@@ -189,6 +229,7 @@ export const ideaCaptureSchema = z
   .transform((data, ctx): IdeaCaptureInput => {
     const fields = normalizeSharedFields(data);
     refineTagCount(fields, ctx);
+    refineRelease(data, fields, ctx);
     return {
       ...fields,
       script: data.script && data.script.length > 0 ? data.script : null,
@@ -201,8 +242,21 @@ export const ideaEditSchema = z
   .transform((data, ctx): IdeaFields => {
     const fields = normalizeSharedFields(data);
     refineTagCount(fields, ctx);
+    refineRelease(data, fields, ctx);
     return fields;
   });
+
+/**
+ * Shared by `rescheduleIdeaRelease`: the one-tap release move behind the
+ * release chip on the idea card (#102). Both parts are required here — unlike
+ * the forms above there is nothing to create or clear, only an existing release
+ * to move, so an empty date is a bad call rather than "no release".
+ */
+export const ideaRescheduleSchema = z.object({
+  ideaId: z.string().min(1),
+  releaseDate: z.string().regex(DATE_RE, "Enter a valid release date"),
+  releaseTime: z.string().regex(TIME_RE, "Enter a valid release time"),
+});
 
 /** Shared by `updateIdeaStatus`: the status control on the card and the board move menu (see docs/content-ideas.md). */
 export const ideaStatusSchema = z.object({

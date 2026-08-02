@@ -9,14 +9,18 @@ export const semanticColorTokens: ColorToken[] = [
   { name: "Foreground", cssVar: "foreground", description: "Default text" },
   { name: "Card", cssVar: "card", description: "Card surface" },
   { name: "Popover", cssVar: "popover", description: "Popover / menu surface" },
-  { name: "Primary", cssVar: "primary", description: "Primary actions" },
+  {
+    name: "Primary",
+    cssVar: "primary",
+    description: "Brand accent (#a8454b) — primary actions",
+  },
   { name: "Secondary", cssVar: "secondary", description: "Secondary actions" },
   { name: "Muted", cssVar: "muted", description: "Muted surface" },
   { name: "Accent", cssVar: "accent", description: "Accent surface" },
   {
     name: "Destructive",
     cssVar: "destructive",
-    description: "Destructive actions",
+    description: "Destructive actions — higher-chroma red, never a solid fill",
   },
   {
     name: "Success",
@@ -24,11 +28,15 @@ export const semanticColorTokens: ColorToken[] = [
     description: "Positive/open state (e.g. an open GitHub issue)",
   },
   { name: "Border", cssVar: "border", description: "Default border" },
-  { name: "Ring", cssVar: "ring", description: "Focus ring" },
+  {
+    name: "Ring",
+    cssVar: "ring",
+    description: "Focus ring — derived from the accent",
+  },
 ];
 
 export const trackColorTokens: {
-  track: "work" | "content";
+  track: "work" | "content" | "stream";
   name: string;
   base: ColorToken;
   foreground: ColorToken;
@@ -61,6 +69,21 @@ export const trackColorTokens: {
     border: {
       name: "Content border",
       cssVar: "track-content-border",
+      description: "",
+    },
+  },
+  {
+    track: "stream",
+    name: "Stream",
+    base: { name: "Stream surface", cssVar: "track-stream", description: "" },
+    foreground: {
+      name: "Stream foreground",
+      cssVar: "track-stream-foreground",
+      description: "",
+    },
+    border: {
+      name: "Stream border",
+      cssVar: "track-stream-border",
       description: "",
     },
   },
@@ -145,7 +168,7 @@ export const motionTokens = [
 
 export const styleguideSections = [
   { id: "colors", label: "Colors" },
-  { id: "tracks", label: "Dual-track" },
+  { id: "tracks", label: "Tracks" },
   { id: "typography", label: "Typography" },
   { id: "spacing-radii", label: "Spacing & radii" },
   { id: "elevation", label: "Elevation" },

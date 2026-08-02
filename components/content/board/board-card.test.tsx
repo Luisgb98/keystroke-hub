@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -10,11 +10,12 @@ function makeIdea(overrides: Partial<Idea> = {}): Idea {
   return {
     id: "idea-1",
     title: "Speedrun any% commentary",
-    notes: null,
+    description: null,
     format: "video",
     status: "scripted",
     tags: [],
     projectId: null,
+    gameId: null,
     releaseEventId: null,
     releaseEventTrack: null,
     stageEnteredAt: new Date(),
@@ -95,5 +96,102 @@ describe("BoardCard", () => {
     await user.click(chip);
 
     expect(onOpenChecklist).toHaveBeenCalledWith(idea);
+  });
+
+  it("advertises the drag handle only when the card is draggable", () => {
+    const { container: plain } = render(
+      <BoardCard idea={makeIdea()} onMove={vi.fn()} />
+    );
+    expect(
+      plain.querySelector('[data-slot="board-card-grip"]')
+    ).not.toBeInTheDocument();
+
+    const { container: draggable } = render(
+      <BoardCard idea={makeIdea()} onMove={vi.fn()} onDragStart={vi.fn()} />
+    );
+    expect(
+      draggable.querySelector('[data-slot="board-card-grip"]')
+    ).toBeInTheDocument();
+  });
+
+  it("starts a drag when the card body is pressed", () => {
+    const onDragStart = vi.fn();
+    const { container } = render(
+      <BoardCard idea={makeIdea()} onMove={vi.fn()} onDragStart={onDragStart} />
+    );
+
+    fireEvent.pointerDown(
+      container.querySelector('[data-slot="board-card"]')!,
+      { clientX: 10, clientY: 10 }
+    );
+
+    expect(onDragStart).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not start a drag from the card's own controls", () => {
+    const onDragStart = vi.fn();
+    const idea = makeIdea({ title: "Boss rush" });
+    render(
+      <BoardCard
+        idea={idea}
+        onMove={vi.fn()}
+        checklistProgress={{ done: 1, total: 4 }}
+        onDragStart={onDragStart}
+      />
+    );
+
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: 'Move "Boss rush"' })
+    );
+    fireEvent.pointerDown(
+      screen.getByRole("link", { name: 'Write script for "Boss rush"' })
+    );
+    fireEvent.pointerDown(
+      screen.getByRole("button", {
+        name: 'Open publish checklist for "Boss rush" (1 of 4 done)',
+      })
+    );
+
+    expect(onDragStart).not.toHaveBeenCalled();
+  });
+
+  it("does not start a drag from inside the open move menu", async () => {
+    const onDragStart = vi.fn();
+    const onMove = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <BoardCard
+        idea={makeIdea({ title: "Boss rush" })}
+        onMove={onMove}
+        onDragStart={onDragStart}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: 'Move "Boss rush"' }));
+    const item = await screen.findByRole("menuitem", { name: "Recorded" });
+    // The menu is portalled out of the card, but React still routes its events
+    // through this card — pressing an item must not lift the card, or pointer
+    // capture would swallow the menu's own click.
+    fireEvent.pointerDown(item);
+    expect(onDragStart).not.toHaveBeenCalled();
+
+    await user.click(item);
+    expect(onMove).toHaveBeenCalledWith(expect.anything(), "recorded");
+  });
+
+  it("marks itself as the airborne card while it is being dragged", () => {
+    const { container } = render(
+      <BoardCard
+        idea={makeIdea()}
+        onMove={vi.fn()}
+        onDragStart={vi.fn()}
+        isDragging
+      />
+    );
+
+    expect(container.querySelector('[data-slot="board-card"]')).toHaveAttribute(
+      "data-dragging",
+      "true"
+    );
   });
 });

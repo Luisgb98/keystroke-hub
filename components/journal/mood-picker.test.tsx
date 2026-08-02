@@ -73,4 +73,16 @@ describe("MoodPicker", () => {
       )
     );
   });
+
+  it("marks the selected step with a solid accent fill, not a primary tint", () => {
+    // Under the red accent a `bg-primary/10 text-primary` step is
+    // near-indistinguishable from the destructive button treatment, so the
+    // selected state fills solid instead (see docs/design-system.md, #84).
+    render(<MoodPicker logDate="2026-07-08" mood={4} />);
+    const selected = screen.getByRole("radio", { name: "Good" });
+
+    expect(selected).toHaveClass("bg-primary", "text-primary-foreground");
+    expect(selected.className).not.toContain("bg-primary/10");
+    expect(selected.className).not.toMatch(/(^|\s)text-primary(\s|$)/);
+  });
 });

@@ -1,10 +1,22 @@
-import { endOfDay, startOfDay } from "date-fns";
+import {
+  appEndOfDay,
+  appMinutesSinceMidnight,
+  appStartOfDay,
+} from "@/lib/time";
 
 import type { CalendarEvent } from "./types";
 
+/**
+ * Day boundaries are the app timezone's, not the renderer's (see lib/time) —
+ * these run inside SSR'd client components, so a server pass in UTC and a
+ * browser pass in Madrid have to agree on where a day starts (issue #95).
+ */
+
 /** Whether an event's span touches the given calendar day at all. */
 export function eventOverlapsDay(event: CalendarEvent, day: Date): boolean {
-  return event.startsAt <= endOfDay(day) && event.endsAt >= startOfDay(day);
+  return (
+    event.startsAt <= appEndOfDay(day) && event.endsAt >= appStartOfDay(day)
+  );
 }
 
 export interface DaySegment {
@@ -17,8 +29,8 @@ export interface DaySegment {
 
 /** Clamps a (possibly multi-day) timed event to the portion visible within `day`. */
 export function clampEventToDay(event: CalendarEvent, day: Date): DaySegment {
-  const dayStart = startOfDay(day);
-  const dayEnd = endOfDay(day);
+  const dayStart = appStartOfDay(day);
+  const dayEnd = appEndOfDay(day);
   return {
     event,
     start: event.startsAt < dayStart ? dayStart : event.startsAt,
@@ -26,7 +38,7 @@ export function clampEventToDay(event: CalendarEvent, day: Date): DaySegment {
   };
 }
 
-/** Minutes elapsed since local midnight, allowing fractional minutes for seconds precision. */
+/** Minutes elapsed since app-timezone midnight, allowing fractional minutes for seconds precision. */
 export function minutesSinceMidnight(date: Date): number {
-  return date.getHours() * 60 + date.getMinutes() + date.getSeconds() / 60;
+  return appMinutesSinceMidnight(date);
 }

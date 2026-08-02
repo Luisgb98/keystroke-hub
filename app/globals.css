@@ -50,6 +50,9 @@
   --color-track-content: var(--track-content);
   --color-track-content-foreground: var(--track-content-foreground);
   --color-track-content-border: var(--track-content-border);
+  --color-track-stream: var(--track-stream);
+  --color-track-stream-foreground: var(--track-stream-foreground);
+  --color-track-stream-border: var(--track-stream-border);
 
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -93,9 +96,10 @@
 }
 
 :root {
-  /* Tells the browser to render native controls (date/time picker popovers,
-     scrollbars) in the matching scheme — without this, `<input type="date">`
-     pickers stay light even in dark mode (see docs/content-ideas.md, #71). */
+  /* Tells the browser to render the remaining native chrome — scrollbars,
+     autofill, form-control focus rings — in the matching scheme. Date and time
+     popovers no longer rely on this (they're `DatePicker`/`TimePicker` now,
+     #86), but scrollbars in dark mode still do. */
   color-scheme: light;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -103,20 +107,25 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.55 0.18 300);
-  --primary-foreground: oklch(0.99 0.01 300);
+  /* Brand accent — #a8454b, a muted brick red (see docs/design-system.md) */
+  --primary: oklch(0.524 0.131 19.1);
+  --primary-foreground: oklch(0.985 0.006 19.1);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
+  /* Alarm red — deliberately hue-shifted off --primary (29 vs 19.1) and ~1.6x
+     its chroma, so "delete" never reads as the brand accent. */
+  --destructive: oklch(0.577 0.215 29);
   --success: oklch(0.6 0.16 145);
   --success-foreground: oklch(0.99 0.02 145);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* Focus rings ride the accent — lighter than --primary so the /50-alpha ring
+     stays a halo rather than a second fill. */
+  --ring: oklch(0.6 0.14 19.1);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -125,22 +134,31 @@
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.55 0.18 300);
-  --sidebar-primary-foreground: oklch(0.99 0.01 300);
+  --sidebar-primary: oklch(0.524 0.131 19.1);
+  --sidebar-primary-foreground: oklch(0.985 0.006 19.1);
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-ring: oklch(0.6 0.14 19.1);
 
   /* Work track: calm/focused, cool blue */
   --track-work: oklch(0.94 0.035 250);
   --track-work-foreground: oklch(0.34 0.11 255);
   --track-work-border: oklch(0.62 0.1 255);
 
-  /* Content track: creative/energetic, warm amber */
-  --track-content: oklch(0.94 0.05 55);
-  --track-content-foreground: oklch(0.36 0.13 45);
-  --track-content-border: oklch(0.62 0.12 50);
+  /* Content track: the accent's hue at surface strength. Deliberately lower
+     chroma than --primary so chips and hovers stay subordinate to buttons. */
+  --track-content: oklch(0.94 0.028 19.1);
+  --track-content-foreground: oklch(0.375 0.105 19.1);
+  --track-content-border: oklch(0.66 0.095 19.1);
+
+  /* Stream track: Twitch purple (#9146FF sits at hue 296.1). The one purple
+     the palette allows — see docs/design-system.md. A live session is an
+     appointment, not a deadline, so it gets its own hue rather than a shade
+     of the content red it would otherwise be mistaken for (issue #104). */
+  --track-stream: oklch(0.94 0.032 296.1);
+  --track-stream-foreground: oklch(0.4 0.13 296.1);
+  --track-stream-border: oklch(0.62 0.16 296.1);
 
   --shadow-color: oklch(0.145 0 0 / 10%);
 
@@ -159,20 +177,24 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.78 0.15 300);
-  --primary-foreground: oklch(0.145 0.02 300);
+  /* Same brand hue, lifted for dark surfaces (#a8454b is too dark to read here) */
+  --primary: oklch(0.72 0.14 19.1);
+  --primary-foreground: oklch(0.16 0.03 19.1);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
+  /* Darker + far more chromatic than the dark --primary — the two reds must
+     not converge just because both got lightened for dark mode. */
+  --destructive: oklch(0.66 0.2 30);
   --success: oklch(0.72 0.17 145);
   --success-foreground: oklch(0.16 0.03 145);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  /* Lighter than the light-mode ring so the /50-alpha halo survives on dark surfaces */
+  --ring: oklch(0.68 0.13 19.1);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -180,12 +202,12 @@
   --chart-5: oklch(0.269 0 0);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.78 0.15 300);
-  --sidebar-primary-foreground: oklch(0.145 0.02 300);
+  --sidebar-primary: oklch(0.72 0.14 19.1);
+  --sidebar-primary-foreground: oklch(0.16 0.03 19.1);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: oklch(0.68 0.13 19.1);
 
   /* Work track: same identity hue, dark surface */
   --track-work: oklch(0.24 0.045 255);
@@ -193,9 +215,16 @@
   --track-work-border: oklch(0.52 0.08 255);
 
   /* Content track: same identity hue, dark surface */
-  --track-content: oklch(0.27 0.06 45);
-  --track-content-foreground: oklch(0.9 0.07 55);
-  --track-content-border: oklch(0.54 0.1 50);
+  --track-content: oklch(0.275 0.045 19.1);
+  --track-content-foreground: oklch(0.895 0.05 19.1);
+  --track-content-border: oklch(0.56 0.09 19.1);
+
+  /* Stream track: same identity hue, dark surface. Carries more chroma than
+     the work track it sits nearest to here — 41° of hue alone reads as too
+     subtle once both surfaces are this dark. */
+  --track-stream: oklch(0.265 0.055 296.1);
+  --track-stream-foreground: oklch(0.885 0.06 296.1);
+  --track-stream-border: oklch(0.6 0.13 296.1);
 
   /* Dark surfaces read shadows poorly — lean on border + slightly lighter surface instead */
   --shadow-color: oklch(0 0 0 / 45%);

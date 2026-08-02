@@ -10,7 +10,7 @@ test.describe("styleguide", () => {
 
     for (const heading of [
       "Colors",
-      "Dual-track palette",
+      "Track palette",
       "Typography",
       "Radii",
       "Elevation",
@@ -29,17 +29,19 @@ test.describe("styleguide", () => {
     await expect(page.locator("#typography")).toBeInViewport();
   });
 
-  test("shows the dual-track showcase with distinguishing icon and label, not color alone", async ({
+  test("shows all three tracks with a distinguishing icon and label, not color alone", async ({
     page,
   }) => {
     await page.goto("/styleguide");
 
     await expect(page.getByText("Ship the auth flow")).toBeVisible();
     await expect(page.getByText("Draft · Video schedule")).toBeVisible();
-    await expect(page.getByText("Work", { exact: true }).first()).toBeVisible();
-    await expect(
-      page.getByText("Content", { exact: true }).first()
-    ).toBeVisible();
+    await expect(page.getByText("Live 20:00 · Checklist 3/5")).toBeVisible();
+    for (const label of ["Work", "Content", "Stream"]) {
+      await expect(
+        page.getByText(label, { exact: true }).first()
+      ).toBeVisible();
+    }
   });
 
   test("opens shadcn components (dialog, dropdown, tooltip) rendered in the app skin", async ({

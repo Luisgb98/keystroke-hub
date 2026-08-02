@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import {
   ideaCaptureSchema,
@@ -53,7 +54,7 @@ describe("normalizeTags", () => {
 function baseInput(overrides: Record<string, unknown> = {}) {
   return {
     title: "Speedrun any% commentary",
-    notes: "",
+    description: "",
     format: undefined,
     tags: undefined,
     ...overrides,
@@ -70,9 +71,10 @@ describe("ideaCaptureSchema", () => {
     if (result.success) {
       expect(result.data).toEqual({
         title: "Speedrun any% commentary",
-        notes: null,
+        description: null,
         format: "either",
         tags: [],
+        gameId: null,
         release: null,
         script: null,
       });
@@ -91,17 +93,17 @@ describe("ideaCaptureSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("accepts full input: notes, format, tags", () => {
+  it("accepts full input: description, format, tags", () => {
     const result = ideaCaptureSchema.safeParse(
       baseInput({
-        notes: "Cover the glitch route",
+        description: "Cover the glitch route",
         format: "video",
         tags: "speedrun, glitch",
       })
     );
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.notes).toBe("Cover the glitch route");
+      expect(result.data.description).toBe("Cover the glitch route");
       expect(result.data.format).toBe("video");
       expect(result.data.tags).toEqual(["speedrun", "glitch"]);
     }
@@ -114,11 +116,29 @@ describe("ideaCaptureSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("trims whitespace-only notes down to null", () => {
-    const result = ideaCaptureSchema.safeParse(baseInput({ notes: "   " }));
+  it("trims a whitespace-only description down to null", () => {
+    const result = ideaCaptureSchema.safeParse(
+      baseInput({ description: "   " })
+    );
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.notes).toBeNull();
+      expect(result.data.description).toBeNull();
+    }
+  });
+
+  // #88: the field is the publish-facing description, so the cap's message has
+  // to name it that way — this is the copy the capture form surfaces verbatim.
+  it("rejects a description over the 4000-character cap, naming the field", () => {
+    const result = ideaCaptureSchema.safeParse(
+      baseInput({ description: "a".repeat(4001) })
+    );
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const { fieldErrors } = z.flattenError(result.error);
+      expect(fieldErrors.description).toEqual([
+        "Keep the description under 4000 characters",
+      ]);
+      expect(fieldErrors).not.toHaveProperty("notes");
     }
   });
 
@@ -157,7 +177,10 @@ describe("release date/time parsing", () => {
     expect(result.success).toBe(true);
     if (result.success && result.data.release) {
       const { startsAt, endsAt } = result.data.release;
-      expect(startsAt).toEqual(new Date("2026-08-01T19:00:00"));
+      // 19:00 in Madrid (CEST, +2) is 17:00Z. Asserted as an absolute
+      // instant: re-parsing "2026-08-01T19:00:00" here would agree with the
+      // schema in every timezone and could never catch the shift (#95).
+      expect(startsAt.toISOString()).toBe("2026-08-01T17:00:00.000Z");
       // 60-minute nominal block (see RELEASE_EVENT_DURATION_MINUTES).
       expect(endsAt.getTime() - startsAt.getTime()).toBe(60 * 60_000);
     }
@@ -169,7 +192,7 @@ describe("release date/time parsing", () => {
       baseInput({ releaseDate: "2026-08-01", releaseTime: "21:15" })
     );
     expect(result.success && result.data.release?.startsAt).toEqual(
-      new Date("2026-08-01T21:15:00")
+      new Date("2026-08-01T19:15:00.000Z")
     );
   });
 
@@ -220,7 +243,7 @@ describe("ideaEditSchema", () => {
     const result = ideaEditSchema.safeParse(
       baseInput({
         title: "Edited title",
-        notes: "new notes",
+        description: "new description",
         format: "stream",
         tags: FIVE_TAGS,
         releaseDate: "2026-09-10",
@@ -233,7 +256,7 @@ describe("ideaEditSchema", () => {
       expect(result.data.format).toBe("stream");
       expect(result.data.tags).toHaveLength(5);
       expect(result.data.release?.startsAt).toEqual(
-        new Date("2026-09-10T18:00:00")
+        new Date("2026-09-10T16:00:00.000Z")
       );
       // No `script` key on the edit shape — editing defers to the script page.
       expect("script" in result.data).toBe(false);

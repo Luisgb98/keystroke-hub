@@ -50,8 +50,100 @@ live in their own modules and are unit-tested directly:
   overflow.
 
 Every event-rendering component (`components/calendar/`) uses only the track
-tokens and pairs color with an icon (`Briefcase`/`Clapperboard`) and a label
-(`track-styles.ts`) — color is never the only signal.
+tokens and pairs color with an icon (`Briefcase`/`Clapperboard`/`Radio`) and a
+label (`track-styles.ts`) — color is never the only signal.
+
+## Three kinds of block, two tracks (#104)
+
+A block reads as one of three things — **Work**, **Content** or **Stream** —
+but `events.track` is still the two-value enum above. `TrackKind`
+(`lib/calendar/track-kind.ts`) is the display-level type, and `stream` is
+**derived**: a content-track event is a Stream block exactly when a `streams`
+row schedules it (`CalendarEvent.streamId`, left-joined in
+`lib/data/events.ts`).
+
+Widening the enum instead would have dragged the whole two-world boundary with
+it — which Google calendar an event syncs through, whether an idea may link to
+it (`idea_event_links`' content-only CHECK), whether a meeting note may attach
+— and needed a backfill to make existing streams read as streams. Deriving it
+buys all of that for free:
+
+- Attaching an event to a stream turns its block purple and detaching turns it
+  back, with no calendar-side write at all.
+- An edit arriving from Google can never change an event's kind: inbound sync
+  writes title/description/times/all-day and never touches `track` or
+  `streams` (`lib/sync/engine.ts`, guarded by a unit test).
+- A stream block syncs through the **content** connection, because that is
+  genuinely its track.
+- Every stream that already existed reads as purple the moment this ships.
+
+`TrackPicker` offers all three. Picking **Stream** stores `track: 'content'`
+and creates the session behind the block, checklist snapshotted from the
+current template (`insertStreamSession`, `lib/content/stream-session.ts`) —
+so a purple block always corresponds to a real session on the planner. The
+editor links straight to it.
+
+Changing an existing block's kind:
+
+| From → to        | What happens                                                                  |
+| ---------------- | ----------------------------------------------------------------------------- |
+| Content → Stream | the session is created behind it                                              |
+| Stream → Content | the session survives as **Unscheduled**, checklist and notes intact           |
+| Stream → Work    | refused — "Unlink the stream first", the same friendly message #67 introduced |
+
+Stream → Work stays a refusal rather than a silent unlink because a work-track
+event can't legally carry the content-pinned link at all; unlinking on the
+user's behalf would be a bigger, less reversible decision than the one they
+asked for. Either way, no purple block is ever left with nothing behind it —
+and the reverse direction is covered too: deleting a stream on the planner now
+takes its calendar block with it (see docs/content-streams.md).
+
+## Scroll contract
+
+Issue #87: on the calendar page the **only** thing that scrolls is the grid.
+The sidebar and the calendar header never move, and the sidebar never changes
+size. Three layers cooperate, and each one is load-bearing:
+
+1. **The app shell is viewport-locked.** `app/(app)/layout.tsx` renders
+   `div.h-dvh.overflow-hidden` and makes `<main>` the app's only vertical
+   scrollport (`overflow-y-auto min-h-0`). That height-caps the sidebar so it
+   can never stretch with tall content. This is deliberately scoped to the app
+   shell rather than `body`: `/login` (self-sufficient `min-h-dvh`) and
+   `/styleguide` render **outside** this layout and still rely on body scroll —
+   the styleguide's section nav is `sticky top-0` against it, and a global
+   `overflow-hidden` would make that page unscrollable.
+2. **The calendar page opts out of `<main>`'s scrolling.** Its wrapper is
+   `min-h-0 flex-1 overflow-hidden`, so the heading and `CalendarHeader` stay
+   pinned and the remaining height goes to the view.
+3. **Each view owns its scrollport.** Day, week (both the phone agenda list and
+   the desktop time grid) and month each mark theirs `data-slot="calendar-scroll"`.
+   The weekday header, the all-day row and the month's weekday labels sit
+   _outside_ it so they stay pinned.
+
+The trap in all of this is flexbox's `min-height: auto`: a flex item's
+automatic minimum size is its content, so without `min-h-0` (or a non-`visible`
+`overflow`) on **every** item in the chain, the views silently stretch to their
+content and the page starts scrolling again. That's why `min-h-0` appears on
+the shell's `<main>`, the page wrapper, each view root and each scrollport, and
+why `components/calendar/scroll-contract.test.tsx` asserts the structure
+directly rather than trusting the pixels.
+
+Two consequences worth knowing:
+
+- **Sticky headers inside `<main>`** (e.g. `components/content/script/script-editor.tsx`)
+  now stick to `<main>`'s scrollport rather than the body's — same visual
+  result, different containing scroller.
+- **The sidebar keeps `overflow-y-auto`.** On a window shorter than the nav
+  itself the cap would otherwise clip the theme/settings footer; on any normal
+  window there is nothing to overflow, so the sidebar still can't scroll.
+
+`e2e/calendar-scroll.spec.ts` covers all of it — page-has-no-scroll, the
+sidebar's bounding box before/after a wheel, the empty grid still filling the
+viewport, month view on a short window, the phone agenda list with the bottom
+nav staying tappable, plus non-regression checks for long shell pages and the
+styleguide's body scroll. It needs no `DATABASE_URL`: the empty 24-hour grid is
+a fixed 96rem tall (`HOURS_IN_DAY × HOUR_HEIGHT_REM`), so it overflows any
+viewport on its own.
 
 ## Resilience to a missing database
 
@@ -147,15 +239,20 @@ also unify mouse, touch, and pen in one code path.
   shift for month/all-day chips, which have no time-of-day axis),
   `resizeEvent` (one edge, floored at a 15-minute minimum duration), and
   `isNoopShift` (a drop back at the origin is not a mutation).
-- **`components/calendar/use-event-drag.ts`** — a DOM/geometry-agnostic
-  pointer gesture state machine (`idle → pressed → dragging → committing`).
-  Mouse/pen engage past a 5px movement threshold; touch requires a ~350ms
-  long-press first (so a scroll swipe isn't mistaken for a lift) and cancels
-  the pending timer if the touch moves like a scroll before it fires.
-  `Escape`/`pointercancel` abort without committing. It reports raw pixel
-  deltas only — callers convert those to day/minute offsets using
-  `drag.ts`, which keeps the conversion independently testable and lets
-  component tests inject geometry instead of depending on real layout.
+- **`hooks/use-pointer-drag.ts`** — a DOM/geometry-agnostic pointer gesture
+  state machine (`idle → pressed → dragging → committing`). Mouse/pen engage
+  past a 5px movement threshold; touch requires a ~350ms long-press first (so a
+  scroll swipe isn't mistaken for a lift) and cancels the pending timer if the
+  touch moves like a scroll before it fires; once engaged it blocks `touchmove`
+  so the surface underneath can't pan away. `Escape`/`pointercancel` abort
+  without committing. It reports raw pixel deltas plus the live pointer
+  position — callers convert those to day/minute offsets using `drag.ts` (or,
+  on the content board, to a target column using `lib/content/board-drag.ts`),
+  which keeps the conversion independently testable and lets component tests
+  inject geometry instead of depending on real layout. It lives in `hooks/`
+  rather than under `components/calendar/` because the content board's card
+  drag & drop (#89) runs on the same machine — one drag idiom, no library (see
+  docs/content-ideas.md).
 - **`components/calendar/use-event-reschedule.ts`** — shared by every view:
   wraps the new `rescheduleEvent` Server Function in React's `useOptimistic`
   so a drag/resize applies instantly in the UI. Unlike #11's mutations

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Columns3, Lightbulb, Radio } from "lucide-react";
+import { Columns3, Gamepad2, Lightbulb, Radio } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -46,6 +46,23 @@ export default function ContentPage() {
               <span className="font-heading text-h3 font-semibold">Board</span>
               <span className="text-small text-muted-foreground">
                 Track every idea through the pipeline, stage by stage
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
+
+      <Link href="/content/games" className="block">
+        <Card className="border-track-content-border transition-colors hover:bg-track-content/40">
+          <CardContent className="flex items-center gap-3">
+            <Gamepad2
+              aria-hidden
+              className="size-6 shrink-0 text-track-content-foreground"
+            />
+            <div className="flex flex-col">
+              <span className="font-heading text-h3 font-semibold">Games</span>
+              <span className="text-small text-muted-foreground">
+                The library your ideas and streams are tagged from
               </span>
             </div>
           </CardContent>

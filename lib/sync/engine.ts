@@ -1,6 +1,5 @@
-import { addDays, format, subDays } from "date-fns";
-
 import type { GoogleEvent } from "@/lib/google/client";
+import { appAddDays, formatAppDateParam, parseAppDate } from "@/lib/time";
 
 import type {
   LocalEventSnapshot,
@@ -17,7 +16,14 @@ import type {
  * are. `lib/sync/run.ts` is the only caller and does the actual I/O.
  */
 
-const DATE_ONLY = "yyyy-MM-dd";
+/**
+ * Google's all-day `start.date`/`end.date` are bare `yyyy-MM-dd` strings with
+ * no zone of their own, and the app stores all-day boundaries as app-timezone
+ * midnight instants (docs/calendar.md). Both directions therefore go through
+ * `lib/time` with the app zone pinned — parsing and formatting have to agree,
+ * or every all-day event reads back a day off and the diff sees a phantom
+ * change on each run (issue #95).
+ */
 
 /**
  * App events store an *inclusive* last day for multi-day all-day events
@@ -26,11 +32,25 @@ const DATE_ONLY = "yyyy-MM-dd";
  * all-day boundary crosses this +/-1 day translation.
  */
 export function toGoogleAllDayEnd(endsAt: Date): string {
-  return format(addDays(endsAt, 1), DATE_ONLY);
+  return formatAppDateParam(appAddDays(endsAt, 1));
 }
 
 export function fromGoogleAllDayEnd(endDate: string): Date {
-  return subDays(new Date(`${endDate}T00:00:00`), 1);
+  const parsed = parseAppDateFromGoogle(endDate);
+  return appAddDays(parsed, -1);
+}
+
+/**
+ * Google is the source of these strings, so a value we can't parse is a
+ * protocol violation rather than user input — fail loudly instead of writing
+ * an Invalid Date into the events table.
+ */
+function parseAppDateFromGoogle(value: string): Date {
+  const parsed = parseAppDate(value);
+  if (!parsed) {
+    throw new Error(`Google returned an unparseable all-day date: ${value}`);
+  }
+  return parsed;
 }
 
 export function toGooglePayload(
@@ -43,7 +63,7 @@ export function toGooglePayload(
     return {
       summary: event.title,
       description: event.description ?? undefined,
-      start: { date: format(event.startsAt, DATE_ONLY) },
+      start: { date: formatAppDateParam(event.startsAt) },
       end: { date: toGoogleAllDayEnd(event.endsAt) },
     };
   }
@@ -58,7 +78,7 @@ export function toGooglePayload(
 export function fromGooglePayload(google: GoogleEvent): MappedEventInput {
   const allDay = Boolean(google.start.date);
   const startsAt = allDay
-    ? new Date(`${google.start.date}T00:00:00`)
+    ? parseAppDateFromGoogle(google.start.date!)
     : new Date(google.start.dateTime!);
   const endsAt = allDay
     ? fromGoogleAllDayEnd(google.end.date!)

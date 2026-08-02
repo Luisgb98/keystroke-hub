@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { format } from "date-fns";
 import { AlertTriangle } from "lucide-react";
 import type { CSSProperties } from "react";
 
 import { cn } from "@/lib/utils";
+import { usePointerDrag } from "@/hooks/use-pointer-drag";
 import { HOUR_HEIGHT_REM, MINUTES_IN_DAY } from "@/lib/calendar/constants";
 import {
   moveEvent,
@@ -18,10 +18,11 @@ import {
   minutesSinceMidnight,
   type DaySegment,
 } from "@/lib/calendar/segments";
+import { trackKindOf } from "@/lib/calendar/track-kind";
+import { formatInAppZone } from "@/lib/time";
 
 import { EventEditor } from "./event-editor";
 import { TRACK_ICON, TRACK_LABEL, TRACK_SURFACE_CLASSES } from "./track-styles";
-import { useEventDrag } from "./use-event-drag";
 
 interface EventBlockProps {
   segment: DaySegment;
@@ -75,7 +76,8 @@ export function EventBlock({
   const [gesture, setGesture] = useState<Gesture | null>(null);
   const geometryRef = useRef<Geometry>({ pxPerMinute: 0, columnWidthPx: 0 });
   const { event, start, end } = segment;
-  const Icon = TRACK_ICON[event.track];
+  const trackKind = trackKindOf(event);
+  const Icon = TRACK_ICON[trackKind];
 
   const canResizeStart = segment.start.getTime() === event.startsAt.getTime();
   const canResizeEnd = segment.end.getTime() === event.endsAt.getTime();
@@ -86,7 +88,7 @@ export function EventBlock({
     );
   }
 
-  const move = useEventDrag({
+  const move = usePointerDrag({
     disabled: !onReschedule,
     onDragMove: ({ dx, dy }) => {
       const { pxPerMinute, columnWidthPx } = geometryRef.current;
@@ -112,7 +114,7 @@ export function EventBlock({
     onDragCancel: () => setGesture(null),
   });
 
-  const resizeStart = useEventDrag({
+  const resizeStart = usePointerDrag({
     disabled: !onReschedule,
     onDragMove: ({ dy }) => {
       const { pxPerMinute } = geometryRef.current;
@@ -131,7 +133,7 @@ export function EventBlock({
     onDragCancel: () => setGesture(null),
   });
 
-  const resizeEnd = useEventDrag({
+  const resizeEnd = usePointerDrag({
     disabled: !onReschedule,
     onDragMove: ({ dy }) => {
       const { pxPerMinute } = geometryRef.current;
@@ -187,8 +189,8 @@ export function EventBlock({
   }, [gesture, style, day, event, previewShift]);
 
   const timeLabel = previewShift
-    ? `${format(previewShift.startsAt, "HH:mm")}–${format(previewShift.endsAt, "HH:mm")}`
-    : `${format(start, "HH:mm")}–${format(end, "HH:mm")}`;
+    ? `${formatInAppZone(previewShift.startsAt, "HH:mm")}–${formatInAppZone(previewShift.endsAt, "HH:mm")}`
+    : `${formatInAppZone(start, "HH:mm")}–${formatInAppZone(end, "HH:mm")}`;
 
   return (
     <>
@@ -206,7 +208,7 @@ export function EventBlock({
         }}
         className={cn(
           "absolute overflow-hidden rounded-md border px-1.5 py-1 text-left text-caption leading-tight",
-          TRACK_SURFACE_CLASSES[event.track],
+          TRACK_SURFACE_CLASSES[trackKind],
           gesture ? "z-20 shadow-md" : "z-10"
         )}
         style={previewStyle}
@@ -228,7 +230,7 @@ export function EventBlock({
 
         <div className="flex items-center gap-1 font-medium">
           <Icon aria-hidden className="size-3 shrink-0" />
-          <span className="sr-only">{TRACK_LABEL[event.track]}: </span>
+          <span className="sr-only">{TRACK_LABEL[trackKind]}: </span>
           <span className="truncate">{event.title}</span>
           {event.conflictNote ? (
             <span

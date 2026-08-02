@@ -19,7 +19,7 @@ vi.mock("@/components/command-palette/palette-trigger", () => ({
 describe("BottomNav", () => {
   it("renders every nav item with an accessible name", () => {
     usePathname.mockReturnValue("/");
-    render(<BottomNav />);
+    render(<BottomNav untriagedCount={0} />);
 
     expect(
       screen.getByRole("navigation", { name: "Primary" })
@@ -33,7 +33,7 @@ describe("BottomNav", () => {
 
   it("puts aria-current on the item matching the current route", () => {
     usePathname.mockReturnValue("/projects");
-    render(<BottomNav />);
+    render(<BottomNav untriagedCount={0} />);
 
     expect(
       screen.getByRole("link", { name: "Projects & Meetings" })
@@ -41,5 +41,43 @@ describe("BottomNav", () => {
     expect(screen.getByRole("link", { name: "Content" })).not.toHaveAttribute(
       "aria-current"
     );
+  });
+
+  it("carries an Inbox tab — mobile's only persistent inbox entry point (#85)", () => {
+    usePathname.mockReturnValue("/");
+    render(<BottomNav untriagedCount={0} />);
+
+    expect(screen.getByRole("link", { name: /Inbox/ })).toHaveAttribute(
+      "href",
+      "/inbox"
+    );
+  });
+
+  it("marks the Inbox tab active on /inbox", () => {
+    usePathname.mockReturnValue("/inbox");
+    render(<BottomNav untriagedCount={0} />);
+
+    expect(screen.getByRole("link", { name: /Inbox/ })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+  });
+
+  it("shows the untriaged count on the Inbox tab and announces it after the label", () => {
+    usePathname.mockReturnValue("/");
+    render(<BottomNav untriagedCount={4} />);
+
+    const badge = document.querySelector('[data-slot="inbox-count"]');
+    expect(badge).toHaveTextContent("4");
+    expect(
+      screen.getByRole("link", { name: "Inbox, 4 to triage" })
+    ).toBeInTheDocument();
+  });
+
+  it("stays quiet at inbox zero", () => {
+    usePathname.mockReturnValue("/");
+    render(<BottomNav untriagedCount={0} />);
+
+    expect(document.querySelector('[data-slot="inbox-count"]')).toBeNull();
   });
 });

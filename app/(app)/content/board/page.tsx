@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Lightbulb } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { PipelineBoard } from "@/components/content/board/pipeline-board";
 import {
   getChecklistProgressForIdeas,
@@ -36,20 +37,27 @@ export default async function BoardPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-4 px-4 py-6 sm:px-10 sm:py-8">
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <div className="flex flex-col gap-1">
           <h1 className="font-heading text-h1 font-semibold">Board</h1>
-          <Link
-            href="/content/ideas"
-            className="flex items-center gap-1.5 text-small font-medium text-track-content-foreground hover:underline"
-          >
-            <Lightbulb aria-hidden className="size-4" />
-            Ideas list
-          </Link>
+          <p className="text-small text-muted-foreground">
+            Every idea&apos;s pipeline stage, at a glance — drag a card to move
+            it.
+          </p>
         </div>
-        <p className="text-small text-muted-foreground">
-          Every idea&apos;s pipeline stage, at a glance.
-        </p>
+        {/* One button system across the app: a link that looks like a button
+            is a `Button` rendering an `<a>`, never hand-rolled surface classes
+            (see docs/design-system.md). */}
+        <Button
+          variant="outline"
+          size="sm"
+          nativeButton={false}
+          role="link"
+          render={<Link href="/content/ideas" />}
+        >
+          <Lightbulb aria-hidden />
+          Ideas list
+        </Button>
       </div>
 
       <PipelineBoard

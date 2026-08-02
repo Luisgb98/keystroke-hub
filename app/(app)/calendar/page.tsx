@@ -58,8 +58,13 @@ export default async function CalendarPage({
     console.error("Failed to load calendar connection status:", error);
   }
 
+  // The one page that never lets `<main>` scroll: the heading and header stay
+  // pinned and each view scrolls inside its own grid instead (issue #87, see
+  // docs/calendar.md#scroll-contract). `min-h-0` + `overflow-hidden` are what
+  // make this a hard cap — without them flexbox's `min-height: auto` lets the
+  // column stretch to its content and the page scrolls again.
   return (
-    <div className="flex flex-1 flex-col gap-4 px-4 py-6 sm:px-10 sm:py-8">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-4 py-6 sm:px-10 sm:py-8">
       <h1 className="font-heading text-h1 font-semibold">Calendar</h1>
       <CalendarHeader view={view} date={date} syncStatus={syncStatus} />
       {view === "day" && <DayView day={date} events={events} now={now} />}

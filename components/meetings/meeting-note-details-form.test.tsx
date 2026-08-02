@@ -84,6 +84,34 @@ describe("MeetingNoteDetailsForm", () => {
     ];
     expect(formData.get("id")).toBe("m-1");
     expect(formData.get("title")).toBe("Renamed sync");
+    // The uncontrolled DatePicker is the form's real `date` field — no hidden mirror.
+    expect(formData.get("date")).toBe("2026-07-12");
+  });
+
+  it("submits a date chosen from the calendar", async () => {
+    updateMeetingNoteDetails.mockResolvedValue({
+      success: true,
+      meetingNoteId: "m-1",
+    });
+    const user = userEvent.setup();
+    render(<MeetingNoteDetailsForm meetingNote={meetingNote} projects={[]} />);
+
+    await user.click(
+      screen.getByRole("button", { name: "Open meeting day calendar" })
+    );
+    await user.click(
+      await screen.findByRole("button", { name: "Monday, July 20th, 2026" })
+    );
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(updateMeetingNoteDetails).toHaveBeenCalledTimes(1)
+    );
+    const [, formData] = updateMeetingNoteDetails.mock.calls[0] as [
+      unknown,
+      FormData,
+    ];
+    expect(formData.get("date")).toBe("2026-07-20");
   });
 
   it("shows a field error on invalid input", async () => {

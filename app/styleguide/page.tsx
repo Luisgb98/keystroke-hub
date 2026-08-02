@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { ComponentsGallery } from "@/components/styleguide/components-gallery";
-import { DualTrackShowcase } from "@/components/styleguide/dual-track-showcase";
+import { TrackShowcase } from "@/components/styleguide/track-showcase";
 import { SectionNav } from "@/components/styleguide/section-nav";
 import { TokenSwatch } from "@/components/styleguide/token-swatch";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -43,7 +43,11 @@ export default async function StyleguidePage() {
         <section id="colors" className="scroll-mt-20">
           <h2 className="font-heading text-h2 font-semibold">Colors</h2>
           <p className="mt-1 text-small text-muted-foreground">
-            Semantic tokens, resolved live from the active theme.
+            Semantic tokens, resolved live from the active theme. The accent is{" "}
+            <span className="font-mono text-foreground">#a8454b</span>; the
+            focus ring and the content track are derived from it, and{" "}
+            <span className="font-mono text-foreground">--destructive</span> is
+            held apart from both by chroma and hue.
           </p>
           <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
             {semanticColorTokens.map((token) => (
@@ -51,22 +55,22 @@ export default async function StyleguidePage() {
                 key={token.cssVar}
                 name={token.name}
                 cssVar={token.cssVar}
+                description={token.description}
               />
             ))}
           </div>
         </section>
 
         <section id="tracks" className="scroll-mt-20">
-          <h2 className="font-heading text-h2 font-semibold">
-            Dual-track palette
-          </h2>
+          <h2 className="font-heading text-h2 font-semibold">Track palette</h2>
           <p className="mt-1 text-small text-muted-foreground">
-            Work and content never share a color. Every component rendering
-            items from both worlds consumes only these tokens — and pairs color
-            with an icon and label, never color alone.
+            Work, content and stream never share a color. Every component
+            rendering items from those worlds consumes only these tokens — and
+            pairs color with an icon and label, never color alone. Stream is the
+            one purple the palette allows.
           </p>
 
-          <div className="mt-4 grid gap-6 sm:grid-cols-2">
+          <div className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {trackColorTokens.map((group) => (
               <div key={group.track} className="flex flex-col gap-3">
                 <h3 className="font-heading text-h3 font-semibold">
@@ -109,7 +113,7 @@ export default async function StyleguidePage() {
           </div>
 
           <div className="mt-6">
-            <DualTrackShowcase />
+            <TrackShowcase />
           </div>
         </section>
 

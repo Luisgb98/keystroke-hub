@@ -4,7 +4,6 @@ import {
   DEFAULT_STREAM_DURATION_MS,
   attachEventSchema,
   checklistLabelSchema,
-  retroNotesSchema,
   streamCaptureSchema,
   streamDetailsSchema,
 } from "./stream-schema";
@@ -26,6 +25,7 @@ describe("streamCaptureSchema", () => {
       expect(result.data).toEqual({
         title: "Boss rush stream",
         notes: null,
+        gameId: null,
         schedule: null,
       });
     }
@@ -54,9 +54,11 @@ describe("streamCaptureSchema", () => {
     if (result.success) {
       expect(result.data.schedule).toEqual({
         allDay: false,
-        startsAt: new Date("2026-08-01T19:00:00"),
+        // 19:00 Madrid (CEST, +2) as an absolute instant — see #95.
+        startsAt: new Date("2026-08-01T17:00:00.000Z"),
         endsAt: new Date(
-          new Date("2026-08-01T19:00:00").getTime() + DEFAULT_STREAM_DURATION_MS
+          new Date("2026-08-01T17:00:00.000Z").getTime() +
+            DEFAULT_STREAM_DURATION_MS
         ),
       });
     }
@@ -70,8 +72,9 @@ describe("streamCaptureSchema", () => {
     if (result.success) {
       expect(result.data.schedule).toEqual({
         allDay: true,
-        startsAt: new Date("2026-08-01T00:00:00"),
-        endsAt: new Date("2026-08-01T00:00:00"),
+        // App-zone midnight on 2026-08-01 is 22:00Z the evening before.
+        startsAt: new Date("2026-07-31T22:00:00.000Z"),
+        endsAt: new Date("2026-07-31T22:00:00.000Z"),
       });
     }
   });
@@ -97,6 +100,7 @@ describe("streamDetailsSchema", () => {
       id: "stream-1",
       title: "Renamed stream",
       notes: "",
+      retroNotes: "",
     });
     expect(result.success).toBe(true);
   });
@@ -106,23 +110,26 @@ describe("streamDetailsSchema", () => {
       id: "stream-1",
       title: "",
       notes: "",
+      retroNotes: "",
     });
     expect(result.success).toBe(false);
   });
-});
 
-describe("retroNotesSchema", () => {
   it("accepts empty retro notes (clearing them)", () => {
-    const result = retroNotesSchema.safeParse({
+    const result = streamDetailsSchema.safeParse({
       id: "stream-1",
+      title: "Renamed stream",
+      notes: "",
       retroNotes: "",
     });
     expect(result.success).toBe(true);
   });
 
-  it("rejects retro notes over the length cap", () => {
-    const result = retroNotesSchema.safeParse({
+  it("rejects retro notes over the length cap, failing the whole save", () => {
+    const result = streamDetailsSchema.safeParse({
       id: "stream-1",
+      title: "Renamed stream",
+      notes: "",
       retroNotes: "a".repeat(4001),
     });
     expect(result.success).toBe(false);

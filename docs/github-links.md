@@ -87,9 +87,11 @@ surfaces:
 - **`GithubIssueChip`** — `owner/repo#123`, the cached title (truncated with
   a tooltip for the full text), and an open/closed state dot. Color is never
   the only signal: the dot pairs a `CircleDot`/`CircleCheck` icon with an
-  `sr-only` "Open"/"Closed" label (`--success` for open, `--primary` — this
-  app's existing purple hue — for closed, `CircleHelp` + "State unknown"
-  when the metadata snapshot is null). The whole chip opens GitHub in a new
+  `sr-only` "Open"/"Closed" label. The three states read as an attention ramp:
+  `--success` for open (actionable), `--foreground` for closed (settled — not
+  `--primary`, which is a red and would read as a failure), and
+  `--muted-foreground` with `CircleHelp` + "State unknown" when the metadata
+  snapshot is null. The whole chip opens GitHub in a new
   tab; a small refresh icon re-fetches title/state on demand; removing a
   link toasts with an "Undo" action, same pattern as
   `MeetingNoteImprovementsSection`'s unlink.

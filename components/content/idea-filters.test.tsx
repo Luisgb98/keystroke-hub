@@ -82,6 +82,71 @@ describe("IdeaFilters", () => {
     expect(replace).toHaveBeenCalledWith("/content/ideas?tag=speedrun");
   });
 
+  it("renders a chip per game only when the library has entries (#105)", () => {
+    const { rerender } = render(<IdeaFilters value={{}} availableTags={[]} />);
+    expect(screen.queryByText("Path of Exile")).not.toBeInTheDocument();
+
+    rerender(
+      <IdeaFilters
+        value={{}}
+        availableTags={[]}
+        availableGames={[{ id: "g-poe", name: "Path of Exile" }]}
+      />
+    );
+    expect(screen.getByText("Path of Exile")).toBeInTheDocument();
+  });
+
+  it("navigates with the game param, and clears it on a second click (#105)", async () => {
+    const user = userEvent.setup();
+    const games = [{ id: "g-poe", name: "Path of Exile" }];
+    const { rerender } = render(
+      <IdeaFilters value={{}} availableTags={[]} availableGames={games} />
+    );
+
+    await user.click(screen.getByText("Path of Exile"));
+    expect(replace).toHaveBeenCalledWith("/content/ideas?game=g-poe");
+
+    rerender(
+      <IdeaFilters
+        value={{ game: "g-poe" }}
+        availableTags={[]}
+        availableGames={games}
+      />
+    );
+    await user.click(screen.getByText("Path of Exile"));
+    expect(replace).toHaveBeenLastCalledWith("/content/ideas");
+  });
+
+  it("composes the game filter with the existing ones (#105)", async () => {
+    const user = userEvent.setup();
+    render(
+      <IdeaFilters
+        value={{ format: "video", tag: "speedrun" }}
+        availableTags={["speedrun"]}
+        availableGames={[{ id: "g-poe", name: "Path of Exile" }]}
+      />
+    );
+
+    await user.click(screen.getByText("Path of Exile"));
+
+    expect(replace).toHaveBeenCalledWith(
+      "/content/ideas?format=video&tag=speedrun&game=g-poe"
+    );
+  });
+
+  it("counts an active game filter towards showing 'Reset filters' (#105)", () => {
+    render(
+      <IdeaFilters
+        value={{ game: "g-poe" }}
+        availableTags={[]}
+        availableGames={[{ id: "g-poe", name: "Path of Exile" }]}
+      />
+    );
+    expect(
+      screen.getByRole("button", { name: /Reset filters/ })
+    ).toBeInTheDocument();
+  });
+
   it("combines multiple active filters into one query string", async () => {
     const user = userEvent.setup();
     render(
