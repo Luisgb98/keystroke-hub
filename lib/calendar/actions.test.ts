@@ -120,7 +120,9 @@ describe("createEvent", () => {
 
   it("inserts a valid event and revalidates the calendar", async () => {
     const state = await createEvent(undefined, form(validTimedForm));
-    expect(state).toEqual({ success: true });
+    // The new event's id comes back so a non-UI caller (the MCP server, #109)
+    // can keep working on the row it just created.
+    expect(state).toEqual({ success: true, eventId: "evt-1" });
     expect(dbMock.insert).toHaveBeenCalledTimes(1);
     expect(dbMock.insertValues).toHaveBeenCalledWith(
       expect.objectContaining({ title: "Sprint planning", track: "work" })
@@ -163,7 +165,10 @@ describe("createEvent", () => {
       form({ ...validTimedForm, track: "stream", title: "Ranked run" })
     );
 
-    expect(state).toEqual({ success: true });
+    expect(state).toEqual({
+      success: true,
+      eventId: expect.any(String),
+    });
     // The event INSERT rides along as the batch's leading query, so the block
     // and its session land in one round trip.
     expect(insertStreamSession).toHaveBeenCalledWith(

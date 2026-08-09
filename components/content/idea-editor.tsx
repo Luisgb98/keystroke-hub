@@ -11,11 +11,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import {
-  createIdea,
-  updateIdea,
-  type IdeaActionState,
-} from "@/lib/content/actions";
+import { createIdea, updateIdea } from "@/lib/content/actions";
+// The result shape comes from the domain module, not the `"use server"` one —
+// a `"use server"` module can't re-export a type (see lib/content/actions.ts).
+import type { IdeaActionState } from "@/lib/content/core/ideas";
 import {
   IDEA_FORMATS,
   INITIAL_IDEA_FORMAT,
