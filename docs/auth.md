@@ -48,7 +48,9 @@ Vercel project settings for deploys):
      after signing in); already signed in and visiting `/login` → redirect
      home. Unauthenticated `/api/*` requests get a `401` instead of a
      redirect. Exemptions: `/api/health` (public uptime probe, leaks
-     nothing), Next internals, and static files.
+     nothing), the Google sync routes, `/api/cron/calendar-sync`, `/api/mcp`
+     — each carrying its own auth instead of a cookie — plus Next internals
+     and static files.
   2. `verifySession()` in `lib/auth/session.ts` — the authoritative
      data-access-layer check, called by protected layouts/pages and any
      future Server Action or route handler that touches data. Proxy checks
@@ -73,6 +75,11 @@ Vercel project settings for deploys):
 - **`AUTH_FAILURE_DELAY_MS`** (optional): overrides the failure delay in
   milliseconds, mainly so unit/e2e tests don't wait out the real 1 s. Leave
   unset in production.
+- **`MCP_AUTH_TOKEN`**: the machine door. MCP clients arrive with no cookie
+  and carry this bearer token instead, checked in `lib/mcp/auth.ts` before
+  anything runs (see [`docs/mcp.md`](mcp.md)). It grants everything the
+  content workspace can do, so treat it like the password: rotate it by
+  changing the env var and redeploying. Unset, `/api/mcp` fails closed.
 
 ## Testing
 

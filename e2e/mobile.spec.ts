@@ -66,7 +66,12 @@ test.describe("journal mobile viewport", () => {
     const title = `${PREFIX} Quick capture`;
     await page.getByLabel("Add planned item").fill(title);
     await page.keyboard.press("Enter");
-    await expect(page.getByText(title)).toBeVisible();
+    // `QuickAdd` is not optimistic: the item appears only once the server
+    // action's `revalidatePath` refresh lands, so this waits on a full
+    // round trip. The default 5s is tight when the whole suite is hammering
+    // one dev server and one Neon endpoint in parallel — same headroom as
+    // the other cross-suite waits (meetings.spec.ts).
+    await expect(page.getByText(title)).toBeVisible({ timeout: 15000 });
   });
 });
 

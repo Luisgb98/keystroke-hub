@@ -1,6 +1,6 @@
 {
   "name": "keystroke-hub",
-  "version": "0.40.0",
+  "version": "0.42.0",
   "private": true,
   "packageManager": "pnpm@11.10.0",
   "scripts": {
@@ -27,6 +27,7 @@
   "dependencies": {
     "@base-ui/react": "^1.6.0",
     "@date-fns/tz": "^1.5.0",
+    "@modelcontextprotocol/server": "^2.0.0",
     "@neondatabase/serverless": "1.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -35,6 +36,7 @@
     "drizzle-orm": "0.45.2",
     "jose": "^6.2.3",
     "lucide-react": "^1.23.0",
+    "mcp-handler": "^2.1.0",
     "next": "16.2.11",
     "next-themes": "^0.4.6",
     "react": "19.2.4",

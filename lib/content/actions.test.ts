@@ -149,7 +149,9 @@ describe("createIdea", () => {
 
   it("inserts a title-only idea with defaults and revalidates the list and board", async () => {
     const state = await createIdea(undefined, form(validCaptureForm));
-    expect(state).toEqual({ success: true });
+    // The new idea's id comes back so a non-UI caller (the MCP server, #109)
+    // can keep working on the row it just captured.
+    expect(state).toEqual({ success: true, ideaId: "idea-new" });
     expect(dbMock.insertValues).toHaveBeenCalledWith({
       title: "Speedrun any% commentary",
       description: null,
@@ -207,7 +209,7 @@ describe("createIdea", () => {
       })
     );
 
-    expect(state).toEqual({ success: true });
+    expect(state).toEqual({ success: true, ideaId: "idea-1" });
     // Release event on the content track, timed, titled from the idea.
     expect(dbMock.insertValues).toHaveBeenCalledWith(
       expect.objectContaining({

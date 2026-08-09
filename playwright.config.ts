@@ -6,6 +6,7 @@ import {
   E2E_GOOGLE_CLIENT_ID,
   E2E_GOOGLE_CLIENT_SECRET,
   E2E_GOOGLE_TOKEN_ENCRYPTION_KEY,
+  E2E_MCP_AUTH_TOKEN,
   E2E_PASSWORD_HASH,
   E2E_SESSION_SECRET,
   FAKE_GITHUB_BASE_URL,
@@ -84,7 +85,7 @@ export default defineConfig({
       // project would race against the chromium project's runs against the same
       // shared DB.
       testIgnore:
-        /(calendar|calendar-sync|event-management|drag-reschedule|agenda|board|scripts|content-links|streams|publish-checklist|journal|weekly-summary|weekly-assessment|projects|improvements|meetings|github-links|dashboard|stream-track|mobile|command-palette|inbox|ideas|idea-detail|games|timezone)\.spec\.ts$/,
+        /(calendar|calendar-sync|event-management|drag-reschedule|agenda|board|scripts|content-links|streams|publish-checklist|journal|weekly-summary|weekly-assessment|projects|improvements|meetings|github-links|dashboard|stream-track|mobile|command-palette|inbox|ideas|idea-detail|games|timezone|mcp)\.spec\.ts$/,
     },
   ],
   webServer: [
@@ -124,6 +125,7 @@ export default defineConfig({
         GOOGLE_CALENDAR_API_BASE_URL: FAKE_GOOGLE_BASE_URL,
         GOOGLE_OAUTH_TOKEN_BASE_URL: FAKE_GOOGLE_BASE_URL,
         CRON_SECRET: E2E_CRON_SECRET,
+        MCP_AUTH_TOKEN: E2E_MCP_AUTH_TOKEN,
         GITHUB_API_BASE_URL: FAKE_GITHUB_BASE_URL,
         // Match production: Vercel runs in UTC. Without this the server would
         // inherit the developer's own zone and the browser/server split above

@@ -58,6 +58,10 @@ export async function seedTestIdea(fixture: {
   tags?: string[];
   /** Overrides the default-now `stage_entered_at` — for dashboard specs that need a deterministic "stuck longest" pick regardless of other rows in the dev DB. */
   stageEnteredAt?: Date;
+  /** Overrides the default-now `created_at` — for the month review (#110), whose "ideas captured" count and past-month cases are keyed on it. */
+  createdAt?: Date;
+  /** Tags the idea with a library game up front, saving a follow-up `setTestIdeaGame` (#110). */
+  gameId?: string;
 }): Promise<void> {
   const db = getTestDb();
   await db.insert(ideas).values({
@@ -66,8 +70,10 @@ export async function seedTestIdea(fixture: {
     format: fixture.format ?? "either",
     status: fixture.status ?? "idea",
     tags: fixture.tags ?? [],
+    gameId: fixture.gameId ?? null,
     ...(fixture.stageEnteredAt
       ? { stageEnteredAt: fixture.stageEnteredAt }
       : {}),
+    ...(fixture.createdAt ? { createdAt: fixture.createdAt } : {}),
   });
 }

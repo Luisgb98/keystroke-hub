@@ -33,6 +33,13 @@ export const E2E_GOOGLE_TOKEN_ENCRYPTION_KEY =
   "Xxd7oidPxvoey2tpYyV+fGHHcFLVRzFtc2ETs1lD7io=";
 export const E2E_CRON_SECRET = "e2e-cron-secret";
 
+// --- MCP server (issue #109) ---
+//
+// The bearer token e2e/mcp.spec.ts sends to /api/mcp. Injected into the app
+// under test by playwright.config.ts, deliberately overriding whatever the
+// real .env carries, so the suite is hermetic (see docs/mcp.md).
+export const E2E_MCP_AUTH_TOKEN = "e2e-mcp-token-0123456789abcdef";
+
 // --- GitHub issue linking (issue #27) ---
 //
 // The metadata fetch happens server-side, so Playwright's page-level route

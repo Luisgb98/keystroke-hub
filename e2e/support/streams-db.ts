@@ -2,7 +2,11 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { like } from "drizzle-orm";
 
-import { streamChecklistTemplateItems, streams } from "../../lib/db/schema";
+import {
+  events,
+  streamChecklistTemplateItems,
+  streams,
+} from "../../lib/db/schema";
 
 function getTestDb() {
   const connectionString = process.env.DATABASE_URL;
@@ -16,6 +20,45 @@ function getTestDb() {
 export async function clearTestStreams(prefix: string): Promise<void> {
   const db = getTestDb();
   await db.delete(streams).where(like(streams.title, `${prefix}%`));
+}
+
+/**
+ * Seeds a stream that already has its slot on the calendar — an `events` row
+ * on the content track plus the stream that owns it, exactly the shape
+ * `createStream` produces (see docs/content-streams.md).
+ *
+ * The month review (#110) counts a stream as *held* from its linked event's
+ * `starts_at`, so a stream with no event can't be placed in a month at all;
+ * every dashboard fixture therefore has to go through here rather than
+ * inserting a bare `streams` row. Deleting the stream leaves its event
+ * behind, so callers pair this with `clearEventsWithPrefix`.
+ */
+export async function seedTestStream(fixture: {
+  title: string;
+  startsAt: Date;
+  /** Defaults to an hour after `startsAt` — long enough to look like a real session. */
+  endsAt?: Date;
+  gameId?: string;
+}): Promise<void> {
+  const db = getTestDb();
+  const [event] = await db
+    .insert(events)
+    .values({
+      track: "content",
+      title: fixture.title,
+      startsAt: fixture.startsAt,
+      endsAt:
+        fixture.endsAt ?? new Date(fixture.startsAt.getTime() + 60 * 60 * 1000),
+      allDay: false,
+    })
+    .returning({ id: events.id });
+
+  await db.insert(streams).values({
+    title: fixture.title,
+    gameId: fixture.gameId ?? null,
+    eventId: event.id,
+    eventTrack: "content",
+  });
 }
 
 /**
