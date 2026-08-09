@@ -3,10 +3,10 @@
 import { useId, useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import {
-  updateStreamDetails,
-  type StreamActionState,
-} from "@/lib/content/stream-actions";
+import { updateStreamDetails } from "@/lib/content/stream-actions";
+// The result shape comes from the domain module, not the `"use server"` one —
+// a `"use server"` module can't re-export a type (see lib/content/actions.ts).
+import type { StreamActionState } from "@/lib/content/core/streams";
 import type { GameOption } from "@/lib/data/games";
 import type { Stream } from "@/lib/db/schema";
 import { Button } from "@/components/ui/button";

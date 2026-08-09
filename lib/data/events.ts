@@ -108,3 +108,38 @@ export async function getUpcomingEvents(
     streamId,
   }));
 }
+
+/**
+ * One event by id, with just enough to decide what may touch it: its track
+ * (the work/content boundary the MCP tools enforce — issue #109) and whether a
+ * stream session schedules it.
+ */
+export async function getEventById(id: string): Promise<{
+  id: string;
+  track: CalendarEvent["track"];
+  title: string;
+  description: string | null;
+  startsAt: Date;
+  endsAt: Date;
+  allDay: boolean;
+  streamId: string | null;
+} | null> {
+  const db = getDb();
+  const [row] = await db
+    .select({ event: events, streamId: streams.id })
+    .from(events)
+    .leftJoin(streams, eq(streams.eventId, events.id))
+    .where(eq(events.id, id));
+
+  if (!row) return null;
+  return {
+    id: row.event.id,
+    track: row.event.track,
+    title: row.event.title,
+    description: row.event.description,
+    startsAt: row.event.startsAt,
+    endsAt: row.event.endsAt,
+    allDay: row.event.allDay,
+    streamId: row.streamId,
+  };
+}
