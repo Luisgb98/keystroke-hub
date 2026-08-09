@@ -114,6 +114,15 @@ note on the event; disconnecting never deletes local events. See
 [`docs/google-sync.md`](docs/google-sync.md) for setup (including the
 one-time Google Cloud Console steps), the sync design, and known follow-ups.
 
+## MCP server
+
+The content world is drivable from any MCP client: point Claude Code, Claude
+Desktop or an agent at `/api/mcp` with a bearer `MCP_AUTH_TOKEN` and it can
+capture ideas, write scripts, plan streams and reschedule releases without
+opening the app. Work life is deliberately out of reach — the two-worlds
+separation applies to machines too. See [`docs/mcp.md`](docs/mcp.md) for the
+one-block client config and the full tool reference.
+
 ## Versioning
 
 The project version in `package.json` is bumped once per feature, semver

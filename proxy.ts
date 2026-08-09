@@ -67,9 +67,11 @@ export const config = {
      *   - api/google/oauth/callback — signed `state` JWT
      *   - api/google/webhook — per-channel `X-Goog-Channel-Token`
      *   - api/cron/calendar-sync — `CRON_SECRET` bearer token
+     * - api/mcp (issue #109) — MCP clients arrive with no cookie and carry a
+     *   bearer `MCP_AUTH_TOKEN` the route checks itself (see docs/mcp.md)
      * - Next internals (_next/static, _next/image)
      * - static files (anything with an extension, e.g. favicon.ico, icons)
      */
-    "/((?!api/health|api/google/oauth/callback|api/google/webhook|api/cron/calendar-sync|_next/static|_next/image|.*\\..*).*)",
+    "/((?!api/health|api/google/oauth/callback|api/google/webhook|api/cron/calendar-sync|api/mcp|_next/static|_next/image|.*\\..*).*)",
   ],
 };

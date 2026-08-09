@@ -106,6 +106,22 @@ export async function getTestEventTimes(
   return row;
 }
 
+/**
+ * Reads back an event's id by exact title. `e2e/mcp.spec.ts` uses it to get
+ * hold of a work-track id no MCP tool would ever hand out, so it can prove the
+ * endpoint refuses one even when named explicitly (issue #109).
+ */
+export async function getTestEventId(
+  title: string
+): Promise<string | undefined> {
+  const db = getTestDb();
+  const [row] = await db
+    .select({ id: events.id })
+    .from(events)
+    .where(eq(events.title, title));
+  return row?.id;
+}
+
 /** Deletes a single event by exact title — used to simulate a concurrent deletion mid-drag. */
 export async function deleteTestEventByTitle(title: string): Promise<void> {
   const db = getTestDb();
