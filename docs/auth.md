@@ -56,7 +56,11 @@ Vercel project settings for deploys):
      future Server Action or route handler that touches data. Proxy checks
      alone are advisory by design.
 - **Sign-out** — a Server Action that deletes the cookie; the button lives in
-  the sidebar footer (desktop) and the bottom bar (mobile).
+  the sidebar footer (desktop) and the bottom nav's "More" sheet (mobile,
+  since #114 — see [`docs/mobile.md`](mobile.md)). Both render a plain `<form
+action={logout}>`: `SignOutButton` is a server component, which is also why
+  the bottom nav passes it into the client sheet as a slot rather than the
+  sheet importing it.
 
 ## Operational notes
 

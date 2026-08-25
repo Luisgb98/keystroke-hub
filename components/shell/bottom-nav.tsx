@@ -1,26 +1,27 @@
-import { Inbox, Settings } from "lucide-react";
-
 import { SignOutButton } from "@/components/auth/sign-out-button";
-import { PaletteSearchButton } from "@/components/command-palette/palette-trigger";
-import {
-  InboxCountBadge,
-  inboxCountLabel,
-} from "@/components/shell/inbox-count-badge";
+import { BOTTOM_NAV_BAR_CLASSES } from "@/components/shell/bottom-nav-styles";
+import { MoreSheet } from "@/components/shell/more-sheet";
 import { NavLink } from "@/components/shell/nav-link";
-import { navItems } from "@/lib/navigation";
+import { bottomNavItems } from "@/lib/navigation";
 
 interface BottomNavProps {
-  /** Untriaged inbox entries — overlaid as a badge on the Inbox tab. */
+  /** Untriaged inbox entries — a dot on the More trigger, the count on its Inbox row. */
   untriagedCount: number;
 }
 
+/**
+ * The mobile tab bar: four destinations plus "More" (#114).
+ *
+ * It used to carry nine items — the five `navItems`, Inbox, Search, Settings
+ * and Sign out — which left ~42px per slot and wrapped labels across three
+ * lines. The five that no longer have a slot moved into `MoreSheet`, one tap
+ * away, and the inbox count is mirrored on the More trigger so mobile keeps a
+ * permanently visible untriaged signal (docs/inbox.md).
+ */
 export function BottomNav({ untriagedCount }: BottomNavProps) {
   return (
-    <nav
-      aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-20 flex border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
-    >
-      {navItems.map(({ href, label, icon: Icon }) => (
+    <nav aria-label="Primary" className={BOTTOM_NAV_BAR_CLASSES}>
+      {bottomNavItems.map(({ href, label, icon: Icon }) => (
         <NavLink
           key={href}
           href={href}
@@ -29,30 +30,12 @@ export function BottomNav({ untriagedCount }: BottomNavProps) {
           variant="bottom"
         />
       ))}
-      {/* Mobile's only persistent inbox entry point since the floating dock
-          went away — the sidebar that carries the desktop link is `md:` only
-          (Issue #85, see docs/inbox.md). */}
-      <NavLink
-        href="/inbox"
-        label="Inbox"
-        icon={<Inbox aria-hidden className="size-5" />}
-        variant="bottom"
-        badge={
-          <InboxCountBadge
-            count={untriagedCount}
-            className="absolute -top-1 -right-1 h-4 min-w-4 px-1"
-          />
-        }
-        badgeLabel={inboxCountLabel(untriagedCount)}
-      />
-      <PaletteSearchButton />
-      <NavLink
-        href="/settings/calendars"
-        label="Settings"
-        icon={<Settings aria-hidden className="size-5" />}
-        variant="bottom"
-      />
-      <SignOutButton variant="bottom" />
+      {/* The sign-out form is a server component (it hands a Server Action to
+          `<form action>`), so it's passed into the client sheet as a slot
+          rather than imported there. */}
+      <MoreSheet untriagedCount={untriagedCount}>
+        <SignOutButton variant="sheet" />
+      </MoreSheet>
     </nav>
   );
 }

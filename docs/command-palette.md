@@ -139,12 +139,15 @@ label match as nav items.
   one — server actions have no abort signal). Loading shows two skeleton
   rows rather than a layout jump; no matches at all render `CommandEmpty`.
   Selecting any item closes the dialog and `router.push`es its `href`.
-- **`PaletteTriggerChip`** / **`PaletteSearchButton`**
-  (`palette-trigger.tsx`) — the sidebar's `⌘K`/`Ctrl K` chip (Mac detection
-  via a `useSyncExternalStore`-based hook, resolved client-only so the
-  server-rendered chip never mismatches the hydrated one — same idiom as
-  `theme-toggle.tsx`'s `useMounted`) and the bottom-nav's `Search` button
-  (a 6th slot, styled like `NavLink`'s `"bottom"` variant).
+- **`PaletteTriggerChip`** (`palette-trigger.tsx`) — the sidebar's
+  `⌘K`/`Ctrl K` chip (Mac detection via a `useSyncExternalStore`-based hook,
+  resolved client-only so the server-rendered chip never mismatches the
+  hydrated one — same idiom as `theme-toggle.tsx`'s `useMounted`). On mobile
+  there is no chip: #114 cut the bottom bar to five slots, so Search became a
+  row inside the "More" sheet, which owns the `setOpen(true)` call itself
+  (`components/shell/more-sheet.tsx`, see [`docs/mobile.md`](mobile.md)). The
+  sheet closes before the palette opens, so the two modals never fight over
+  the focus trap.
 - **Every result row** shows its world three ways — a track-colored icon
   chip (`TRACK_ICON`/`TRACK_SURFACE_CLASSES`, `components/calendar/track-styles.ts`,
   the same source every calendar chip uses), plus a visible `"Work"`/`"Content"`
@@ -194,8 +197,8 @@ e2e (`e2e/command-palette.spec.ts`, Playwright, `chromium` + a
   sidebar chip advertises the new shortcut (#102).
 - Esc closes the palette and returns focus to the trigger that opened it.
 - Empty query shows the Navigate group immediately.
-- Tapping the bottom-nav Search button (mobile viewport) opens the palette
-  and a tapped result navigates.
+- Reaching Search through the bottom nav's "More" sheet (mobile viewport)
+  opens the palette and a tapped result navigates.
 - DB-backed: seeding one project (work) and one idea (content) sharing a
   token and searching for it surfaces both, each labeled with its world —
   skipped without `DATABASE_URL`, same guard as every other DB-backed spec

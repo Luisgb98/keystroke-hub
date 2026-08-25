@@ -130,14 +130,20 @@ test.describe("command palette navigation", () => {
 test.describe("command palette mobile viewport", () => {
   test.use({ viewport: { width: 375, height: 812 } });
 
-  test("tapping the bottom-nav Search button opens the palette and a tapped result navigates", async ({
+  test("reaching Search through the bottom nav's More sheet opens the palette and a tapped result navigates", async ({
     page,
   }) => {
     await page.goto("/");
-    const trigger = page
+    // #114 took Search off the tab bar itself — it's a row in the "More"
+    // sheet now, one tap away.
+    await page
       .getByRole("navigation", { name: "Primary" })
-      .getByRole("button", { name: "Search" });
-    await trigger.click();
+      .getByRole("button", { name: /More/ })
+      .click();
+    await page
+      .getByRole("navigation", { name: "More" })
+      .getByRole("button", { name: "Search" })
+      .click();
 
     const dialog = page.getByRole("dialog", PALETTE);
     await expect(dialog).toBeVisible();

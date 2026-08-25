@@ -747,11 +747,17 @@ test.describe("idea capture mobile viewport", () => {
     // Roughly on the heading's row, rather than floating far below it.
     expect(Math.abs(actionBox!.y - headingBox!.y)).toBeLessThan(80);
 
-    // Nothing floats in the corner any more: no capture "+", and the only
-    // Inbox link is the nav's.
+    // Nothing floats in the corner any more: no capture "+", and no Inbox
+    // link outside the nav — which since #114 means none visible at all until
+    // the bottom bar's "More" sheet is opened, and exactly one inside it.
     await expect(
       page.getByRole("button", { name: "Capture a thought" })
     ).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /Inbox/ })).toHaveCount(0);
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .getByRole("button", { name: /More/ })
+      .click();
     await expect(page.getByRole("link", { name: /Inbox/ })).toHaveCount(1);
   });
 
