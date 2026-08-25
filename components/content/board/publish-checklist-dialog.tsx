@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -111,13 +112,15 @@ export function PublishChecklistDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent variant="sheet">
         <DialogHeader>
           <DialogTitle>Publish checklist</DialogTitle>
           <DialogDescription>{ideaTitle}</DialogDescription>
         </DialogHeader>
 
-        <div data-slot="publish-checklist" className="flex flex-col gap-2">
+        {/* Only the list scrolls — the add field below stays pinned to the
+            bottom edge, so a long checklist never buries it. */}
+        <DialogBody data-slot="publish-checklist" className="gap-2">
           {loading ? (
             <p className="py-6 text-center text-small text-muted-foreground">
               Loading…
@@ -164,30 +167,30 @@ export function PublishChecklistDialog({
               ))}
             </ul>
           )}
+        </DialogBody>
 
-          <div className="flex items-center gap-2">
-            <Input
-              aria-label="Add checklist item"
-              placeholder="Add an item…"
-              value={newLabel}
-              onChange={(e) => setNewLabel(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleAdd();
-                }
-              }}
-            />
-            <Button
-              type="button"
-              size="sm"
-              disabled={pending || !newLabel.trim()}
-              onClick={handleAdd}
-            >
-              <Plus aria-hidden />
-              Add
-            </Button>
-          </div>
+        <div className="flex items-center gap-2">
+          <Input
+            aria-label="Add checklist item"
+            placeholder="Add an item…"
+            value={newLabel}
+            onChange={(e) => setNewLabel(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleAdd();
+              }
+            }}
+          />
+          <Button
+            type="button"
+            size="sm"
+            disabled={pending || !newLabel.trim()}
+            onClick={handleAdd}
+          >
+            <Plus aria-hidden />
+            Add
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

@@ -11,6 +11,7 @@ import { toast } from "sonner";
 
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -134,7 +135,7 @@ export function AttachPicker<T>({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent variant="sheet">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
@@ -148,7 +149,10 @@ export function AttachPicker<T>({
           onChange={(e) => setQuery(e.target.value)}
         />
 
-        <div className="flex max-h-72 flex-col gap-1 overflow-y-auto">
+        {/* The results are the only part that scrolls: the search field stays
+            put above them, which on a phone means the query you're refining
+            doesn't slide away under your thumb. */}
+        <DialogBody className="gap-1 md:max-h-72">
           {loading ? (
             <p className="py-6 text-center text-small text-muted-foreground">
               Searching…
@@ -176,7 +180,7 @@ export function AttachPicker<T>({
               );
             })
           )}
-        </div>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );

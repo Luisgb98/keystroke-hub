@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -68,7 +69,7 @@ export function CaptureDialog({ open, onOpenChange }: CaptureDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md" aria-labelledby={labelId}>
+      <DialogContent variant="sheet" aria-labelledby={labelId}>
         <form ref={formRef} action={formAction} className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle id={labelId}>Capture a thought</DialogTitle>
@@ -76,41 +77,41 @@ export function CaptureDialog({ open, onOpenChange }: CaptureDialogProps) {
               Get it out of your head now — triage it later from the inbox.
             </DialogDescription>
           </DialogHeader>
-
-          <div className="flex flex-col gap-1.5">
-            <Textarea
-              name="body"
-              autoFocus
-              rows={4}
-              maxLength={MAX_BODY_LENGTH}
-              aria-label="What's on your mind?"
-              placeholder="What's on your mind?"
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              onKeyDown={handleKeyDown}
-              aria-invalid={state?.fieldError ? true : undefined}
-            />
-            <div className="flex min-h-4 items-center justify-between">
-              {state?.fieldError ? (
-                <p role="alert" className="text-caption text-destructive">
-                  {state.fieldError}
-                </p>
-              ) : (
-                <span />
-              )}
-              {body.length >= COUNTER_VISIBLE_FROM ? (
-                <span
-                  className={cn(
-                    "text-caption text-muted-foreground tabular-nums",
-                    remaining < 0 && "text-destructive"
-                  )}
-                >
-                  {remaining}
-                </span>
-              ) : null}
+          <DialogBody>
+            <div className="flex flex-col gap-1.5">
+              <Textarea
+                name="body"
+                autoFocus
+                rows={4}
+                maxLength={MAX_BODY_LENGTH}
+                aria-label="What's on your mind?"
+                placeholder="What's on your mind?"
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                onKeyDown={handleKeyDown}
+                aria-invalid={state?.fieldError ? true : undefined}
+              />
+              <div className="flex min-h-4 items-center justify-between">
+                {state?.fieldError ? (
+                  <p role="alert" className="text-caption text-destructive">
+                    {state.fieldError}
+                  </p>
+                ) : (
+                  <span />
+                )}
+                {body.length >= COUNTER_VISIBLE_FROM ? (
+                  <span
+                    className={cn(
+                      "text-caption text-muted-foreground tabular-nums",
+                      remaining < 0 && "text-destructive"
+                    )}
+                  >
+                    {remaining}
+                  </span>
+                ) : null}
+              </div>
             </div>
-          </div>
-
+          </DialogBody>
           <DialogFooter>
             <Button type="submit" disabled={pending}>
               {pending ? "Saving…" : "Capture"}

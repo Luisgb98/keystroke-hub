@@ -37,6 +37,7 @@ import { GamePicker } from "@/components/content/games/game-picker";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -117,10 +118,12 @@ function initialValues(
 
 /**
  * Shared create/edit surface for an idea (issue #71). Mirrors `EventEditor`'s
- * `mode` prop and Dialog-for-both-viewports approach (see docs/calendar.md):
- * this project's shadcn setup has no drawer/sheet, and `DialogContent` is
- * responsive enough for a mobile-first, one-handed form. Capture allows an
- * inline Markdown script; editing links out to the dedicated script page.
+ * `mode` prop and its dialog shape (see docs/calendar.md): `variant="sheet"`,
+ * so this is a bottom sheet on a phone and the same centred panel on desktop,
+ * with the fields in a `DialogBody` that scrolls under a pinned header and
+ * Save button (#114 — this form is long enough that the whole panel scrolling
+ * left Save below the fold). Capture allows an inline Markdown script; editing
+ * links out to the dedicated script page.
  */
 export function IdeaEditor({
   mode,
@@ -217,7 +220,7 @@ export function IdeaEditor({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md">
+      <DialogContent variant="sheet">
         <form
           onSubmit={handleSubmit}
           className="flex flex-col gap-4"
@@ -235,278 +238,284 @@ export function IdeaEditor({
                 : "Update any field. Clearing the release date removes it from the calendar."}
             </DialogDescription>
           </DialogHeader>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={titleId}>Title</Label>
-            <Input
-              id={titleId}
-              name="title"
-              autoFocus
-              value={values.title}
-              onChange={(e) =>
-                setValues((v) => ({ ...v, title: e.target.value }))
-              }
-              aria-invalid={fieldErrors.title ? true : undefined}
-            />
-            {fieldErrors.title ? (
-              <p role="alert" className="text-small text-destructive">
-                {fieldErrors.title[0]}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label>Format</Label>
-            <div
-              role="radiogroup"
-              aria-label="Format"
-              className="grid grid-cols-3 gap-2"
-            >
-              {IDEA_FORMATS.map((format) => {
-                const Icon = IDEA_FORMAT_ICON[format];
-                const selected = values.format === format;
-                return (
-                  // Shared button system for geometry, focus ring and press
-                  // feedback; the checked state overrides only the surface, so
-                  // a picked format stays content-track colored (docs/design-system.md).
-                  <Button
-                    key={format}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    variant="outline"
-                    onClick={() => setValues((v) => ({ ...v, format }))}
-                    className={cn(
-                      "h-11 w-full",
-                      selected
-                        ? "border-track-content-border bg-track-content text-track-content-foreground hover:bg-track-content hover:text-track-content-foreground dark:bg-track-content dark:hover:bg-track-content"
-                        : "text-muted-foreground"
-                    )}
-                  >
-                    <Icon aria-hidden className="size-4 shrink-0" />
-                    {IDEA_FORMAT_LABEL[format]}
-                  </Button>
-                );
-              })}
-            </div>
-            {fieldErrors.format ? (
-              <p role="alert" className="text-small text-destructive">
-                {fieldErrors.format[0]}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="flex flex-col gap-2">
-            {/* Its own field, not one of the tags below: tags describe the
-                video for publishing, the game says what the work is about
-                (#105, docs/content-games.md). */}
-            {/* No `htmlFor`: the picker's trigger is a button carrying its own
-                `aria-label`, so the visible label is decoration, not the
-                accessible name. */}
-            <Label>Game</Label>
-            <GamePicker
-              games={games}
-              name="gameId"
-              label="Game"
-              value={values.gameId}
-              onChange={(gameId) => setValues((v) => ({ ...v, gameId }))}
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="idea-description">Description</Label>
-            {/* Capped like the script field below: `field-sizing-content` would
-                otherwise let a pasted description stretch the dialog off-screen
-                (#93). */}
-            <Textarea
-              id="idea-description"
-              name="description"
-              value={values.description}
-              placeholder="The description you'll publish with the video"
-              className="max-h-32 resize-none overflow-y-auto overscroll-contain"
-              onChange={(e) =>
-                setValues((v) => ({ ...v, description: e.target.value }))
-              }
-              aria-invalid={fieldErrors.description ? true : undefined}
-            />
-            {fieldErrors.description ? (
-              <p role="alert" className="text-small text-destructive">
-                {fieldErrors.description[0]}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <Label htmlFor="idea-tags">Tags</Label>
-              <span
-                data-slot="tag-counter"
-                aria-live="polite"
-                className={cn(
-                  "font-mono text-caption",
-                  tagsOver
-                    ? "text-destructive"
-                    : tagsComplete
-                      ? "text-track-content-foreground"
-                      : "text-muted-foreground"
-                )}
-              >
-                {tagCount}/{PUBLISHING_TAG_STANDARD}
-              </span>
-            </div>
-            <Input
-              id="idea-tags"
-              name="tags"
-              placeholder="speedrun, tutorial, glitch"
-              value={values.tags}
-              onChange={(e) =>
-                setValues((v) => ({ ...v, tags: e.target.value }))
-              }
-              aria-invalid={fieldErrors.tags ? true : undefined}
-            />
-            {fieldErrors.tags ? (
-              <p role="alert" className="text-small text-destructive">
-                {fieldErrors.tags[0]}
-              </p>
-            ) : (
-              <p className="text-caption text-muted-foreground">
-                {tagsComplete
-                  ? "Comma-separated — five tags, the publishing standard."
-                  : `Comma-separated. Aim for ${PUBLISHING_TAG_STANDARD} — this idea reads as incomplete until it has them.`}
-              </p>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <Label htmlFor="idea-release-date">Release date</Label>
-              {values.releaseDate ? (
-                <button
-                  type="button"
-                  onClick={() => setValues((v) => ({ ...v, releaseDate: "" }))}
-                  className="flex items-center gap-1 text-caption text-muted-foreground hover:text-foreground"
-                >
-                  <X aria-hidden className="size-3.5" />
-                  Clear
-                </button>
+          <DialogBody>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor={titleId}>Title</Label>
+              <Input
+                id={titleId}
+                name="title"
+                autoFocus
+                value={values.title}
+                onChange={(e) =>
+                  setValues((v) => ({ ...v, title: e.target.value }))
+                }
+                aria-invalid={fieldErrors.title ? true : undefined}
+              />
+              {fieldErrors.title ? (
+                <p role="alert" className="text-small text-destructive">
+                  {fieldErrors.title[0]}
+                </p>
               ) : null}
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <DatePicker
-                id="idea-release-date"
-                name="releaseDate"
-                triggerLabel="Open publish day calendar"
-                value={values.releaseDate}
-                onChange={(releaseDate) =>
-                  setValues((v) => ({ ...v, releaseDate }))
-                }
-                aria-invalid={fieldErrors.releaseDate ? true : undefined}
-              />
-              <TimePicker
-                name="releaseTime"
-                aria-label="Release time"
-                triggerLabel="Choose publish time"
-                disabled={!values.releaseDate}
-                value={values.releaseTime}
-                onChange={(releaseTime) =>
-                  setValues((v) => ({ ...v, releaseTime }))
-                }
-                aria-invalid={fieldErrors.releaseTime ? true : undefined}
+
+            <div className="flex flex-col gap-2">
+              <Label>Format</Label>
+              <div
+                role="radiogroup"
+                aria-label="Format"
+                className="grid grid-cols-3 gap-2"
+              >
+                {IDEA_FORMATS.map((format) => {
+                  const Icon = IDEA_FORMAT_ICON[format];
+                  const selected = values.format === format;
+                  return (
+                    // Shared button system for geometry, focus ring and press
+                    // feedback; the checked state overrides only the surface, so
+                    // a picked format stays content-track colored (docs/design-system.md).
+                    <Button
+                      key={format}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      variant="outline"
+                      onClick={() => setValues((v) => ({ ...v, format }))}
+                      className={cn(
+                        "h-11 w-full",
+                        selected
+                          ? "border-track-content-border bg-track-content text-track-content-foreground hover:bg-track-content hover:text-track-content-foreground dark:bg-track-content dark:hover:bg-track-content"
+                          : "text-muted-foreground"
+                      )}
+                    >
+                      <Icon aria-hidden className="size-4 shrink-0" />
+                      {IDEA_FORMAT_LABEL[format]}
+                    </Button>
+                  );
+                })}
+              </div>
+              {fieldErrors.format ? (
+                <p role="alert" className="text-small text-destructive">
+                  {fieldErrors.format[0]}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              {/* Its own field, not one of the tags below: tags describe the
+                video for publishing, the game says what the work is about
+                (#105, docs/content-games.md). */}
+              {/* No `htmlFor`: the picker's trigger is a button carrying its own
+                `aria-label`, so the visible label is decoration, not the
+                accessible name. */}
+              <Label>Game</Label>
+              <GamePicker
+                games={games}
+                name="gameId"
+                label="Game"
+                value={values.gameId}
+                onChange={(gameId) => setValues((v) => ({ ...v, gameId }))}
               />
             </div>
-            {fieldErrors.releaseDate || fieldErrors.releaseTime ? (
-              <p role="alert" className="text-small text-destructive">
-                {(fieldErrors.releaseDate ?? fieldErrors.releaseTime)?.[0]}
-              </p>
-            ) : (
-              <p className="text-caption text-muted-foreground">
-                Sets when it publishes — shows on the content calendar. Defaults
-                to {DEFAULT_RELEASE_TIME}.
-              </p>
-            )}
-          </div>
 
-          {mode === "create" ? (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="idea-description">Description</Label>
+              {/* Capped like the script field below: `field-sizing-content` would
+                otherwise let a pasted description stretch the dialog off-screen
+                (#93). */}
+              <Textarea
+                id="idea-description"
+                name="description"
+                value={values.description}
+                placeholder="The description you'll publish with the video"
+                className="max-h-32 resize-none overflow-y-auto overscroll-contain"
+                onChange={(e) =>
+                  setValues((v) => ({ ...v, description: e.target.value }))
+                }
+                aria-invalid={fieldErrors.description ? true : undefined}
+              />
+              {fieldErrors.description ? (
+                <p role="alert" className="text-small text-destructive">
+                  {fieldErrors.description[0]}
+                </p>
+              ) : null}
+            </div>
+
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="idea-script">Script (optional)</Label>
-                <div className="flex items-center gap-3">
-                  {/* Same counter idiom as Tags above: the dialog never shows
+                <Label htmlFor="idea-tags">Tags</Label>
+                <span
+                  data-slot="tag-counter"
+                  aria-live="polite"
+                  className={cn(
+                    "font-mono text-caption",
+                    tagsOver
+                      ? "text-destructive"
+                      : tagsComplete
+                        ? "text-track-content-foreground"
+                        : "text-muted-foreground"
+                  )}
+                >
+                  {tagCount}/{PUBLISHING_TAG_STANDARD}
+                </span>
+              </div>
+              <Input
+                id="idea-tags"
+                name="tags"
+                placeholder="speedrun, tutorial, glitch"
+                value={values.tags}
+                onChange={(e) =>
+                  setValues((v) => ({ ...v, tags: e.target.value }))
+                }
+                aria-invalid={fieldErrors.tags ? true : undefined}
+              />
+              {fieldErrors.tags ? (
+                <p role="alert" className="text-small text-destructive">
+                  {fieldErrors.tags[0]}
+                </p>
+              ) : (
+                <p className="text-caption text-muted-foreground">
+                  {tagsComplete
+                    ? "Comma-separated — five tags, the publishing standard."
+                    : `Comma-separated. Aim for ${PUBLISHING_TAG_STANDARD} — this idea reads as incomplete until it has them.`}
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="idea-release-date">Release date</Label>
+                {values.releaseDate ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setValues((v) => ({ ...v, releaseDate: "" }))
+                    }
+                    className="flex items-center gap-1 text-caption text-muted-foreground hover:text-foreground"
+                  >
+                    <X aria-hidden className="size-3.5" />
+                    Clear
+                  </button>
+                ) : null}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <DatePicker
+                  id="idea-release-date"
+                  name="releaseDate"
+                  triggerLabel="Open publish day calendar"
+                  value={values.releaseDate}
+                  onChange={(releaseDate) =>
+                    setValues((v) => ({ ...v, releaseDate }))
+                  }
+                  aria-invalid={fieldErrors.releaseDate ? true : undefined}
+                />
+                <TimePicker
+                  name="releaseTime"
+                  aria-label="Release time"
+                  triggerLabel="Choose publish time"
+                  disabled={!values.releaseDate}
+                  value={values.releaseTime}
+                  onChange={(releaseTime) =>
+                    setValues((v) => ({ ...v, releaseTime }))
+                  }
+                  aria-invalid={fieldErrors.releaseTime ? true : undefined}
+                />
+              </div>
+              {fieldErrors.releaseDate || fieldErrors.releaseTime ? (
+                <p role="alert" className="text-small text-destructive">
+                  {(fieldErrors.releaseDate ?? fieldErrors.releaseTime)?.[0]}
+                </p>
+              ) : (
+                <p className="text-caption text-muted-foreground">
+                  Sets when it publishes — shows on the content calendar.
+                  Defaults to {DEFAULT_RELEASE_TIME}.
+                </p>
+              )}
+            </div>
+
+            {mode === "create" ? (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="idea-script">Script (optional)</Label>
+                  <div className="flex items-center gap-3">
+                    {/* Same counter idiom as Tags above: the dialog never shows
                       the whole script, so this is how you know the paste
                       landed. */}
-                  <span
-                    data-slot="script-counter"
-                    aria-live="polite"
-                    className={cn(
-                      "font-mono text-caption",
-                      scriptError ? "text-destructive" : "text-muted-foreground"
-                    )}
-                  >
-                    {formatScriptSize(values.script)}
-                  </span>
-                  {scriptTooTall ? (
-                    <button
-                      type="button"
-                      onClick={() => setScriptExpanded((expanded) => !expanded)}
-                      aria-expanded={scriptExpanded}
-                      aria-controls="idea-script"
-                      className="flex items-center gap-1 text-caption text-muted-foreground hover:text-foreground"
-                    >
-                      {scriptExpanded ? (
-                        <ChevronsDownUp aria-hidden className="size-3.5" />
-                      ) : (
-                        <ChevronsUpDown aria-hidden className="size-3.5" />
+                    <span
+                      data-slot="script-counter"
+                      aria-live="polite"
+                      className={cn(
+                        "font-mono text-caption",
+                        scriptError
+                          ? "text-destructive"
+                          : "text-muted-foreground"
                       )}
-                      {scriptExpanded ? "Collapse" : "Expand"}
-                    </button>
-                  ) : null}
+                    >
+                      {formatScriptSize(values.script)}
+                    </span>
+                    {scriptTooTall ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setScriptExpanded((expanded) => !expanded)
+                        }
+                        aria-expanded={scriptExpanded}
+                        aria-controls="idea-script"
+                        className="flex items-center gap-1 text-caption text-muted-foreground hover:text-foreground"
+                      >
+                        {scriptExpanded ? (
+                          <ChevronsDownUp aria-hidden className="size-3.5" />
+                        ) : (
+                          <ChevronsUpDown aria-hidden className="size-3.5" />
+                        )}
+                        {scriptExpanded ? "Collapse" : "Expand"}
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-              {/* Capture surface, not the editing surface (that's the script
+                {/* Capture surface, not the editing surface (that's the script
                   page): the field grows to a cap and then scrolls internally,
                   so pasting a thousand-line Markdown script leaves the dialog
                   exactly as tall as it was. `overscroll-contain` keeps a touch
                   scroll inside the script from chaining to the dialog's own
                   `overflow-y-auto` body. */}
-              <Textarea
-                id="idea-script"
-                name="script"
-                placeholder="Paste or write the Markdown script — or add it later."
-                className={cn(
-                  "resize-none overflow-y-auto overscroll-contain font-mono leading-relaxed",
-                  scriptExpanded ? "max-h-[45dvh]" : "max-h-40"
-                )}
-                value={values.script}
-                onChange={(e) =>
-                  setValues((v) => ({ ...v, script: e.target.value }))
-                }
-                aria-invalid={scriptError ? true : undefined}
-              />
-              {scriptError ? (
-                <p role="alert" className="text-small text-destructive">
-                  {scriptError}
-                </p>
-              ) : null}
-            </div>
-          ) : idea ? (
-            <Button
-              variant="outline"
-              className="justify-start"
-              nativeButton={false}
-              role="link"
-              render={<Link href={`/content/ideas/${idea.id}/script`} />}
-            >
-              <ScrollText aria-hidden className="size-4" />
-              Edit script
-            </Button>
-          ) : null}
+                <Textarea
+                  id="idea-script"
+                  name="script"
+                  placeholder="Paste or write the Markdown script — or add it later."
+                  className={cn(
+                    "resize-none overflow-y-auto overscroll-contain font-mono leading-relaxed",
+                    scriptExpanded ? "max-h-[45dvh]" : "max-h-40"
+                  )}
+                  value={values.script}
+                  onChange={(e) =>
+                    setValues((v) => ({ ...v, script: e.target.value }))
+                  }
+                  aria-invalid={scriptError ? true : undefined}
+                />
+                {scriptError ? (
+                  <p role="alert" className="text-small text-destructive">
+                    {scriptError}
+                  </p>
+                ) : null}
+              </div>
+            ) : idea ? (
+              <Button
+                variant="outline"
+                className="justify-start"
+                nativeButton={false}
+                role="link"
+                render={<Link href={`/content/ideas/${idea.id}/script`} />}
+              >
+                <ScrollText aria-hidden className="size-4" />
+                Edit script
+              </Button>
+            ) : null}
 
-          {state?.error ? (
-            <p role="alert" className="text-small text-destructive">
-              {state.error}
-            </p>
-          ) : null}
-
+            {state?.error ? (
+              <p role="alert" className="text-small text-destructive">
+                {state.error}
+              </p>
+            ) : null}
+          </DialogBody>
           <DialogFooter>
             <Button type="submit" disabled={pending}>
               {pending ? "Saving…" : "Save"}
