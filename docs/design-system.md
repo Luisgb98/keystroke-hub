@@ -26,8 +26,10 @@ The brand accent is **`#a8454b`** — `oklch(0.524 0.131 19.1)`, a muted brick
 red. Dark mode lifts the same hue to `oklch(0.72 0.14 19.1)`; `#a8454b` is too
 dark to read on a dark surface. `--sidebar-primary` and the focus rings
 (`--ring`, `--sidebar-ring`) are derived from it, so buttons, badges, links,
-the sidebar active bar, the mobile bottom-nav dot, the inbox count badge and
-every focus halo all come from one decision.
+the sidebar active bar, the mobile bottom-nav dot, the inbox count badge, the
+app icon and every focus halo all come from one decision. (The icon and the web
+manifest can't read a CSS token, so they read the same hex from `lib/brand.ts`
+instead, pinned to `--primary` by a test — see [`docs/pwa.md`](pwa.md).)
 
 That leaves three reds in the palette, kept apart on purpose:
 

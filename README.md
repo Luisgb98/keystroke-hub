@@ -59,6 +59,10 @@ Open [http://localhost:3000](http://localhost:3000) to see the result.
 | `pnpm test:e2e`     | Run end-to-end tests with Playwright        |
 | `pnpm build`        | Build the production app                    |
 
+Utility scripts: `pnpm auth:hash` (password hash),
+`pnpm icons:generate` (rewrite the PWA icon set into `public/`),
+`pnpm seed:events`, `pnpm fix:shifted-times`, `pnpm version:check`.
+
 ESLint (flat config, `eslint-config-next` + `eslint-config-prettier`) and
 Prettier (with `prettier-plugin-tailwindcss` for deterministic Tailwind class
 ordering) are configured to never disagree — ESLint defers all stylistic
@@ -88,6 +92,15 @@ Testing is mandatory for every feature — see `AGENTS.md`.
     (CI-ready). If port 3000 is already in use by something other than your
     local dev server, stop it first — Playwright's `webServer` needs the
     port and only reuses an existing server outside of `CI`.
+
+## Mobile & installable
+
+The phone is the primary surface: a five-slot bottom tab bar (four
+destinations plus a "More" sheet holding the rest), safe-area-aware layout, and
+an installable web app. Add it to an iPhone home screen or an Android launcher
+and it opens standalone — own icon, own window, no browser chrome. Run
+`pnpm icons:generate` after changing the brand accent and commit the PNGs. See
+[`docs/mobile.md`](docs/mobile.md) and [`docs/pwa.md`](docs/pwa.md).
 
 ## Authentication
 
