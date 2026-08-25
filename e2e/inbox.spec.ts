@@ -190,54 +190,63 @@ test.describe("quick-capture inbox mobile viewport", () => {
   test.use({ viewport: { width: 375, height: 812 } });
   test.skip(skip, skipReason);
 
-  test.afterEach(async () => {
-    await clearTestInboxEntries(MOBILE_PREFIX);
-  });
+  // The cleanup is scoped to the one test that writes a row, rather than the
+  // whole describe. `clearTestInboxEntries` deletes by prefix, and these tests
+  // run in parallel — so a describe-level hook let the (much faster,
+  // write-free) dock test wipe the capture test's entry out from under it,
+  // between its capture and its reload.
+  test.describe(() => {
+    test.afterEach(async () => {
+      await clearTestInboxEntries(MOBILE_PREFIX);
+    });
 
-  test("capture is reachable one-handed: bottom-nav More → Search → palette action", async ({
-    page,
-  }) => {
-    // Unique per run: this describe isn't serial, so two copies (a retry, or a
-    // `--repeat-each` run) can overlap, and each one's prefix cleanup would
-    // otherwise delete the other's entry mid-test.
-    const body = `${MOBILE_PREFIX} one-handed capture ${Date.now()}`;
-    await page.goto("/calendar");
+    test("capture is reachable one-handed: bottom-nav More → Search → palette action", async ({
+      page,
+    }) => {
+      // Unique per run: this describe isn't serial, so two copies (a retry, or a
+      // `--repeat-each` run) can overlap, and each one's prefix cleanup would
+      // otherwise delete the other's entry mid-test.
+      const body = `${MOBILE_PREFIX} one-handed capture ${Date.now()}`;
+      await page.goto("/calendar");
 
-    const bottomNav = page.getByRole("navigation", { name: "Primary" });
-    const more = bottomNav.getByRole("button", { name: /More/ });
-    // Search and Inbox both live behind the "More" trigger since #114 cut the
-    // bar to five slots — still one tap each from the bar.
-    await more.click();
-    await page
-      .getByRole("navigation", { name: "More" })
-      .getByRole("button", { name: "Search" })
-      .click();
-    const palette = page.getByRole("dialog", { name: "Command palette" });
-    await expect(palette).toBeVisible();
-    await palette.getByRole("option", { name: "Capture a thought" }).click();
-    await fillCapture(page, body);
+      const bottomNav = page.getByRole("navigation", { name: "Primary" });
+      const more = bottomNav.getByRole("button", { name: /More/ });
+      // Search and Inbox both live behind the "More" trigger since #114 cut the
+      // bar to five slots — still one tap each from the bar.
+      await more.click();
+      await page
+        .getByRole("navigation", { name: "More" })
+        .getByRole("button", { name: "Search" })
+        .click();
+      const palette = page.getByRole("dialog", { name: "Command palette" });
+      await expect(palette).toBeVisible();
+      await palette.getByRole("option", { name: "Capture a thought" }).click();
+      await fillCapture(page, body);
 
-    // The More trigger mirrors the untriaged signal as a dot, so mobile keeps
-    // a permanently visible "something is waiting" — docs/inbox.md's promise,
-    // carried by the trigger now that the Inbox tab sits inside the sheet.
-    await expect(
-      bottomNav.locator('[data-slot="more-unread-dot"]')
-    ).toBeVisible({ timeout: 10000 });
-    await more.click();
-    const sheet = page.getByRole("navigation", { name: "More" });
-    // …and the count itself is on the Inbox row one tap in.
-    await expect(sheet.locator('[data-slot="inbox-count"]')).toBeVisible();
-    await sheet.getByRole("link", { name: /Inbox/ }).click();
-    await expect(page).toHaveURL(/\/inbox$/);
-    await expect(
-      page.getByRole("heading", { level: 1, name: "Inbox" })
-    ).toBeVisible();
+      // The More trigger mirrors the untriaged signal as a dot, so mobile keeps
+      // a permanently visible "something is waiting" — docs/inbox.md's promise,
+      // carried by the trigger now that the Inbox tab sits inside the sheet.
+      await expect(
+        bottomNav.locator('[data-slot="more-unread-dot"]')
+      ).toBeVisible({ timeout: 10000 });
+      await more.click();
+      const sheet = page.getByRole("navigation", { name: "More" });
+      // …and the count itself is on the Inbox row one tap in.
+      await expect(sheet.locator('[data-slot="inbox-count"]')).toBeVisible();
+      await sheet.getByRole("link", { name: /Inbox/ }).click();
+      await expect(page).toHaveURL(/\/inbox$/);
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Inbox" })
+      ).toBeVisible();
 
-    // The list is asserted after a reload: a client-side nav can be served from
-    // the router cache, which may hold a payload prefetched before the capture.
-    await page.reload();
-    await expect(page.locator(ENTRY_SELECTOR, { hasText: body })).toBeVisible({
-      timeout: 10000,
+      // The list is asserted after a reload: a client-side nav can be served from
+      // the router cache, which may hold a payload prefetched before the capture.
+      await page.reload();
+      await expect(page.locator(ENTRY_SELECTOR, { hasText: body })).toBeVisible(
+        {
+          timeout: 10000,
+        }
+      );
     });
   });
 

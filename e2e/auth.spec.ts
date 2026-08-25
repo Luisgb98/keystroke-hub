@@ -95,7 +95,15 @@ test.describe("access gate — signed in", () => {
   }) => {
     await page.goto("/");
 
-    // Sidebar icon button on desktop, bottom-bar action on mobile.
+    // Sidebar icon button on desktop; on mobile it's a row in the bottom nav's
+    // "More" sheet since #114, so the sheet has to be opened first. This file
+    // runs under both Playwright projects, hence the branch rather than two
+    // viewport-scoped copies of the same flow.
+    const more = page
+      .getByRole("navigation", { name: "Primary" })
+      .getByRole("button", { name: /More/ });
+    if (await more.isVisible()) await more.click();
+
     await page
       .getByRole("button", { name: "Sign out" })
       .filter({ visible: true })
