@@ -45,7 +45,10 @@ function FilterChip({
       aria-pressed={selected}
       onClick={onClick}
       className={cn(
-        "shrink-0 rounded-full border px-3 py-1 text-small font-medium whitespace-nowrap transition-all",
+        // `min-h-11` on a phone: these are the page's main way to narrow a long
+        // idea list, and a 31px pill in a horizontally-scrolling row is a
+        // miss waiting to happen (#114).
+        "inline-flex min-h-11 shrink-0 items-center rounded-full border px-3 py-1 text-small font-medium whitespace-nowrap transition-all md:min-h-0",
         selected
           ? "border-track-content-border bg-track-content text-track-content-foreground"
           : "border-border bg-background text-muted-foreground hover:bg-muted"

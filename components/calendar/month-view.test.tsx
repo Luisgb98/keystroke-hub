@@ -124,3 +124,25 @@ describe("MonthView", () => {
     expect(screen.getByRole("switch", { name: "All day" })).toBeChecked();
   });
 });
+
+describe("month cell add-event affordance on touch (#114)", () => {
+  it("is visible without a pointer on a phone, and hover-revealed from md up", () => {
+    // It used to be `opacity-0 group-hover:opacity-100`, so on a phone the
+    // only way to add an event to a month cell was to tap an invisible target.
+    const anchor = new Date("2026-07-08");
+    render(
+      <MonthView
+        days={getMonthGridDays(anchor)}
+        anchorMonth={anchor}
+        events={[]}
+        now={anchor}
+      />
+    );
+    const addButton = screen.getAllByRole("button", {
+      name: /^Add event on /,
+    })[0];
+    expect(addButton.className).not.toMatch(/(^|\s)opacity-0(\s|$)/);
+    expect(addButton).toHaveClass("md:opacity-0");
+    expect(addButton).toHaveClass("md:group-hover:opacity-100");
+  });
+});

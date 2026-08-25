@@ -87,3 +87,14 @@ describe("WeekRatingPicker", () => {
     expect(selected.className).not.toMatch(/(^|\s)text-primary(\s|$)/);
   });
 });
+
+describe("rating steps as touch targets (#114)", () => {
+  it("gives every step a 44px height on a phone", () => {
+    render(<WeekRatingPicker weekStart="2026-07-06" rating={null} />);
+
+    for (const step of screen.getAllByRole("radio")) {
+      expect(step).toHaveClass("min-h-11");
+      expect(step).toHaveClass("md:min-h-0");
+    }
+  });
+});
