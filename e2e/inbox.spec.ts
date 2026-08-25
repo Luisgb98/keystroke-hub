@@ -194,7 +194,7 @@ test.describe("quick-capture inbox mobile viewport", () => {
     await clearTestInboxEntries(MOBILE_PREFIX);
   });
 
-  test("capture is reachable one-handed: bottom-nav Search → palette action", async ({
+  test("capture is reachable one-handed: bottom-nav More → Search → palette action", async ({
     page,
   }) => {
     // Unique per run: this describe isn't serial, so two copies (a retry, or a
@@ -204,18 +204,30 @@ test.describe("quick-capture inbox mobile viewport", () => {
     await page.goto("/calendar");
 
     const bottomNav = page.getByRole("navigation", { name: "Primary" });
-    await bottomNav.getByRole("button", { name: "Search" }).click();
+    const more = bottomNav.getByRole("button", { name: /More/ });
+    // Search and Inbox both live behind the "More" trigger since #114 cut the
+    // bar to five slots — still one tap each from the bar.
+    await more.click();
+    await page
+      .getByRole("navigation", { name: "More" })
+      .getByRole("button", { name: "Search" })
+      .click();
     const palette = page.getByRole("dialog", { name: "Command palette" });
     await expect(palette).toBeVisible();
     await palette.getByRole("option", { name: "Capture a thought" }).click();
     await fillCapture(page, body);
 
-    // The bottom nav's Inbox tab — mobile's only persistent inbox entry point
-    // since the dock went away — shows the fresh count and reaches the list.
-    await expect(bottomNav.locator('[data-slot="inbox-count"]')).toBeVisible({
-      timeout: 10000,
-    });
-    await bottomNav.getByRole("link", { name: /Inbox/ }).click();
+    // The More trigger mirrors the untriaged signal as a dot, so mobile keeps
+    // a permanently visible "something is waiting" — docs/inbox.md's promise,
+    // carried by the trigger now that the Inbox tab sits inside the sheet.
+    await expect(
+      bottomNav.locator('[data-slot="more-unread-dot"]')
+    ).toBeVisible({ timeout: 10000 });
+    await more.click();
+    const sheet = page.getByRole("navigation", { name: "More" });
+    // …and the count itself is on the Inbox row one tap in.
+    await expect(sheet.locator('[data-slot="inbox-count"]')).toBeVisible();
+    await sheet.getByRole("link", { name: /Inbox/ }).click();
     await expect(page).toHaveURL(/\/inbox$/);
     await expect(
       page.getByRole("heading", { level: 1, name: "Inbox" })
@@ -237,6 +249,13 @@ test.describe("quick-capture inbox mobile viewport", () => {
     await expect(
       page.getByRole("button", { name: "Capture a thought" })
     ).toHaveCount(0);
+    // No visible Inbox link until the sheet is opened (#114) — and exactly one
+    // once it is, never a stray second entry point.
+    await expect(page.getByRole("link", { name: /Inbox/ })).toHaveCount(0);
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .getByRole("button", { name: /More/ })
+      .click();
     await expect(page.getByRole("link", { name: /Inbox/ })).toHaveCount(1);
   });
 });

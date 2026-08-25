@@ -3,8 +3,10 @@ import type { Metadata } from "next";
 import { CommandPaletteProvider } from "@/components/command-palette/command-palette-provider";
 import { InboxCaptureProvider } from "@/components/inbox/inbox-capture-provider";
 import { BottomNav } from "@/components/shell/bottom-nav";
+import { BOTTOM_NAV_SPACER_CLASSES } from "@/components/shell/bottom-nav-styles";
 import { Sidebar } from "@/components/shell/sidebar";
 import { verifySession } from "@/lib/auth/session";
+import { cn } from "@/lib/utils";
 import { getUntriagedCount } from "@/lib/inbox/queries";
 
 export const metadata: Metadata = {
@@ -41,7 +43,14 @@ export default async function AppShellLayout({
             live outside this layout and still rely on body scroll. */}
         <div className="flex h-dvh overflow-hidden">
           <Sidebar untriagedCount={untriagedCount} />
-          <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
+          {/* The bottom padding comes from the bar's own style module so the
+              two can't drift apart and clip the last row of a page (#114). */}
+          <main
+            className={cn(
+              "flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto",
+              BOTTOM_NAV_SPACER_CLASSES
+            )}
+          >
             {children}
           </main>
           <BottomNav untriagedCount={untriagedCount} />

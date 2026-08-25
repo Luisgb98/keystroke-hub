@@ -4,11 +4,6 @@ import { useSyncExternalStore } from "react";
 import { Search } from "lucide-react";
 
 import { useCommandPalette } from "@/components/command-palette/command-palette-provider";
-import {
-  BOTTOM_NAV_ICON_CLASSES,
-  BOTTOM_NAV_ITEM_CLASSES,
-  BOTTOM_NAV_LABEL_CLASSES,
-} from "@/components/shell/bottom-nav-styles";
 import { Button } from "@/components/ui/button";
 
 function subscribeNever() {
@@ -45,27 +40,5 @@ export function PaletteTriggerChip() {
         {`${modifierLabel}K`}
       </kbd>
     </Button>
-  );
-}
-
-/**
- * Bottom-nav search button — sits in the same row as `NavLink`'s "bottom"
- * variant and `SignOutButton`'s bottom form, so it shares `NavLink`'s exported
- * item classes rather than restating them (see docs/command-palette.md).
- */
-export function PaletteSearchButton() {
-  const { setOpen } = useCommandPalette();
-
-  return (
-    <button
-      type="button"
-      onClick={() => setOpen(true)}
-      className={BOTTOM_NAV_ITEM_CLASSES}
-    >
-      <span className={BOTTOM_NAV_ICON_CLASSES}>
-        <Search aria-hidden className="size-5" />
-      </span>
-      <span className={BOTTOM_NAV_LABEL_CLASSES}>Search</span>
-    </button>
   );
 }

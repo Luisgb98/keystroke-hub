@@ -12,47 +12,50 @@ import {
   BOTTOM_NAV_LABEL_CLASSES,
 } from "@/components/shell/bottom-nav-styles";
 
-interface NavLinkProps {
+interface NavLinkBaseProps {
   href: string;
   label: string;
   icon: ReactNode;
-  variant: "sidebar" | "bottom";
-  /**
-   * Optional count adornment (e.g. the inbox count) — **visual only**, so pass
-   * an `aria-hidden` node and spell the count out in `badgeLabel`. The sidebar
-   * trails it after the label; the bottom variant, where a trailing chip has no
-   * room, sits it on the tab icon, which puts it *before* the label in DOM
-   * order — hence the split: `badgeLabel` names the link outright, so both
-   * variants announce "Inbox, 3 to triage" instead of "3Inbox" (Issue #85).
-   */
-  badge?: ReactNode;
-  /** Screen-reader wording for `badge`, e.g. "3 to triage". */
-  badgeLabel?: string;
 }
 
-export function NavLink({
-  href,
-  label,
-  icon,
-  variant,
-  badge,
-  badgeLabel,
-}: NavLinkProps) {
+type NavLinkProps = NavLinkBaseProps &
+  (
+    | {
+        variant: "sidebar";
+        /**
+         * Optional count adornment (e.g. the inbox count) — **visual only**, so
+         * pass an `aria-hidden` node and spell the count out in `badgeLabel`.
+         * It trails the label, so both are announced in reading order: "Inbox,
+         * 3 to triage" (Issue #85).
+         */
+        badge?: ReactNode;
+        /** Screen-reader wording for `badge`, e.g. "3 to triage". */
+        badgeLabel?: string;
+      }
+    /**
+     * The bottom bar takes no badge: #114 cut it to four destinations plus
+     * "More", and the only badged destination (Inbox) moved into the sheet —
+     * whose trigger carries the signal now (see `more-sheet.tsx`). Spelling
+     * that out in the type keeps a future badge from being passed here and
+     * silently dropped.
+     */
+    | { variant: "bottom" }
+  );
+
+export function NavLink(props: NavLinkProps) {
+  const { href, label, icon, variant } = props;
   const pathname = usePathname();
   const active = isNavItemActive(pathname, href);
-  const accessibleName = badgeLabel ? `${label}, ${badgeLabel}` : undefined;
 
   if (variant === "bottom") {
     return (
       <Link
         href={href}
         aria-current={active ? "page" : undefined}
-        aria-label={accessibleName}
         className={cn(BOTTOM_NAV_ITEM_CLASSES, active && "text-foreground")}
       >
         <span className={cn(BOTTOM_NAV_ICON_CLASSES, active && "bg-secondary")}>
           {icon}
-          {badge}
           {active && (
             <span
               aria-hidden
@@ -64,6 +67,9 @@ export function NavLink({
       </Link>
     );
   }
+
+  const { badge, badgeLabel } = props;
+  const accessibleName = badgeLabel ? `${label}, ${badgeLabel}` : undefined;
 
   return (
     <Link

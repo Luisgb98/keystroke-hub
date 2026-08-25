@@ -6,9 +6,7 @@ vi.mock("@/components/command-palette/command-palette-provider", () => ({
   useCommandPalette: () => ({ open: false, setOpen }),
 }));
 
-import { BOTTOM_NAV_ITEM_CLASSES } from "@/components/shell/bottom-nav-styles";
-
-import { PaletteSearchButton, PaletteTriggerChip } from "./palette-trigger";
+import { PaletteTriggerChip } from "./palette-trigger";
 
 describe("PaletteTriggerChip", () => {
   afterEach(() => {
@@ -41,27 +39,5 @@ describe("PaletteTriggerChip", () => {
 
     expect(trigger).toHaveAttribute("data-slot", "button");
     expect(trigger).toHaveClass("focus-visible:ring-ring/50");
-  });
-});
-
-describe("PaletteSearchButton", () => {
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("opens the palette when tapped", () => {
-    render(<PaletteSearchButton />);
-    fireEvent.click(screen.getByRole("button", { name: "Search" }));
-    expect(setOpen).toHaveBeenCalledWith(true);
-  });
-
-  it("reuses NavLink's bottom-nav item classes instead of restating them", () => {
-    // It sits in the same row as the nav links; a copied class string would
-    // silently drift from them (#84).
-    render(<PaletteSearchButton />);
-    expect(screen.getByRole("button", { name: "Search" })).toHaveAttribute(
-      "class",
-      BOTTOM_NAV_ITEM_CLASSES
-    );
   });
 });

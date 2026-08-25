@@ -74,8 +74,8 @@ describe("NavLink", () => {
   });
 
   it("builds the bottom variant from the shared bottom-nav item classes", () => {
-    // Exported so the palette search button and sign-out form share one
-    // geometry rather than keeping drifting copies (#84).
+    // Exported so the "More" sheet's trigger shares one geometry with the nav
+    // links rather than keeping a drifting copy (#84, #114).
     usePathname.mockReturnValue("/content");
     render(
       <NavLink href="/calendar" label="Calendar" icon={icon} variant="bottom" />
@@ -87,8 +87,8 @@ describe("NavLink", () => {
   });
 
   it("builds the bottom variant's icon pill and label from the shared classes too", () => {
-    // The nine-slot row (#85) resized both; the other occupants of the row read
-    // the same constants, so nothing can drift out of the new geometry.
+    // The five-slot row (#114) resized both; the "More" trigger reads the same
+    // constants, so nothing can drift out of the new geometry.
     usePathname.mockReturnValue("/content");
     const { container } = render(
       <NavLink href="/calendar" label="Calendar" icon={icon} variant="bottom" />
@@ -123,31 +123,16 @@ describe("NavLink", () => {
     expect(link.lastElementChild).toHaveAttribute("data-testid", "badge");
   });
 
-  it("sits the badge on the icon for the bottom variant, where a trailing chip has no room (#85)", () => {
+  it("keeps the bottom variant badge-free — the count rides the More trigger now (#114)", () => {
+    // The bar lost its Inbox tab when it was cut to four destinations plus
+    // "More", so nothing in the row carries a count any more; `MoreSheet`'s
+    // trigger shows the dot instead. The prop type forbids passing one here,
+    // and this pins the rendered result to match.
     usePathname.mockReturnValue("/");
-    render(
-      <NavLink
-        href="/inbox"
-        label="Inbox"
-        icon={icon}
-        variant="bottom"
-        badge={
-          <span aria-hidden data-testid="badge">
-            3
-          </span>
-        }
-        badgeLabel="3 to triage"
-      />
+    const { container } = render(
+      <NavLink href="/calendar" label="Calendar" icon={icon} variant="bottom" />
     );
-    // The icon's own wrapper is `relative`, so an absolutely-positioned badge
-    // anchors to the tab icon rather than the whole tab.
-    const badge = screen.getByTestId("badge");
-    expect(badge.parentElement).toHaveClass("relative");
-    expect(badge.parentElement?.querySelector("svg")).not.toBeNull();
-    // …while the count is announced after the label, not before it.
-    expect(
-      screen.getByRole("link", { name: "Inbox, 3 to triage" })
-    ).toBeInTheDocument();
+    expect(container.querySelector('[data-slot="inbox-count"]')).toBeNull();
   });
 
   it("marks the active bottom item with an accent dot", () => {
