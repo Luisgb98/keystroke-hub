@@ -5,7 +5,7 @@ import { format, isValid, parse } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { Calendar } from "@/components/ui/calendar";
+import { Calendar, appToday } from "@/components/ui/calendar";
 import {
   InputGroup,
   InputGroupAddon,
@@ -119,7 +119,10 @@ export function DatePicker({
               mode="single"
               autoFocus
               selected={selected}
-              defaultMonth={selected}
+              // Falls back to the app timezone's current month, not the
+              // runtime's — the same reason `Calendar` resolves `today` that
+              // way (see its `appToday`).
+              defaultMonth={selected ?? appToday()}
               onSelect={(date) => {
                 if (!date) return;
                 commit(formatDateValue(date));

@@ -1,7 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { Calendar, appToday } from "./calendar";
 import { DatePicker, formatDateValue, parseDateValue } from "./date-picker";
 
 describe("parseDateValue", () => {
@@ -124,5 +125,63 @@ describe("DatePicker", () => {
     expect(
       screen.getByRole("button", { name: "Open calendar" })
     ).toBeDisabled();
+  });
+});
+
+/**
+ * The calendar's "today" is the owner's today, not the runtime's.
+ *
+ * `DayPicker` defaults to `new Date()`, which on Vercel means UTC — and for
+ * two hours every night UTC is still on the previous day while the app zone
+ * (Europe/Madrid) has already rolled over. The clock is pinned inside that
+ * window here, so this holds whatever time the suite happens to run at; it
+ * went red in CI at 22:12 UTC before the fix.
+ */
+describe("today, in the app timezone", () => {
+  const IN_THE_WINDOW = new Date("2026-08-25T22:30:00Z");
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("resolves the app-zone day, not the process day", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(IN_THE_WINDOW);
+
+    // 22:30 UTC on the 25th is 00:30 on the 26th in Madrid.
+    const today = appToday();
+    expect(today.getFullYear()).toBe(2026);
+    expect(today.getMonth()).toBe(7);
+    expect(today.getDate()).toBe(26);
+  });
+
+  it("marks that day as Today in the grid", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(IN_THE_WINDOW);
+
+    // The calendar itself, not through the popover: the fix lives in
+    // `Calendar`'s `today` default, and driving Base UI's popover open under
+    // fake timers buys nothing but a stalled animation frame.
+    render(<Calendar mode="single" />);
+
+    expect(
+      screen.getByRole("button", {
+        name: "Today, Wednesday, August 26th, 2026",
+      })
+    ).toBeInTheDocument();
+    // …and the day the server's own clock is still on is not it.
+    expect(
+      screen.queryByRole("button", {
+        name: "Today, Tuesday, August 25th, 2026",
+      })
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens on the app-zone month when no date is selected", () => {
+    vi.useFakeTimers();
+    // 22:30 UTC on Aug 31 is already September for the owner.
+    vi.setSystemTime(new Date("2026-08-31T22:30:00Z"));
+
+    expect(appToday().getMonth()).toBe(8);
   });
 });
