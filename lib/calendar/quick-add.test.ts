@@ -115,3 +115,42 @@ describe("quickAddFromNow", () => {
     });
   });
 });
+
+/**
+ * Pinned for #115. Quick-add is deliberately **track-agnostic** — the track is
+ * chosen afterwards, in the editor — so these defaults still describe a span a
+ * work event may legitimately hold. What matters is that only the very last
+ * slot of the day can cross midnight, and that `EventEditor` repairs exactly
+ * that case when a single-day track is picked (see its own suite).
+ */
+describe("quick-add defaults and the single-day rule", () => {
+  it("keeps every slot but the last one inside its own day", () => {
+    const day = new Date("2026-07-08T12:00:00Z");
+    for (const hour of [0, 9, 22]) {
+      const defaults = quickAddFromSlot(day, hour);
+      expect(defaults.endDate, `hour ${hour}`).toBe(defaults.startDate);
+    }
+  });
+
+  it("documents the one slot that does — 23:00, ending at the next day's 00:00", () => {
+    // A real work meeting, and an impossible stream. `EventEditor` moves the
+    // end to 23:59 the moment Content or Stream is chosen, so the dialog never
+    // opens on a form that is already invalid.
+    const defaults = quickAddFromSlot(new Date("2026-07-08T12:00:00Z"), 23);
+    expect(defaults.startTime).toBe("23:00");
+    expect(defaults.endTime).toBe("00:00");
+    expect(defaults.endDate).not.toBe(defaults.startDate);
+  });
+
+  it("keeps a day-cell tap on exactly one day", () => {
+    const defaults = quickAddFromDayCell(new Date("2026-07-08T12:00:00Z"));
+    expect(defaults.endDate).toBe(defaults.startDate);
+    expect(defaults.allDay).toBe(true);
+  });
+
+  it("keeps the header button inside the current day, even late at night", () => {
+    // 22:40 UTC is 00:40 Madrid the next day, and +1h stays on it.
+    const defaults = quickAddFromNow(new Date("2026-07-08T22:40:00Z"));
+    expect(defaults.endDate).toBe(defaults.startDate);
+  });
+});

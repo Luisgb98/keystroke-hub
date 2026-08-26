@@ -114,7 +114,7 @@ describe("list_content_events", () => {
 });
 
 describe("create_content_event", () => {
-  it("always writes to the content track, defaulting the end day to the start", async () => {
+  it("always writes to the content track, deriving the end day from the single date", async () => {
     vi.mocked(createEventCore).mockResolvedValue({
       success: true,
       eventId: "evt-new",
@@ -122,7 +122,7 @@ describe("create_content_event", () => {
     const body = payloadOf(
       await callTool(eventTools, "create_content_event", {
         title: "Record PoE run",
-        startDate: "2026-08-03",
+        date: "2026-08-03",
         startTime: "10:00",
         endTime: "12:00",
       })
@@ -131,6 +131,8 @@ describe("create_content_event", () => {
       expect.objectContaining({
         track: "content",
         startDate: "2026-08-03",
+        // Derived, never taken from the caller: the tool exposes no `endDate`
+        // at all now, so a multi-day content block can't be asked for (#115).
         endDate: "2026-08-03",
       })
     );
@@ -144,7 +146,7 @@ describe("create_content_event", () => {
     });
     const result = await callTool(eventTools, "create_content_event", {
       title: "Backwards",
-      startDate: "2026-08-03",
+      date: "2026-08-03",
       startTime: "12:00",
       endTime: "10:00",
     });
@@ -163,7 +165,7 @@ describe("reschedule_content_event", () => {
     const body = payloadOf(
       await callTool(eventTools, "reschedule_content_event", {
         eventId: "evt-1",
-        startDate: "2026-08-07",
+        date: "2026-08-07",
         startTime: "19:00",
         endTime: "21:00",
       })
@@ -186,7 +188,7 @@ describe("reschedule_content_event", () => {
     );
     const result = await callTool(eventTools, "reschedule_content_event", {
       eventId: "evt-work",
-      startDate: "2026-08-07",
+      date: "2026-08-07",
       startTime: "19:00",
       endTime: "21:00",
     });
@@ -199,7 +201,7 @@ describe("reschedule_content_event", () => {
     vi.mocked(getEventById).mockResolvedValue(null);
     const result = await callTool(eventTools, "reschedule_content_event", {
       eventId: "gone",
-      startDate: "2026-08-07",
+      date: "2026-08-07",
       startTime: "19:00",
       endTime: "21:00",
     });
@@ -211,7 +213,7 @@ describe("reschedule_content_event", () => {
     vi.mocked(getEventById).mockResolvedValue(calendarEvent());
     const result = await callTool(eventTools, "reschedule_content_event", {
       eventId: "evt-1",
-      startDate: "2026-08-07",
+      date: "2026-08-07",
       startTime: "19:00",
     });
     expect(result.isError).toBe(true);
@@ -224,7 +226,7 @@ describe("reschedule_content_event", () => {
     vi.mocked(rescheduleEventCore).mockResolvedValue({});
     await callTool(eventTools, "reschedule_content_event", {
       eventId: "evt-1",
-      startDate: "2026-08-07",
+      date: "2026-08-07",
     });
     const [, startsAt, endsAt] = vi.mocked(rescheduleEventCore).mock.calls[0];
     // A single-day all-day event stores startsAt === endsAt (docs/calendar.md).
@@ -235,7 +237,7 @@ describe("reschedule_content_event", () => {
     vi.mocked(getEventById).mockResolvedValue(calendarEvent());
     const result = await callTool(eventTools, "reschedule_content_event", {
       eventId: "evt-1",
-      startDate: "2026-08-07",
+      date: "2026-08-07",
       startTime: "21:00",
       endTime: "19:00",
     });

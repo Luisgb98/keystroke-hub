@@ -50,7 +50,12 @@ const dbMock = vi.hoisted(() => {
       where: vi.fn(() => ({ returning: deleteReturning })),
     })),
     select: vi.fn(() => ({
-      from: vi.fn(() => ({ where: selectWhere })),
+      // `leftJoin` is the reschedule path's kind lookup (#115); the other
+      // callers go straight from `from()` to `where()`.
+      from: vi.fn(() => ({
+        where: selectWhere,
+        leftJoin: vi.fn(() => ({ where: selectWhere })),
+      })),
     })),
   };
 });
@@ -382,6 +387,67 @@ describe("rescheduleEvent", () => {
   it("schedules a Google push for the updated event", async () => {
     await rescheduleEvent("evt-1", start, end);
     expect(pushEventUpdated).toHaveBeenCalledWith("evt-1", "work");
+  });
+
+  it("refuses to stretch a content event across midnight (#115)", async () => {
+    // The rule's last line of defence: a drag clamps in the gesture, so
+    // anything arriving multi-day here ignored the rule — refusing is louder
+    // than silently rewriting the request.
+    dbMock.selectWhere.mockResolvedValueOnce([
+      { track: "content", streamId: null },
+    ]);
+    const result = await rescheduleEvent(
+      "evt-1",
+      new Date("2026-07-08T21:00:00Z"),
+      new Date("2026-07-09T01:00:00Z")
+    );
+
+    expect(result.error).toContain("same day");
+    expect(dbMock.update).not.toHaveBeenCalled();
+  });
+
+  it("refuses the same for a stream block", async () => {
+    dbMock.selectWhere.mockResolvedValueOnce([
+      { track: "content", streamId: "stream-1" },
+    ]);
+    const result = await rescheduleEvent(
+      "evt-1",
+      new Date("2026-07-08T21:00:00Z"),
+      new Date("2026-07-09T01:00:00Z")
+    );
+
+    expect(result.error).toContain("same day");
+    expect(dbMock.update).not.toHaveBeenCalled();
+  });
+
+  it("still lets a work event span days", async () => {
+    // Meetings, trips and multi-day work items are real — only content is
+    // single-day.
+    dbMock.selectWhere.mockResolvedValueOnce([
+      { track: "work", streamId: null },
+    ]);
+    const result = await rescheduleEvent(
+      "evt-1",
+      new Date("2026-07-08T21:00:00Z"),
+      new Date("2026-07-10T01:00:00Z")
+    );
+
+    expect(result).toEqual({});
+    expect(dbMock.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows a content event that stays inside its day", async () => {
+    dbMock.selectWhere.mockResolvedValueOnce([
+      { track: "content", streamId: null },
+    ]);
+    const result = await rescheduleEvent(
+      "evt-1",
+      new Date("2026-07-08T17:00:00Z"),
+      new Date("2026-07-08T19:00:00Z")
+    );
+
+    expect(result).toEqual({});
+    expect(dbMock.update).toHaveBeenCalledTimes(1);
   });
 
   it("returns an error without writing when endsAt is before startsAt", async () => {

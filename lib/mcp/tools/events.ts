@@ -8,6 +8,7 @@ import {
   rescheduleEventCore,
 } from "@/lib/calendar/core";
 import { getEventById, getEventsInRange } from "@/lib/data/events";
+import { SINGLE_DAY_MESSAGE } from "@/lib/calendar/single-day";
 import { parseAppDate, parseAppDateTime } from "@/lib/time";
 
 import { dateParam, idParam, timeParam } from "../params";
@@ -103,20 +104,22 @@ const createContentEvent = defineTool(
   {
     title: "Create a content calendar event",
     description:
-      "Creates a plain content-track block on the calendar and syncs it to Google Calendar. It cannot create a work-track event, and it cannot create a Stream block — use `create_stream`/`schedule_stream` for a session, so a purple block always has a real one behind it.",
+      "Creates a plain content-track block on the calendar and syncs it to Google Calendar. Content blocks are single-day: one `date` plus a start and end time on it, and `endTime` must be later than `startTime`. It cannot create a work-track event, and it cannot create a Stream block — use `create_stream`/`schedule_stream` for a session, so a purple block always has a real one behind it.",
     inputSchema: z.object({
       title: z.string(),
       description: z.string().optional(),
-      startDate: dateParam,
+      // No `endDate` (#115): a content block ends the day it starts, so the
+      // parameter could only ever hold one valid value. Leaving it out is what
+      // makes the multi-day state unrepresentable through this door.
+      date: dateParam.describe("The single day the block sits on."),
       startTime: timeParam
         .optional()
         .describe("Required unless `allDay` is true."),
-      endDate: dateParam
-        .optional()
-        .describe("Defaults to `startDate` — same-day blocks are the norm."),
       endTime: timeParam
         .optional()
-        .describe("Required unless `allDay` is true."),
+        .describe(
+          "Required unless `allDay` is true. Must be later than `startTime`, on the same day."
+        ),
       allDay: z.boolean().optional(),
     }),
   },
@@ -126,9 +129,11 @@ const createContentEvent = defineTool(
       track: "content",
       description: args.description,
       allDay: args.allDay ?? false,
-      startDate: args.startDate,
+      startDate: args.date,
       startTime: args.startTime,
-      endDate: args.endDate ?? args.startDate,
+      // The schema derives this from `startDate` for content anyway; passing
+      // it keeps the raw shape it expects.
+      endDate: args.date,
       endTime: args.endTime,
     });
     return fromCoreResult(result, { eventId: result.eventId });
@@ -140,17 +145,19 @@ const rescheduleContentEvent = defineTool(
   {
     title: "Move a content calendar event",
     description:
-      "Moves a content-track event to a new slot and nothing else — title, description and any stream or idea attached to it are untouched. Refuses work-track events.",
+      "Moves a content-track event to a new slot and nothing else — title, description and any stream or idea attached to it are untouched. Content events are single-day, so this takes one `date` plus times on it. Refuses work-track events.",
     inputSchema: z.object({
       eventId: idParam,
-      startDate: dateParam,
+      // No `endDate` (#115) — see `create_content_event`.
+      date: dateParam.describe("The single day to move the event to."),
       startTime: timeParam
         .optional()
         .describe("Required unless `allDay` is true."),
-      endDate: dateParam.optional().describe("Defaults to `startDate`."),
       endTime: timeParam
         .optional()
-        .describe("Required unless `allDay` is true."),
+        .describe(
+          "Required unless `allDay` is true. Must be later than `startTime`, on the same day."
+        ),
       allDay: z
         .boolean()
         .optional()
@@ -162,23 +169,23 @@ const rescheduleContentEvent = defineTool(
     if (guard.error) return fail(guard.error);
 
     const allDay = args.allDay ?? guard.event!.allDay;
-    const endDate = args.endDate ?? args.startDate;
 
     const startsAt = allDay
-      ? parseAppDate(args.startDate)
+      ? parseAppDate(args.date)
       : args.startTime
-        ? parseAppDateTime(args.startDate, args.startTime)
+        ? parseAppDateTime(args.date, args.startTime)
         : null;
+    // Same day by construction: there is no second date to disagree with.
     const endsAt = allDay
-      ? parseAppDate(endDate)
+      ? parseAppDate(args.date)
       : args.endTime
-        ? parseAppDateTime(endDate, args.endTime)
+        ? parseAppDateTime(args.date, args.endTime)
         : null;
 
     if (!startsAt || !endsAt) {
       return fail(
         allDay
-          ? "Pick a real day for the start and end."
+          ? "Pick a real day to move the event to."
           : "A timed event needs both a start time and an end time.",
         {
           startTime: startsAt ? undefined : ["Missing or not a real start."],
@@ -186,8 +193,8 @@ const rescheduleContentEvent = defineTool(
         }
       );
     }
-    if (endsAt.getTime() < startsAt.getTime()) {
-      return fail("End must be after start.", {
+    if (!allDay && endsAt.getTime() <= startsAt.getTime()) {
+      return fail(SINGLE_DAY_MESSAGE, {
         endTime: ["The event ends before it starts."],
       });
     }
