@@ -32,7 +32,11 @@ export function AllDayRow({ days, events }: AllDayRowProps) {
               className="flex min-h-8 flex-col gap-1 border-l border-border p-1 first:border-l-0"
             >
               {dayEvents.map((event) => (
-                <EventChip key={event.id} event={event} />
+                <EventChip
+                  key={event.id}
+                  event={event}
+                  className="min-h-11 md:min-h-[1.75rem]"
+                />
               ))}
             </div>
           );

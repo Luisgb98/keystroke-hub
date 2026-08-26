@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { parse } from "date-fns";
 import {
   DayPicker,
   getDefaultClassNames,
@@ -8,7 +9,29 @@ import {
   type Locale,
 } from "react-day-picker";
 
+import { appTodayParam } from "@/lib/time";
 import { cn } from "@/lib/utils";
+
+/**
+ * "Today" as this app means it: the current day in the **app timezone**, as a
+ * local `Date`.
+ *
+ * `DayPicker` defaults `today` to `new Date()` and compares it against the
+ * local `Date` it builds for each cell — so it marks the runtime's today, not
+ * the owner's. Those disagree for two hours every night on Vercel, which runs
+ * in UTC while the app zone is Europe/Madrid: at 22:30 UTC the owner is
+ * already on the next day and the calendar still highlighted the previous one
+ * (issue #95's rule, see docs/timezone.md).
+ *
+ * The two-step is deliberate and mirrors `parseDateValue`: take the app-zone
+ * calendar date as `yyyy-MM-dd`, then re-materialise it in the local zone,
+ * which is the zone `DayPicker` does its day comparisons in. `appTodayParam`
+ * resolves identically on a UTC server and a Madrid browser, so this is also
+ * hydration-safe — unlike the `new Date()` it replaces.
+ */
+export function appToday(): Date {
+  return parse(appTodayParam(), "yyyy-MM-dd", new Date());
+}
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   ChevronLeftIcon,
@@ -25,6 +48,7 @@ function Calendar({
   locale,
   formatters,
   components,
+  today = appToday(),
   ...props
 }: React.ComponentProps<typeof DayPicker> & {
   buttonVariant?: React.ComponentProps<typeof Button>["variant"];
@@ -34,6 +58,7 @@ function Calendar({
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
+      today={today}
       className={cn(
         "group/calendar bg-background p-2 [--cell-radius:var(--radius-md)] [--cell-size:--spacing(7)] in-data-[slot=card-content]:bg-transparent in-data-[slot=popover-content]:bg-transparent",
         String.raw`rtl:**:[.rdp-button\_next>svg]:rotate-180`,

@@ -88,6 +88,15 @@ describe("AppShellLayout", () => {
     expect(main.className).toContain(BOTTOM_NAV_SPACER_CLASSES);
   });
 
+  it("contains overscroll on the scrollport", async () => {
+    const { main } = await renderShell();
+
+    // The shell is viewport-locked, so a rubber-band overscroll at the top of
+    // this scrollport would hand the gesture to the browser and fire
+    // pull-to-refresh over a page that never scrolls (#114).
+    expect(main.className).toContain("overscroll-y-contain");
+  });
+
   it("degrades the inbox count to 0 when the database is unreachable", async () => {
     getUntriagedCount.mockRejectedValue(new Error("no database"));
     const consoleError = vi

@@ -142,7 +142,10 @@ function MonthCell({
         type="button"
         aria-label={`Add event on ${formatInAppZone(day, "MMMM d, yyyy")}`}
         onClick={() => setQuickAddOpen(true)}
-        className="absolute top-1 right-1 z-10 flex size-6 items-center justify-center rounded-full bg-background text-muted-foreground opacity-0 ring-1 ring-border group-hover:opacity-100 hover:text-foreground focus-visible:opacity-100"
+        // Hover-revealed on desktop, permanently visible on a phone — a
+        // pointer can't reveal it there, so before #114 the only way to add an
+        // event to a month cell on touch was to tap an invisible 24px target.
+        className="absolute top-1 right-1 z-10 flex size-8 items-center justify-center rounded-full bg-background text-muted-foreground ring-1 ring-border hover:text-foreground focus-visible:opacity-100 md:size-6 md:opacity-0 md:group-hover:opacity-100"
       >
         <Plus aria-hidden className="size-3.5" />
       </button>

@@ -8,6 +8,7 @@ import type { ImprovementOutcomeStatus } from "@/lib/improvements/improvement-st
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -73,39 +74,39 @@ export function RecordOutcomeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent variant="sheet">
         <DialogHeader>
           <DialogTitle>Record outcome</DialogTitle>
           <DialogDescription>{improvementTitle}</DialogDescription>
         </DialogHeader>
+        <DialogBody>
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-2" role="radiogroup" aria-label="Decision">
+              {DECISIONS.map((item) => (
+                <Button
+                  key={item.status}
+                  type="button"
+                  variant={decision === item.status ? "default" : "outline"}
+                  role="radio"
+                  aria-checked={decision === item.status}
+                  onClick={() => setDecision(item.status)}
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </div>
 
-        <div className="flex flex-col gap-3">
-          <div className="flex gap-2" role="radiogroup" aria-label="Decision">
-            {DECISIONS.map((item) => (
-              <Button
-                key={item.status}
-                type="button"
-                variant={decision === item.status ? "default" : "outline"}
-                role="radio"
-                aria-checked={decision === item.status}
-                onClick={() => setDecision(item.status)}
-              >
-                {item.label}
-              </Button>
-            ))}
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="record-outcome-text">Outcome (optional)</Label>
+              <Textarea
+                id="record-outcome-text"
+                placeholder="What was decided?"
+                value={outcome}
+                onChange={(e) => setOutcome(e.target.value)}
+              />
+            </div>
           </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="record-outcome-text">Outcome (optional)</Label>
-            <Textarea
-              id="record-outcome-text"
-              placeholder="What was decided?"
-              value={outcome}
-              onChange={(e) => setOutcome(e.target.value)}
-            />
-          </div>
-        </div>
-
+        </DialogBody>
         <DialogFooter>
           <Button
             type="button"

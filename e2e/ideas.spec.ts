@@ -761,7 +761,7 @@ test.describe("idea capture mobile viewport", () => {
     await expect(page.getByRole("link", { name: /Inbox/ })).toHaveCount(1);
   });
 
-  // #93: on a 812px-tall screen the dialog only has 90dvh to work with, so a
+  // #93: on a 812px-tall screen the sheet only has 92svh to work with, so a
   // pasted script must take its cap and leave the rest of the form usable.
   test("a pasted script stays capped and doesn't squeeze the other fields", async ({
     page,
@@ -781,7 +781,9 @@ test.describe("idea capture mobile viewport", () => {
 
     const viewport = page.viewportSize()!;
     const dialogBox = (await dialog.boundingBox())!;
-    expect(dialogBox.height).toBeLessThanOrEqual(viewport.height * 0.9 + 1);
+    // 92svh — the bottom sheet's cap since #114 (`svh` rather than `dvh` so a
+    // collapsing mobile toolbar can't push the pinned Save off-screen).
+    expect(dialogBox.height).toBeLessThanOrEqual(viewport.height * 0.92 + 1);
 
     const scriptBox = (await script.boundingBox())!;
     expect(scriptBox.height).toBeLessThanOrEqual(170);

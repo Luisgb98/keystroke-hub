@@ -12,6 +12,7 @@ import type { StreamChecklistTemplateItem } from "@/lib/db/schema";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -66,7 +67,7 @@ export function TemplateEditor({ items }: TemplateEditorProps) {
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent variant="sheet">
           <DialogHeader>
             <DialogTitle>Default checklist</DialogTitle>
             <DialogDescription>
@@ -74,34 +75,36 @@ export function TemplateEditor({ items }: TemplateEditorProps) {
               existing stream&apos;s checklist.
             </DialogDescription>
           </DialogHeader>
-
-          {items.length === 0 ? (
-            <p className="text-small text-muted-foreground">
-              No default items yet.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-1.5">
-              {items.map((item) => (
-                <li
-                  key={item.id}
-                  className="flex items-center gap-2 rounded-lg border border-border px-3 py-2"
-                >
-                  <span className="flex-1 text-small">{item.label}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Remove "${item.label}"`}
-                    disabled={pending}
-                    onClick={() => handleRemove(item)}
+          {/* Only the list scrolls — the add field stays pinned to the bottom
+    edge, so a long checklist never buries it. */}
+          <DialogBody>
+            {items.length === 0 ? (
+              <p className="text-small text-muted-foreground">
+                No default items yet.
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-1.5">
+                {items.map((item) => (
+                  <li
+                    key={item.id}
+                    className="flex items-center gap-2 rounded-lg border border-border px-3 py-2"
                   >
-                    <X aria-hidden className="size-3.5" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-
+                    <span className="flex-1 text-small">{item.label}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Remove "${item.label}"`}
+                      disabled={pending}
+                      onClick={() => handleRemove(item)}
+                    >
+                      <X aria-hidden className="size-3.5" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </DialogBody>
           <div className="flex items-center gap-2">
             <Input
               aria-label="Add default checklist item"

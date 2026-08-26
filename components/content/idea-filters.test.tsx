@@ -194,3 +194,16 @@ describe("IdeaFilters", () => {
     expect(replace).toHaveBeenCalledWith("/content/ideas?q=glitch");
   });
 });
+
+describe("filter chips as touch targets (#114)", () => {
+  it("gives every chip a 44px height on a phone, and the dense one from md up", () => {
+    // These are the page's main way to narrow a long idea list, and they sit
+    // in a horizontally-scrolling row — a 31px pill was a miss waiting to
+    // happen.
+    render(<IdeaFilters value={{}} availableTags={["speedrun"]} />);
+    const chip = screen.getByRole("button", { name: "Video" });
+
+    expect(chip).toHaveClass("min-h-11");
+    expect(chip).toHaveClass("md:min-h-0");
+  });
+});

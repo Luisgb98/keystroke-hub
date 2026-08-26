@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { GamePicker } from "@/components/content/games/game-picker";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -92,7 +93,7 @@ export function StreamCreate({ games = [] }: StreamCreateProps) {
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent variant="sheet">
           <form action={formAction} className="flex flex-col gap-4" noValidate>
             <input
               type="hidden"
@@ -111,119 +112,121 @@ export function StreamCreate({ games = [] }: StreamCreateProps) {
                 Plan the topic now — the date can wait.
               </DialogDescription>
             </DialogHeader>
+            <DialogBody>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor={titleId}>Topic</Label>
+                <Input
+                  id={titleId}
+                  name="title"
+                  autoFocus
+                  value={values.title}
+                  onChange={(e) =>
+                    setValues((v) => ({ ...v, title: e.target.value }))
+                  }
+                  aria-invalid={fieldErrors.title ? true : undefined}
+                />
+                {fieldErrors.title ? (
+                  <p role="alert" className="text-small text-destructive">
+                    {fieldErrors.title[0]}
+                  </p>
+                ) : null}
+              </div>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor={titleId}>Topic</Label>
-              <Input
-                id={titleId}
-                name="title"
-                autoFocus
-                value={values.title}
-                onChange={(e) =>
-                  setValues((v) => ({ ...v, title: e.target.value }))
-                }
-                aria-invalid={fieldErrors.title ? true : undefined}
-              />
-              {fieldErrors.title ? (
-                <p role="alert" className="text-small text-destructive">
-                  {fieldErrors.title[0]}
-                </p>
-              ) : null}
-            </div>
-
-            <div className="flex flex-col gap-2">
-              {/* See docs/content-games.md — which game the session is about,
+              <div className="flex flex-col gap-2">
+                {/* See docs/content-games.md — which game the session is about,
                   picked from the library rather than typed into the topic. */}
-              <Label>Game</Label>
-              <GamePicker
-                games={games}
-                name="gameId"
-                label="Game"
-                value={values.gameId}
-                onChange={(gameId) => setValues((v) => ({ ...v, gameId }))}
-              />
-            </div>
+                <Label>Game</Label>
+                <GamePicker
+                  games={games}
+                  name="gameId"
+                  label="Game"
+                  value={values.gameId}
+                  onChange={(gameId) => setValues((v) => ({ ...v, gameId }))}
+                />
+              </div>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="stream-notes">Prep notes</Label>
-              <Textarea
-                id="stream-notes"
-                name="notes"
-                value={values.notes}
-                onChange={(e) =>
-                  setValues((v) => ({ ...v, notes: e.target.value }))
-                }
-              />
-            </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="stream-notes">Prep notes</Label>
+                <Textarea
+                  id="stream-notes"
+                  name="notes"
+                  value={values.notes}
+                  onChange={(e) =>
+                    setValues((v) => ({ ...v, notes: e.target.value }))
+                  }
+                />
+              </div>
 
-            <div className="flex items-center justify-between gap-2">
-              <Label htmlFor="stream-planned">Plan a date</Label>
-              <Switch
-                id="stream-planned"
-                checked={values.planned}
-                onCheckedChange={(planned) =>
-                  setValues((v) => ({ ...v, planned }))
-                }
-              />
-            </div>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="stream-planned">Plan a date</Label>
+                <Switch
+                  id="stream-planned"
+                  checked={values.planned}
+                  onCheckedChange={(planned) =>
+                    setValues((v) => ({ ...v, planned }))
+                  }
+                />
+              </div>
 
-            {values.planned ? (
-              <>
-                <div className="flex items-center justify-between gap-2">
-                  <Label htmlFor="stream-all-day">All day</Label>
-                  <Switch
-                    id="stream-all-day"
-                    checked={values.allDay}
-                    onCheckedChange={(allDay) =>
-                      setValues((v) => ({ ...v, allDay }))
-                    }
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="stream-date">Date</Label>
-                    <DatePicker
-                      id="stream-date"
-                      name="date"
-                      triggerLabel="Open stream day calendar"
-                      value={values.date}
-                      onChange={(date) => setValues((v) => ({ ...v, date }))}
-                      aria-invalid={fieldErrors.date ? true : undefined}
+              {values.planned ? (
+                <>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="stream-all-day">All day</Label>
+                    <Switch
+                      id="stream-all-day"
+                      checked={values.allDay}
+                      onCheckedChange={(allDay) =>
+                        setValues((v) => ({ ...v, allDay }))
+                      }
                     />
                   </div>
-                  {!values.allDay ? (
+                  <div className="grid grid-cols-2 gap-2">
                     <div className="flex flex-col gap-2">
-                      <Label htmlFor="stream-time">Start time</Label>
-                      <TimePicker
-                        id="stream-time"
-                        name="time"
-                        triggerLabel="Choose stream starting time"
-                        value={values.time}
-                        onChange={(time) => setValues((v) => ({ ...v, time }))}
-                        aria-invalid={fieldErrors.time ? true : undefined}
+                      <Label htmlFor="stream-date">Date</Label>
+                      <DatePicker
+                        id="stream-date"
+                        name="date"
+                        triggerLabel="Open stream day calendar"
+                        value={values.date}
+                        onChange={(date) => setValues((v) => ({ ...v, date }))}
+                        aria-invalid={fieldErrors.date ? true : undefined}
                       />
                     </div>
+                    {!values.allDay ? (
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="stream-time">Start time</Label>
+                        <TimePicker
+                          id="stream-time"
+                          name="time"
+                          triggerLabel="Choose stream starting time"
+                          value={values.time}
+                          onChange={(time) =>
+                            setValues((v) => ({ ...v, time }))
+                          }
+                          aria-invalid={fieldErrors.time ? true : undefined}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                  {fieldErrors.date || fieldErrors.time ? (
+                    <p role="alert" className="text-small text-destructive">
+                      {(fieldErrors.date ?? fieldErrors.time)?.[0]}
+                    </p>
                   ) : null}
-                </div>
-                {fieldErrors.date || fieldErrors.time ? (
-                  <p role="alert" className="text-small text-destructive">
-                    {(fieldErrors.date ?? fieldErrors.time)?.[0]}
-                  </p>
-                ) : null}
-                {!values.allDay ? (
-                  <p className="text-caption text-muted-foreground">
-                    Ends automatically 2 hours later.
-                  </p>
-                ) : null}
-              </>
-            ) : null}
+                  {!values.allDay ? (
+                    <p className="text-caption text-muted-foreground">
+                      Ends automatically 2 hours later.
+                    </p>
+                  ) : null}
+                </>
+              ) : null}
 
-            {state?.error ? (
-              <p role="alert" className="text-small text-destructive">
-                {state.error}
-              </p>
-            ) : null}
-
+              {state?.error ? (
+                <p role="alert" className="text-small text-destructive">
+                  {state.error}
+                </p>
+              ) : null}
+            </DialogBody>
             <DialogFooter>
               <Button type="submit" disabled={pending}>
                 {pending ? "Saving…" : "Save"}

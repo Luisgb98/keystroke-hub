@@ -47,7 +47,11 @@ export default async function AppShellLayout({
               two can't drift apart and clip the last row of a page (#114). */}
           <main
             className={cn(
-              "flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto",
+              // `overscroll-y-contain`: the shell is viewport-locked, so a
+              // rubber-band overscroll at the top of this scrollport would
+              // hand the gesture to the browser and fire pull-to-refresh over
+              // a page that never scrolls (#114).
+              "flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-y-contain",
               BOTTOM_NAV_SPACER_CLASSES
             )}
           >

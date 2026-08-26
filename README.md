@@ -85,8 +85,10 @@ Testing is mandatory for every feature — see `AGENTS.md`.
 - **E2e tests** live in `e2e/` as `*.spec.ts` files and exercise real user
   flows with [Playwright](https://playwright.dev) against the actual
   production build (`pnpm build && pnpm start`), not the dev server. Every
-  spec runs against both a desktop (`chromium`) and a mobile (`Pixel 7`)
-  project to enforce the mobile-first contract.
+  spec runs against a desktop (`chromium`) and a mobile (`Pixel 7`) project to
+  enforce the mobile-first contract, plus an `iphone` project (a 390×844 iPhone
+  viewport) that runs a curated read-only subset — the page-by-page mobile
+  audit, the shell navigation contract and PWA installability.
   - One-time setup: `pnpm exec playwright install --with-deps chromium`.
   - `pnpm test:e2e` — build, start, and run all e2e specs headlessly
     (CI-ready). If port 3000 is already in use by something other than your
@@ -96,8 +98,8 @@ Testing is mandatory for every feature — see `AGENTS.md`.
 ## Mobile & installable
 
 The phone is the primary surface: a five-slot bottom tab bar (four
-destinations plus a "More" sheet holding the rest), safe-area-aware layout, and
-an installable web app. Add it to an iPhone home screen or an Android launcher
+destinations plus a "More" sheet holding the rest), bottom-sheet dialogs,
+44px touch targets, safe-area-aware layout, and an installable web app. Add it to an iPhone home screen or an Android launcher
 and it opens standalone — own icon, own window, no browser chrome. Run
 `pnpm icons:generate` after changing the brand accent and commit the PNGs. See
 [`docs/mobile.md`](docs/mobile.md) and [`docs/pwa.md`](docs/pwa.md).

@@ -58,6 +58,9 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"], storageState: STORAGE_STATE },
       dependencies: ["setup"],
+      // The mobile audit measures a phone viewport by definition (#114) — it
+      // belongs to the `iphone` project below and nowhere else.
+      testIgnore: /mobile-audit\.spec\.ts$/,
     },
     {
       name: "mobile-chrome",
@@ -72,7 +75,10 @@ export default defineConfig({
       // stream sessions share the one global checklist template, so a
       // concurrent run's cleanup would delete the template item another run
       // is still asserting on), mobile.spec.ts (whose
-      // journal and weekly-summary cases write real rows), and
+      // journal and weekly-summary cases write real rows), mobile-audit.spec.ts
+      // (which belongs to the `iphone` project below — it measures one
+      // specific phone viewport, and running it at Pixel 7's would assert the
+      // wrong geometry), and
       // command-palette.spec.ts (whose content-search describe seeds/clears
       // a real project + idea) and timezone.spec.ts (which drives the
       // desktop-only week/month time grid and writes real rows) and
@@ -85,7 +91,27 @@ export default defineConfig({
       // project would race against the chromium project's runs against the same
       // shared DB.
       testIgnore:
-        /(calendar|calendar-sync|event-management|drag-reschedule|agenda|board|scripts|content-links|streams|publish-checklist|journal|weekly-summary|weekly-assessment|projects|improvements|meetings|github-links|dashboard|stream-track|mobile|command-palette|inbox|ideas|idea-detail|games|timezone|mcp)\.spec\.ts$/,
+        /(calendar|calendar-sync|event-management|drag-reschedule|agenda|board|scripts|content-links|streams|publish-checklist|journal|weekly-summary|weekly-assessment|projects|improvements|meetings|github-links|dashboard|stream-track|mobile|mobile-audit|command-palette|inbox|ideas|idea-detail|games|timezone|mcp)\.spec\.ts$/,
+    },
+    {
+      // A real iPhone viewport (390x844, DPR 3, touch) for the mobile
+      // contract #114 set. `browserName` is pinned to chromium on purpose:
+      // `devices["iPhone 14"]` defaults to WebKit, and CI installs chromium
+      // only — the value here is the phone-shaped viewport and touch input,
+      // not a second rendering engine.
+      name: "iphone",
+      use: {
+        ...devices["iPhone 14"],
+        browserName: "chromium",
+        storageState: STORAGE_STATE,
+      },
+      dependencies: ["setup"],
+      // Deliberately a curated, read-only subset. Every other mobile-viewport
+      // check in the suite writes real rows and already runs its own
+      // `test.use`-scoped mobile describe under `chromium` — running those
+      // again here would race the same shared development database, which is
+      // the same reason `mobile-chrome` carries the long `testIgnore` above.
+      testMatch: /(mobile-audit|shell-navigation|pwa)\.spec\.ts$/,
     },
   ],
   webServer: [
