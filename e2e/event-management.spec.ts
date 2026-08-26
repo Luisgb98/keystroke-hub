@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { formatDateParam } from "../lib/calendar/range";
 import { clearEventsWithPrefix } from "./support/events-db";
+import { clearTestStreams } from "./support/streams-db";
 
 // This file creates/edits/deletes real rows through the UI against the same
 // dev database as calendar.spec.ts. It uses its own title prefix (not the
@@ -9,6 +10,9 @@ import { clearEventsWithPrefix } from "./support/events-db";
 // fixtures — or vice versa — if the two spec files happen to run
 // concurrently in different Playwright workers (see docs/calendar.md).
 const PREFIX = "[e2e-mgmt]";
+
+/** #115's suite writes rows too — see the note on its `afterEach`. */
+const SINGLE_DAY_PREFIX = "[e2e-mgmt-1day]";
 
 const skip = !process.env.DATABASE_URL;
 const skipReason =
@@ -320,5 +324,186 @@ test.describe("event management mobile viewport", () => {
       .boundingBox();
     expect(dayBox!.height).toBeGreaterThanOrEqual(32);
     expect(dayBox!.width).toBeGreaterThanOrEqual(32);
+  });
+});
+
+/**
+ * Content-track events are single-day (#115): a stream or a release begins and
+ * ends on the same day, so the editor asks for one date and work keeps the
+ * full range.
+ */
+test.describe("single-day content events", () => {
+  test.skip(skip, skipReason);
+
+  /**
+   * Cleanup is scoped to the exact titles the running test created, not to the
+   * suite's prefix.
+   *
+   * `clearEventsWithPrefix` deletes by `LIKE 'prefix%'`, and `fullyParallel`
+   * runs these tests in separate workers against one database — so a
+   * prefix-wide `afterEach` on the three read-only tests here (which create
+   * nothing and finish in a second) deleted the two writing tests' rows
+   * between their save and their assertion. Playwright gives each worker its
+   * own module instance, so this array only ever holds the current test's own
+   * titles. Same failure the inbox mobile suite hit in #114.
+   */
+  const created: string[] = [];
+
+  test.afterEach(async () => {
+    for (const title of created) {
+      // Streams first: creating a Stream block from the editor creates a
+      // session behind it, and deleting the event alone would leave the stream
+      // orphaned as "unscheduled" (same order as stream-track.spec.ts).
+      await clearTestStreams(title);
+      await clearEventsWithPrefix(title);
+    }
+    created.length = 0;
+  });
+
+  /**
+   * Re-navigates until the calendar has caught up. The dialog closes on the
+   * server's response while the view waits on `revalidatePath`'s refresh, and
+   * a client-side nav can still be served from the router cache — so a single
+   * reload is not enough under a parallel run (same helper shape as
+   * stream-track.spec.ts).
+   */
+  async function eventually(fn: () => Promise<void>) {
+    await expect(fn).toPass({ timeout: 20000 });
+  }
+
+  test("shows one Date field for a stream, and no end-date input anywhere", async ({
+    page,
+  }) => {
+    await page.goto(`/calendar?view=day&date=${targetParam}`);
+    await page.getByRole("button", { name: "New event" }).click();
+    const dialog = page.getByRole("dialog", { name: "New event" });
+
+    // Work first: the full range is still there.
+    await dialog.getByRole("radio", { name: /work/i }).click();
+    await expect(dialog.getByLabel("Start", { exact: true })).toBeVisible();
+    await expect(dialog.getByLabel("End", { exact: true })).toBeVisible();
+
+    // Then Stream: one date, two times, and the end-date picker is gone.
+    await dialog.getByRole("radio", { name: /stream/i }).click();
+    await expect(dialog.getByLabel("Date", { exact: true })).toBeVisible();
+    await expect(dialog.getByLabel("Start", { exact: true })).toHaveCount(0);
+    await expect(dialog.getByLabel("End", { exact: true })).toHaveCount(0);
+    await expect(
+      dialog.getByRole("button", { name: "Open ending day calendar" })
+    ).toHaveCount(0);
+    await expect(dialog.getByText("From", { exact: true })).toBeVisible();
+    await expect(dialog.getByText("To", { exact: true })).toBeVisible();
+  });
+
+  test("saves a stream onto exactly one day", async ({ page }) => {
+    const title = `${SINGLE_DAY_PREFIX} Single-day stream`;
+    created.push(title);
+    await page.goto(`/calendar?view=day&date=${targetParam}`);
+
+    await page.getByRole("button", { name: "New event" }).click();
+    const dialog = page.getByRole("dialog", { name: "New event" });
+    await dialog.getByRole("radio", { name: /stream/i }).click();
+    await dialog.getByLabel("Title").fill(title);
+    await dialog.getByLabel("Date", { exact: true }).fill(targetParam);
+    await dialog.getByLabel("Start time").fill("20:00");
+    await dialog.getByLabel("End time").fill("22:00");
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 10000 });
+
+    await eventually(async () => {
+      await page.goto(`/calendar?view=day&date=${targetParam}`);
+      await expect(
+        page.locator(EVENT_BLOCK_SELECTOR, { hasText: title })
+      ).toBeVisible({ timeout: 2000 });
+    });
+
+    // …and not bleeding into the next day, which is what a multi-day span
+    // would do.
+    const next = new Date(target);
+    next.setDate(target.getDate() + 1);
+    await page.goto(`/calendar?view=day&date=${formatDateParam(next)}`);
+    await expect(
+      page.locator(EVENT_BLOCK_SELECTOR, { hasText: title })
+    ).toHaveCount(0);
+  });
+
+  test("refuses an end time that isn't after the start, in plain words", async ({
+    page,
+  }) => {
+    await page.goto(`/calendar?view=day&date=${targetParam}`);
+
+    await page.getByRole("button", { name: "New event" }).click();
+    const dialog = page.getByRole("dialog", { name: "New event" });
+    await dialog.getByRole("radio", { name: /content/i }).click();
+    await dialog.getByLabel("Title").fill(`${SINGLE_DAY_PREFIX} Backwards`);
+    await dialog.getByLabel("Date", { exact: true }).fill(targetParam);
+    await dialog.getByLabel("Start time").fill("20:00");
+    await dialog.getByLabel("End time").fill("19:00");
+    await dialog.getByRole("button", { name: "Save" }).click();
+
+    // The field error names the rule; the form-level "Check the highlighted
+    // fields." alert sits beside it, hence the specific match.
+    await expect(
+      dialog.getByRole("alert").filter({ hasText: "same day" })
+    ).toBeVisible();
+    await expect(dialog).toBeVisible();
+  });
+
+  test("repairs the 23:00 slot default instead of opening on an invalid form", async ({
+    page,
+  }) => {
+    // Quick-add is track-agnostic, so the last slot of the day hands the
+    // dialog a 23:00 → next-day-00:00 default — real for work, impossible for
+    // a stream. Choosing Stream must fix it, not complain about it.
+    await page.goto(`/calendar?view=day&date=${targetParam}`);
+    await page
+      .getByRole("button", { name: `Add event at 23:00 on ${targetLongLabel}` })
+      .click();
+
+    const dialog = page.getByRole("dialog", { name: "New event" });
+    await expect(dialog.getByLabel("End time")).toHaveValue("00:00");
+
+    await dialog.getByRole("radio", { name: /stream/i }).click();
+    await expect(dialog.getByLabel("Start time")).toHaveValue("23:00");
+    await expect(dialog.getByLabel("End time")).toHaveValue("23:59");
+  });
+
+  test("keeps the full range editable on a work event", async ({ page }) => {
+    const title = `${SINGLE_DAY_PREFIX} Multi-day trip`;
+    created.push(title);
+    await page.goto(`/calendar?view=day&date=${targetParam}`);
+
+    await page.getByRole("button", { name: "New event" }).click();
+    const dialog = page.getByRole("dialog", { name: "New event" });
+    await dialog.getByRole("radio", { name: /work/i }).click();
+    await dialog.getByLabel("Title").fill(title);
+    await dialog.getByLabel("Start", { exact: true }).fill(targetParam);
+    await dialog.getByLabel("Start time").fill("09:00");
+    const end = new Date(target);
+    end.setDate(target.getDate() + 2);
+    await dialog.getByLabel("End", { exact: true }).fill(formatDateParam(end));
+    await dialog.getByLabel("End time").fill("17:00");
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 10000 });
+
+    // Reopened from the start day: the two dates round-trip independently,
+    // which is the whole point of leaving work alone. Asserting on the stored
+    // form values rather than on how a multi-day block paints keeps this about
+    // the rule and not about the day view's rendering.
+    await eventually(async () => {
+      await page.goto(`/calendar?view=day&date=${targetParam}`);
+      await expect(
+        page.locator(EVENT_BLOCK_SELECTOR, { hasText: title })
+      ).toBeVisible({ timeout: 2000 });
+    });
+
+    await page.locator(EVENT_BLOCK_SELECTOR, { hasText: title }).click();
+    const editor = page.getByRole("dialog", { name: "Edit event" });
+    await expect(editor.getByLabel("Start", { exact: true })).toHaveValue(
+      targetParam
+    );
+    await expect(editor.getByLabel("End", { exact: true })).toHaveValue(
+      formatDateParam(end)
+    );
   });
 });

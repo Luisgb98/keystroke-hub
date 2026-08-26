@@ -230,3 +230,34 @@ test.describe("no iOS focus zoom", () => {
     expect(tooSmall).toEqual([]);
   });
 });
+
+test.describe("single-day content on a phone", () => {
+  // Read-only, like everything else in this file: it opens the editor and
+  // measures, never saves.
+  test("a stream asks for one date, not two", async ({ page }) => {
+    // The whole point of #115 on a phone — the second date picker was the
+    // most expensive field on the smallest screen.
+    await page.goto("/calendar?view=day");
+    await page.getByRole("button", { name: "New event" }).click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await settled(dialog);
+
+    await dialog.getByRole("radio", { name: /stream/i }).click();
+
+    // `getByLabel` matches substrings, so "End" would also catch "End time"
+    // and "Choose ending time" — the end *date* is the one that must be gone.
+    await expect(dialog.getByLabel("Date", { exact: true })).toBeVisible();
+    await expect(dialog.getByLabel("End", { exact: true })).toHaveCount(0);
+    await expect(
+      dialog.getByRole("button", { name: "Open ending day calendar" })
+    ).toHaveCount(0);
+
+    // Both time fields survive, and both are real touch targets.
+    for (const label of ["Start time", "End time"]) {
+      const box = (await dialog.getByLabel(label).boundingBox())!;
+      expect(box.height, label).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET);
+    }
+  });
+});
