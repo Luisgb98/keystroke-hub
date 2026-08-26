@@ -22,6 +22,12 @@ import {
 import { schedulePush } from "@/lib/sync/schedule";
 
 import { eventFormSchema, rescheduleSchema } from "./event-schema";
+import {
+  SINGLE_DAY_MESSAGE,
+  isSingleAppDay,
+  isSingleDayKind,
+} from "./single-day";
+import { trackKindOf } from "./track-kind";
 
 /**
  * The calendar-event domain, free of any transport. `lib/calendar/actions.ts`
@@ -232,6 +238,30 @@ export async function rescheduleEventCore(
   }
 
   const db = getDb();
+
+  // The single-day rule has to hold on the drag/resize path too (#115), and
+  // this is the only place all of them meet: the calendar's own reschedule,
+  // Undo, and the MCP tool. Read the kind first — a reschedule carries only
+  // bounds, so the row is the only thing that knows whether it's content.
+  //
+  // It refuses rather than clamping. The calendar clamps in the gesture
+  // (`clampToStartDay`, see `./single-day.ts`), so anything still arriving
+  // multi-day here is a caller that ignored the rule, and silently rewriting
+  // its request would hide that.
+  const [existing] = await db
+    .select({ track: events.track, streamId: streams.id })
+    .from(events)
+    .leftJoin(streams, eq(streams.eventId, events.id))
+    .where(eq(events.id, parsed.data.id));
+
+  if (
+    existing &&
+    isSingleDayKind(trackKindOf(existing)) &&
+    !isSingleAppDay(parsed.data.startsAt, parsed.data.endsAt)
+  ) {
+    return { error: SINGLE_DAY_MESSAGE };
+  }
+
   const updated = await db
     .update(events)
     .set({ startsAt: parsed.data.startsAt, endsAt: parsed.data.endsAt })

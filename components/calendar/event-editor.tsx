@@ -13,6 +13,7 @@ import { toast } from "sonner";
 
 import { createEvent, updateEvent } from "@/lib/calendar/actions";
 import type { QuickAddDefaults } from "@/lib/calendar/quick-add";
+import { isSingleDayKind } from "@/lib/calendar/single-day";
 import { trackKindOf, type TrackKind } from "@/lib/calendar/track-kind";
 import type { CalendarEvent } from "@/lib/calendar/types";
 import { dismissConflictNote } from "@/lib/sync/actions";
@@ -57,6 +58,9 @@ interface EventEditorProps {
 const dateParam = formatAppDateParam;
 const timeParam = formatAppTimeParam;
 
+/** Where a single-day event's end lands when its default ran past midnight (#115). */
+const LAST_MINUTE_OF_DAY = "23:59";
+
 function initialValues(
   event: CalendarEvent | undefined,
   defaults: QuickAddDefaults | undefined
@@ -87,10 +91,12 @@ function initialValues(
 }
 
 /**
- * Shared create/edit surface. Rendered inside the existing `Dialog` primitive
- * for both mobile and desktop — this project's shadcn setup (Base UI) has no
- * drawer/sheet component, and `DialogContent` is already responsive enough
- * for a mobile-first form (see docs/calendar.md).
+ * Shared create/edit surface, in a `variant="sheet"` dialog — a bottom sheet on
+ * a phone, the centred panel on desktop (#114, see docs/mobile.md).
+ *
+ * The date fields branch on the chosen track (#115): work keeps the full
+ * Start/End range, while content and stream get one Date plus From/To times,
+ * with no end-date input mounted at all (see docs/calendar.md).
  */
 export function EventEditor({
   mode,
@@ -157,6 +163,53 @@ export function EventEditor({
   const fieldErrors = state?.fieldErrors ?? {};
   const canSubmit = !pending && values.track !== undefined;
 
+  // A stream or a release begins and ends on the same day (#115), so those
+  // kinds get one Date field plus From/To times — there is no end-date input
+  // to mount, and nothing for the owner to fix.
+  const singleDay = values.track !== undefined && isSingleDayKind(values.track);
+
+  /**
+   * Keeps `endDate` glued to `startDate` while a single-day kind is selected.
+   *
+   * The schema derives the end date itself, so this isn't what makes the rule
+   * hold — it's what stops the *form* from carrying a stale value across a
+   * track switch. Without it, opening the editor on a 23:00 default and then
+   * flipping the track picker back to Work would submit yesterday's
+   * midnight-spanning end date, which is the live bug the issue names.
+   */
+  function setSpan(next: Partial<typeof values>) {
+    setValues((v) => {
+      const merged = { ...v, ...next };
+      const kind = merged.track;
+      return kind !== undefined && isSingleDayKind(kind)
+        ? { ...merged, endDate: merged.startDate }
+        : merged;
+    });
+  }
+
+  /**
+   * Switching tracks also repairs a span the new kind can't hold.
+   *
+   * Quick-add is track-agnostic — tapping the 23:00 slot hands the dialog a
+   * 23:00 → next-day-00:00 default, which is a perfectly real work meeting and
+   * an impossible stream. Rather than open on a form that is already invalid
+   * and make the owner fix it, the end time moves to the last minute of the
+   * day. Only a track change repairs: a time the owner typed themselves is
+   * left alone for validation to speak to.
+   */
+  function handleTrackChange(track: TrackKind) {
+    setValues((v) => {
+      const next = { ...v, track };
+      if (!isSingleDayKind(track)) return next;
+
+      next.endDate = next.startDate;
+      if (!next.allDay && next.startTime && next.endTime <= next.startTime) {
+        next.endTime = LAST_MINUTE_OF_DAY;
+      }
+      return next;
+    });
+  }
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -164,6 +217,11 @@ export function EventEditor({
           <form action={formAction} className="flex flex-col gap-4" noValidate>
             <input type="hidden" name="track" value={values.track ?? ""} />
             <input type="hidden" name="allDay" value={String(values.allDay)} />
+            {/* Single-day kinds mount no end-date picker, so the value rides
+                along here — kept equal to `startDate` by `setSpan` (#115). */}
+            {singleDay ? (
+              <input type="hidden" name="endDate" value={values.endDate} />
+            ) : null}
 
             <DialogHeader>
               <DialogTitle>
@@ -192,7 +250,7 @@ export function EventEditor({
               <div className="flex flex-col gap-2">
                 <TrackPicker
                   value={values.track}
-                  onChange={(track) => setValues((v) => ({ ...v, track }))}
+                  onChange={handleTrackChange}
                 />
                 {fieldErrors.track ? (
                   <p role="alert" className="text-small text-destructive">
@@ -251,56 +309,94 @@ export function EventEditor({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              {singleDay ? (
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="event-start-date">Start</Label>
+                  <Label htmlFor="event-start-date">Date</Label>
                   <DatePicker
                     id="event-start-date"
                     name="startDate"
-                    triggerLabel="Open starting day calendar"
+                    triggerLabel="Open the day calendar"
                     value={values.startDate}
-                    onChange={(startDate) =>
-                      setValues((v) => ({ ...v, startDate }))
-                    }
+                    onChange={(startDate) => setSpan({ startDate })}
                   />
+                  {/* No end-date input is mounted at all — the schema derives
+                      it from this one, so a multi-day stream or release is not
+                      something the form can express (#115). */}
                   {!values.allDay ? (
-                    <TimePicker
-                      name="startTime"
-                      aria-label="Start time"
-                      triggerLabel="Choose starting time"
-                      required
-                      value={values.startTime}
-                      onChange={(startTime) =>
-                        setValues((v) => ({ ...v, startTime }))
-                      }
-                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex flex-col gap-2">
+                        {/* No `htmlFor`: the field carries its own
+                            `aria-label` ("Start time"), which every existing
+                            query and screen reader already uses — the visible
+                            word is decoration, same as `GamePicker`'s. */}
+                        <Label>From</Label>
+                        <TimePicker
+                          name="startTime"
+                          aria-label="Start time"
+                          triggerLabel="Choose starting time"
+                          required
+                          value={values.startTime}
+                          onChange={(startTime) => setSpan({ startTime })}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <Label>To</Label>
+                        <TimePicker
+                          name="endTime"
+                          aria-label="End time"
+                          triggerLabel="Choose ending time"
+                          required
+                          value={values.endTime}
+                          onChange={(endTime) => setSpan({ endTime })}
+                        />
+                      </div>
+                    </div>
                   ) : null}
                 </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="event-end-date">End</Label>
-                  <DatePicker
-                    id="event-end-date"
-                    name="endDate"
-                    triggerLabel="Open ending day calendar"
-                    value={values.endDate}
-                    onChange={(endDate) =>
-                      setValues((v) => ({ ...v, endDate }))
-                    }
-                  />
-                  {!values.allDay ? (
-                    <TimePicker
-                      name="endTime"
-                      aria-label="End time"
-                      triggerLabel="Choose ending time"
-                      required
-                      value={values.endTime}
-                      onChange={(endTime) =>
-                        setValues((v) => ({ ...v, endTime }))
-                      }
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="event-start-date">Start</Label>
+                    <DatePicker
+                      id="event-start-date"
+                      name="startDate"
+                      triggerLabel="Open starting day calendar"
+                      value={values.startDate}
+                      onChange={(startDate) => setSpan({ startDate })}
                     />
-                  ) : null}
+                    {!values.allDay ? (
+                      <TimePicker
+                        name="startTime"
+                        aria-label="Start time"
+                        triggerLabel="Choose starting time"
+                        required
+                        value={values.startTime}
+                        onChange={(startTime) => setSpan({ startTime })}
+                      />
+                    ) : null}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="event-end-date">End</Label>
+                    <DatePicker
+                      id="event-end-date"
+                      name="endDate"
+                      triggerLabel="Open ending day calendar"
+                      value={values.endDate}
+                      onChange={(endDate) => setSpan({ endDate })}
+                    />
+                    {!values.allDay ? (
+                      <TimePicker
+                        name="endTime"
+                        aria-label="End time"
+                        triggerLabel="Choose ending time"
+                        required
+                        value={values.endTime}
+                        onChange={(endTime) => setSpan({ endTime })}
+                      />
+                    ) : null}
+                  </div>
                 </div>
-              </div>
+              )}
               {fieldErrors.startTime ||
               fieldErrors.endTime ||
               fieldErrors.endDate ? (

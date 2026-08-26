@@ -259,3 +259,105 @@ describe("rescheduleSchema", () => {
     expect(result.success).toBe(false);
   });
 });
+
+/**
+ * The single-day rule (#115). Content and stream events end on the day they
+ * start; work keeps the full range. The schema is the one choke point all
+ * three write paths — editor, drag/resize and MCP — pass through.
+ */
+describe("eventFormSchema — single-day content", () => {
+  function content(overrides: Record<string, unknown> = {}) {
+    return baseInput({ track: "content", title: "Release", ...overrides });
+  }
+
+  it("accepts a timed content event inside one day", () => {
+    const result = eventFormSchema.safeParse(
+      content({ startTime: "19:00", endTime: "20:00" })
+    );
+    expect(result.success).toBe(true);
+    expect(result.data!.startsAt.toISOString()).toBe(
+      "2026-07-08T17:00:00.000Z"
+    );
+    expect(result.data!.endsAt.toISOString()).toBe("2026-07-08T18:00:00.000Z");
+  });
+
+  it("ignores a submitted end date entirely and derives it from the start", () => {
+    // The editor mounts no end-date input for these kinds, but a stale value
+    // could still ride along in FormData — and used to, as the 23:00 → next
+    // day 00:00 default that produced two-day releases.
+    const result = eventFormSchema.safeParse(
+      content({ endDate: "2026-07-20", startTime: "19:00", endTime: "20:00" })
+    );
+    expect(result.success).toBe(true);
+    expect(result.data!.endsAt.toISOString()).toBe("2026-07-08T18:00:00.000Z");
+  });
+
+  it("does not need an end date at all", () => {
+    const input = content({ startTime: "19:00", endTime: "20:00" });
+    delete (input as Record<string, unknown>).endDate;
+    expect(eventFormSchema.safeParse(input).success).toBe(true);
+  });
+
+  it("rejects an end time at or before the start, in plain words", () => {
+    for (const endTime of ["19:00", "18:00"]) {
+      const result = eventFormSchema.safeParse(
+        content({ startTime: "19:00", endTime })
+      );
+      expect(result.success, endTime).toBe(false);
+      const issue = result.error!.issues[0];
+      expect(issue.path).toEqual(["endTime"]);
+      expect(issue.message).toMatch(/same day/);
+    }
+  });
+
+  it("rejects the midnight-spanning default outright", () => {
+    // 23:00 → 00:00 was the live bug: a "stream" that ended the next day.
+    const result = eventFormSchema.safeParse(
+      content({ startTime: "23:00", endTime: "00:00" })
+    );
+    expect(result.success).toBe(false);
+    expect(result.error!.issues[0].message).toMatch(/same day/);
+  });
+
+  it("makes an all-day content event exactly one day", () => {
+    const result = eventFormSchema.safeParse(
+      content({ allDay: true, endDate: "2026-07-20" })
+    );
+    expect(result.success).toBe(true);
+    // A single-day all-day event stores startsAt === endsAt (docs/calendar.md).
+    expect(result.data!.endsAt.toISOString()).toBe(
+      result.data!.startsAt.toISOString()
+    );
+  });
+
+  it("applies the same rule to a stream, which stores as content", () => {
+    const result = eventFormSchema.safeParse(
+      content({ track: "stream", startTime: "23:00", endTime: "01:00" })
+    );
+    expect(result.success).toBe(false);
+    expect(result.error!.issues[0].message).toMatch(/same day/);
+
+    const ok = eventFormSchema.safeParse(
+      content({ track: "stream", startTime: "20:00", endTime: "22:00" })
+    );
+    expect(ok.success).toBe(true);
+    expect(ok.data!.track).toBe("content");
+    expect(ok.data!.kind).toBe("stream");
+  });
+
+  it("leaves multi-day work events alone", () => {
+    const result = eventFormSchema.safeParse(
+      baseInput({ endDate: "2026-07-10" })
+    );
+    expect(result.success).toBe(true);
+    expect(result.data!.endsAt.toISOString()).toBe("2026-07-10T08:00:00.000Z");
+  });
+
+  it("still requires an end date for a work event", () => {
+    const input = baseInput();
+    delete (input as Record<string, unknown>).endDate;
+    const result = eventFormSchema.safeParse(input);
+    expect(result.success).toBe(false);
+    expect(result.error!.issues[0].path).toEqual(["endDate"]);
+  });
+});

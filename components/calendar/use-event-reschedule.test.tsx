@@ -137,3 +137,75 @@ describe("useEventReschedule", () => {
     expect(toast).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * The single-day clamp (#115). A move preserves duration and so can't break
+ * the rule on its own; resizing the end edge can, and is pulled back to 23:59
+ * of the start's day rather than refused mid-gesture.
+ */
+describe("useEventReschedule — single-day content", () => {
+  /** 22:00 Madrid on the 8th, dragged out to 02:00 on the 9th. */
+  const overrun = {
+    startsAt: new Date("2026-07-08T20:00:00Z"),
+    endsAt: new Date("2026-07-09T00:00:00Z"),
+  };
+
+  function OverrunHarness({ event }: { event: CalendarEvent }) {
+    const { reschedule } = useEventReschedule([event]);
+    return (
+      <button type="button" onClick={() => reschedule(event, overrun)}>
+        resize
+      </button>
+    );
+  }
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each([
+    ["a content event", { track: "content" as const, streamId: null }],
+    ["a stream block", { track: "content" as const, streamId: "stream-1" }],
+  ])("clamps %s to the end of its start day", async (_label, overrides) => {
+    rescheduleEvent.mockResolvedValue({});
+    const user = userEvent.setup();
+    render(<OverrunHarness event={makeEvent(overrides)} />);
+
+    await user.click(screen.getByText("resize"));
+
+    await waitFor(() => expect(rescheduleEvent).toHaveBeenCalled());
+    const [, startsAt, endsAt] = rescheduleEvent.mock.calls[0];
+    expect(startsAt).toEqual(overrun.startsAt);
+    // 23:59 Madrid on the 8th — never midnight on the 9th, which reads as a
+    // different wall-clock day.
+    expect(endsAt.toISOString()).toBe("2026-07-08T21:59:00.000Z");
+  });
+
+  it("leaves a work event free to span days", async () => {
+    rescheduleEvent.mockResolvedValue({});
+    const user = userEvent.setup();
+    render(<OverrunHarness event={makeEvent()} />);
+
+    await user.click(screen.getByText("resize"));
+
+    await waitFor(() => expect(rescheduleEvent).toHaveBeenCalled());
+    const [, , endsAt] = rescheduleEvent.mock.calls[0];
+    expect(endsAt).toEqual(overrun.endsAt);
+  });
+
+  it("does not touch a content shift that already fits its day", async () => {
+    rescheduleEvent.mockResolvedValue({});
+    const user = userEvent.setup();
+    render(<Harness event={makeEvent({ track: "content", streamId: null })} />);
+
+    await user.click(screen.getByText("drag"));
+
+    await waitFor(() =>
+      expect(rescheduleEvent).toHaveBeenCalledWith(
+        "evt-1",
+        shifted.startsAt,
+        shifted.endsAt
+      )
+    );
+  });
+});
