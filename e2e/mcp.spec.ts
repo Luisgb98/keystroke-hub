@@ -348,7 +348,8 @@ test.describe("MCP server", () => {
       "reschedule_content_event",
       {
         eventId: workEventId!,
-        startDate: "2026-09-19",
+        // One `date`, no `endDate` — content events are single-day (#115).
+        date: "2026-09-19",
         startTime: "09:00",
         endTime: "10:00",
       }

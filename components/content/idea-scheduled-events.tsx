@@ -112,7 +112,9 @@ function ReleaseChip({
             aria-label={`Reschedule release, currently ${label}`}
           />
         }
-        className="rounded-full hover:underline"
+        // Fills the chip's height so the tap target is the whole chip, not
+        // just the 17px line of text inside it (#114).
+        className="flex h-full items-center rounded-full hover:underline"
       >
         {label}
       </PopoverTrigger>
@@ -190,14 +192,16 @@ export function IdeaScheduledEvents({
       {scheduledEvents.map((event) => (
         <span
           key={event.id}
-          className="inline-flex items-center gap-1 rounded-full border border-track-content-border bg-track-content px-2 py-0.5 text-caption text-track-content-foreground"
+          // `min-h-11` on a phone: the chip carries two controls (open the
+          // day, unlink) and at 17px tall neither was reliably tappable (#114).
+          className="inline-flex min-h-11 items-center gap-1 rounded-full border border-track-content-border bg-track-content px-2.5 py-0.5 text-caption text-track-content-foreground md:min-h-0 md:px-2"
         >
           {releaseEventId && event.id === releaseEventId ? (
             <ReleaseChip ideaId={ideaId} event={event} />
           ) : (
             <Link
               href={`/calendar?view=day&date=${formatDateParam(event.startsAt)}`}
-              className="hover:underline"
+              className="flex h-full items-center hover:underline"
             >
               {chipLabel(event)}
             </Link>
@@ -207,7 +211,7 @@ export function IdeaScheduledEvents({
             aria-label={`Unlink from "${event.title}"`}
             disabled={pending}
             onClick={() => handleUnlink(event)}
-            className="opacity-60 hover:opacity-100 disabled:pointer-events-none disabled:opacity-30"
+            className="-mr-1 flex size-8 items-center justify-center rounded-full opacity-60 hover:opacity-100 disabled:pointer-events-none disabled:opacity-30 md:mr-0 md:size-auto"
           >
             <X aria-hidden className="size-3" />
           </button>

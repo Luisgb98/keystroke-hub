@@ -45,6 +45,11 @@ yarn-error.log*
 # agent worktrees (local scratch checkouts, never ours to commit)
 .claude/
 
+# one-off repair-script backups — they hold real event titles, and this repo
+# is public (scripts/fix-shifted-times.mts, scripts/fix-multi-day-content.mts)
+scripts/.tz-fix-*.json
+scripts/.single-day-fix-*.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

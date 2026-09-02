@@ -159,12 +159,12 @@ Without the header the same call answers `401` with
 
 ### Calendar (content track only)
 
-| Tool                       | Parameters                                                                            | Behaviour                                                                                                                                                         |
-| -------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `list_content_events`      | `from`, `to`                                                                          | Content events overlapping the (inclusive) day range, chronological. `kind` is `stream` when a session schedules the block. Work-track events are never returned. |
-| `create_content_event`     | `title`, `description?`, `startDate`, `startTime?`, `endDate?`, `endTime?`, `allDay?` | Creates a plain content block. It cannot create a work event, and it cannot create a Stream block — use `create_stream`/`schedule_stream`.                        |
-| `reschedule_content_event` | `eventId`, `startDate`, `startTime?`, `endDate?`, `endTime?`, `allDay?`               | Moves the slot only. Refuses work-track events.                                                                                                                   |
-| `delete_content_event`     | `eventId`                                                                             | Deletes the event (and in Google Calendar). A stream scheduled by it survives as unscheduled. Refuses work-track events.                                          |
+| Tool                       | Parameters                                                           | Behaviour                                                                                                                                                         |
+| -------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_content_events`      | `from`, `to`                                                         | Content events overlapping the (inclusive) day range, chronological. `kind` is `stream` when a session schedules the block. Work-track events are never returned. |
+| `create_content_event`     | `title`, `description?`, `date`, `startTime?`, `endTime?`, `allDay?` | Creates a plain content block on one day. It cannot create a work event, and it cannot create a Stream block — use `create_stream`/`schedule_stream`.             |
+| `reschedule_content_event` | `eventId`, `date`, `startTime?`, `endTime?`, `allDay?`               | Moves the slot only, within one day. Refuses work-track events.                                                                                                   |
+| `delete_content_event`     | `eventId`                                                            | Deletes the event (and in Google Calendar). A stream scheduled by it survives as unscheduled. Refuses work-track events.                                          |
 
 ## How it stays honest
 
@@ -186,7 +186,11 @@ An MCP write is not a second implementation of the app — it's the **same** one
   one. A work-track event can never be read, moved or deleted, because the
   calendar tools re-read the event and refuse it before mutating, and the
   content-track checks in `linkIdeaToEventCore`/`attachEventToStreamCore` (and
-  the composite FKs behind them) refuse it again.
+  the composite FKs behind them) refuse it again. And a content event can never
+  span more than one day: both calendar write tools take a single `date` and
+  expose **no `endDate` parameter at all** (#115), so the multi-day state isn't
+  something a client can ask for — see
+  [`docs/calendar.md`](calendar.md#the-content-track-is-single-day-115).
 
 ## Auth
 

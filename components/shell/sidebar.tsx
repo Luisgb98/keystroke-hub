@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Inbox, Settings } from "lucide-react";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { PaletteTriggerChip } from "@/components/command-palette/palette-trigger";
@@ -10,7 +9,7 @@ import {
 import { NavLink } from "@/components/shell/nav-link";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
-import { navItems } from "@/lib/navigation";
+import { inboxNavItem, navItems, settingsNavItem } from "@/lib/navigation";
 
 interface SidebarProps {
   /** Untriaged inbox entries — rendered as a badge on the Inbox link. */
@@ -47,9 +46,9 @@ export function Sidebar({ untriagedCount }: SidebarProps) {
           />
         ))}
         <NavLink
-          href="/inbox"
-          label="Inbox"
-          icon={<Inbox aria-hidden className="size-5" />}
+          href={inboxNavItem.href}
+          label={inboxNavItem.label}
+          icon={<inboxNavItem.icon aria-hidden className="size-5" />}
           variant="sidebar"
           badge={<InboxCountBadge count={untriagedCount} className="ml-auto" />}
           badgeLabel={inboxCountLabel(untriagedCount)}
@@ -62,11 +61,11 @@ export function Sidebar({ untriagedCount }: SidebarProps) {
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Settings"
+            aria-label={settingsNavItem.label}
             nativeButton={false}
-            render={<Link href="/settings/calendars" />}
+            render={<Link href={settingsNavItem.href} />}
           >
-            <Settings aria-hidden />
+            <settingsNavItem.icon aria-hidden />
           </Button>
           <ThemeToggle />
           <SignOutButton variant="sidebar" />

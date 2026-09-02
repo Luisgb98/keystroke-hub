@@ -1,6 +1,6 @@
 {
   "name": "keystroke-hub",
-  "version": "0.42.0",
+  "version": "0.45.0",
   "private": true,
   "packageManager": "pnpm@11.10.0",
   "scripts": {
@@ -18,8 +18,10 @@
     "test:e2e": "playwright test",
     "version:check": "node scripts/verify-version-bump.mjs",
     "auth:hash": "node scripts/hash-password.mts",
+    "icons:generate": "node scripts/generate-app-icons.mts",
     "seed:events": "node scripts/seed-events.mts",
     "fix:shifted-times": "node scripts/fix-shifted-times.mts",
+    "fix:multi-day-content": "node scripts/fix-multi-day-content.mts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"

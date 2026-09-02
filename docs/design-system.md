@@ -26,8 +26,10 @@ The brand accent is **`#a8454b`** — `oklch(0.524 0.131 19.1)`, a muted brick
 red. Dark mode lifts the same hue to `oklch(0.72 0.14 19.1)`; `#a8454b` is too
 dark to read on a dark surface. `--sidebar-primary` and the focus rings
 (`--ring`, `--sidebar-ring`) are derived from it, so buttons, badges, links,
-the sidebar active bar, the mobile bottom-nav dot, the inbox count badge and
-every focus halo all come from one decision.
+the sidebar active bar, the mobile bottom-nav dot, the inbox count badge, the
+app icon and every focus halo all come from one decision. (The icon and the web
+manifest can't read a CSS token, so they read the same hex from `lib/brand.ts`
+instead, pinned to `--primary` by a test — see [`docs/pwa.md`](pwa.md).)
 
 That leaves three reds in the palette, kept apart on purpose:
 
@@ -186,6 +188,33 @@ Handled by `next-themes` (`ThemeProvider` in `app/layout.tsx`), class-based
 persisting the user's explicit choice. `suppressHydrationWarning` is set on
 `<html>` per next-themes' recommendation, so there's no flash on load.
 
+## Dialog shape (#114)
+
+`DialogContent` takes a `variant`: `"centered"` (the default — a centred panel
+at every width) or `"sheet"` (a bottom sheet below `md`, the same centred panel
+from `md` up). Form-shaped dialogs use `"sheet"` and put their fields in a
+`DialogBody`, which is the only part that scrolls, so the header and the Save
+button stay anchored. Short, glanceable dialogs — confirmations, pickers,
+one-field prompts, and every `AlertDialog` — stay centred.
+
+The switch is pure CSS, never a breakpoint hook, so a dialog can't re-mount on
+rotation or mismatch between the server render and the hydrated one. Full
+rationale in [`docs/mobile.md`](mobile.md).
+
+## Control sizes and touch targets (#114)
+
+Every size in the button system, plus `Input`, `SelectTrigger`, `InputGroup`
+and `TabsList`, is **44px below `md` and the dense desktop value from `md`
+up** — mobile-first in the literal sense. The one deliberate exception is the
+`xs` pair (`xs` / `icon-xs`), the inline-chip size used inside rows of text,
+which settles at 36px on a phone. `Input`, `Textarea` and `SelectTrigger` all
+render `text-base` below `md`, because Safari zooms the page whenever a focused
+field computes under 16px.
+
+Don't hand-size a control to hit the bar — reach for the right size token and
+let the primitive do it, or the two scales drift. The named exceptions and the
+e2e check that enforces the rest are in [`docs/mobile.md`](mobile.md).
+
 ## Dialogs and long strings (#102)
 
 `DialogContent` is a `grid` with a `max-w-*` cap, and a grid item's
@@ -198,7 +227,9 @@ field, End date/time and footer all painted on the page _outside_ the white box.
 Two rules follow:
 
 - `DialogContent` carries `[&>*]:min-w-0`, which zeroes that floor on its direct
-  children and makes `max-w-*` authoritative for every dialog.
+  children and makes `max-w-*` authoritative for every dialog. (#114 added the
+  vertical twin, `[&>*]:min-h-0` — that's what lets a `DialogBody` inside a
+  full-height form scroll instead of stretching the sheet past the viewport.)
 - Any flex item that holds text meant to `truncate` needs `min-w-0` itself —
   `overflow-hidden` and `flex-1` are not enough. Without it the item reports its
   full unwrapped width as its minimum and the ellipsis never appears.

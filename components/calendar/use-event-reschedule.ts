@@ -5,6 +5,8 @@ import { toast } from "sonner";
 
 import { rescheduleEvent } from "@/lib/calendar/actions";
 import { isNoopShift, type TimeShift } from "@/lib/calendar/drag";
+import { clampToStartDay, isSingleDayKind } from "@/lib/calendar/single-day";
+import { trackKindOf } from "@/lib/calendar/track-kind";
 import type { CalendarEvent } from "@/lib/calendar/types";
 
 interface OptimisticOverride extends TimeShift {
@@ -41,7 +43,19 @@ export function useEventReschedule(
   );
   const [isPending, startTransition] = useTransition();
 
-  function reschedule(event: CalendarEvent, shift: TimeShift) {
+  function reschedule(event: CalendarEvent, requested: TimeShift) {
+    // Content-track events are single-day (#115). A *move* preserves duration
+    // and so can't break the rule on its own; a *resize* of the end edge can,
+    // so the end is pulled back to 23:59 of the start's day. Clamping rather
+    // than refusing keeps the gesture feeling like a gesture — a resize that
+    // silently did nothing would read as a broken drag.
+    const shift = isSingleDayKind(trackKindOf(event))
+      ? {
+          startsAt: requested.startsAt,
+          endsAt: clampToStartDay(requested.startsAt, requested.endsAt),
+        }
+      : requested;
+
     if (isNoopShift(event, shift)) return;
 
     const previous: TimeShift = {

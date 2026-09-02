@@ -59,6 +59,28 @@ ever moves.
 Weeks start on Monday (`WEEK_STARTS_ON`), matching `lib/calendar/range.ts` and
 `lib/journal/week-dates.ts`.
 
+### "Today" inside a third-party calendar
+
+`react-day-picker` decides which cell is today from `new Date()` and compares
+it against the local `Date` it builds for each cell — so left alone it marks
+the **runtime's** today, which on Vercel is UTC. For two hours every night the
+owner is already on the next day and the calendar still highlighted the
+previous one.
+
+`components/ui/calendar.tsx` exports **`appToday()`** and passes it as
+`DayPicker`'s `today`: `appTodayParam()` for the app-zone calendar date, then
+re-materialised as a local `Date`, because local is the zone `DayPicker`
+compares in — the same two-step as `parseDateValue`. `DatePicker` uses it for
+`defaultMonth` too, so an empty field opens on the owner's month rather than
+the server's. It is hydration-safe by construction: `appTodayParam()` resolves
+identically on a UTC server and a Madrid browser, unlike the `new Date()` it
+replaces.
+
+The regression test in `components/ui/date-picker.test.tsx` pins the clock to
+`22:30Z` — inside the two-hour window — so it holds whatever time the suite
+runs at. It first showed up as a nightly CI failure in two unrelated suites
+that asked for the "Today, …" cell by its app-zone name.
+
 ## DST
 
 `Europe/Madrid` is CET (+1) in winter and CEST (+2) in summer, so the repair

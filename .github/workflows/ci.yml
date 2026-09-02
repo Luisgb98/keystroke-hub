@@ -1,8 +1,14 @@
 name: CI
 
 on:
+  # `feat/**` covers stacked PRs, whose base is the branch below them in the
+  # chain rather than `develop` — without it they get no CI at all, which is
+  # exactly when a green check is worth most. The filter matches the PR's
+  # *base*, so a feature branch still runs its pipeline once, not twice.
   pull_request:
-    branches: [develop, main]
+    branches: [develop, main, "feat/**"]
+  # Deliberately narrower: pushes to a feature branch would burn a runner on
+  # every intermediate commit, and its PR already covers it.
   push:
     branches: [develop, main]
 

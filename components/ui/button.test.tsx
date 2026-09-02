@@ -99,3 +99,41 @@ describe("button variants", () => {
     }
   });
 });
+
+/**
+ * Touch targets (#114). The audit that opened the issue found almost nothing
+ * in the app clearing Apple's 44px minimum on a phone — most controls sat at
+ * 32px or less — so every size is a touch target below `md` and collapses back
+ * to the desktop scale from `md` up.
+ */
+describe("button sizes on a phone", () => {
+  const TOUCH_SIZES = ["default", "sm", "lg"] as const;
+  const TOUCH_ICON_SIZES = ["icon", "icon-sm", "icon-lg"] as const;
+
+  it.each(TOUCH_SIZES)("gives size=%s a 44px height below md", (size) => {
+    expect(buttonVariants({ size })).toContain("h-11");
+  });
+
+  it.each(TOUCH_ICON_SIZES)("gives size=%s a 44px square below md", (size) => {
+    expect(buttonVariants({ size })).toContain("size-11");
+  });
+
+  it.each([...TOUCH_SIZES, ...TOUCH_ICON_SIZES])(
+    "restores the desktop scale for size=%s from md up",
+    (size) => {
+      // The dense desktop design is unchanged — the phone sizing must not leak
+      // into it, or every toolbar in the app grows by 12px.
+      expect(buttonVariants({ size })).toMatch(/md:(h|size)-\d/);
+    }
+  );
+
+  it("keeps the xs pair deliberately smaller", () => {
+    // `xs` is the inline-chip size, used *inside* rows of text — a 44px
+    // control there would out-shout the content it belongs to. It still grows
+    // from 24px to 36px on a phone.
+    expect(buttonVariants({ size: "xs" })).toContain("h-9");
+    expect(buttonVariants({ size: "xs" })).toContain("md:h-6");
+    expect(buttonVariants({ size: "icon-xs" })).toContain("size-9");
+    expect(buttonVariants({ size: "icon-xs" })).toContain("md:size-6");
+  });
+});

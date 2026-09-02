@@ -54,7 +54,14 @@ export function WeekView({ days, events, now }: WeekViewProps) {
               ) : (
                 <div className="flex flex-col gap-1">
                   {dayEvents.map((event) => (
-                    <EventChip key={event.id} event={event} />
+                    // Full-width agenda rows, so there's room to make each one
+                    // a real touch target — unlike the month grid's chips,
+                    // which have a 52px-wide cell to live in (#114).
+                    <EventChip
+                      key={event.id}
+                      event={event}
+                      className="min-h-11 md:min-h-[1.75rem]"
+                    />
                   ))}
                 </div>
               )}

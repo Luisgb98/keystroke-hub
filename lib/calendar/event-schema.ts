@@ -2,6 +2,11 @@ import { z } from "zod";
 
 import { parseAppDate, parseAppDateTime } from "@/lib/time";
 
+import {
+  SINGLE_DAY_MESSAGE,
+  isSingleAppDay,
+  isSingleDayKind,
+} from "./single-day";
 import { isTrackKind, trackForKind, type TrackKind } from "./track-kind";
 import type { Track } from "./types";
 
@@ -45,7 +50,10 @@ const rawEventSchema = z.object({
   // Absent entirely for all-day events (the time inputs are disabled, so a
   // native form omits them from FormData) — required only when timed.
   startTime: z.string().regex(TIME_RE, "Enter a valid start time").optional(),
-  endDate: z.string().regex(DATE_RE, "Enter a valid end date"),
+  // Optional because the editor mounts no end-date input for content-track
+  // kinds (#115) — they derive it from `startDate`. Required for work, which
+  // the transform below enforces.
+  endDate: z.string().regex(DATE_RE, "Enter a valid end date").optional(),
   endTime: z.string().regex(TIME_RE, "Enter a valid end time").optional(),
 });
 
@@ -57,17 +65,40 @@ const rawEventSchema = z.object({
  * on Vercel (issue #95). All-day events are normalized to app-timezone
  * midnight date boundaries (see docs/calendar.md) — a single-day all-day event
  * has `startsAt === endsAt`.
+ *
+ * The span rule branches on `kind` (#115). Work events keep the full
+ * start-date/end-date range. Content and stream events are **single-day**: any
+ * submitted `endDate` is ignored and derived from `startDate`, so a stale
+ * midnight-spanning default can't survive a track switch, and an end time at
+ * or before the start is rejected in plain words. See `./single-day.ts`.
  */
 export const eventFormSchema = rawEventSchema.transform((data, ctx) => {
   const description =
     data.description && data.description.length > 0 ? data.description : null;
+
+  // Guaranteed valid here: a failed `track` refine short-circuits parsing
+  // before this transform ever runs.
+  const kind = data.track as TrackKind;
+  const singleDay = isSingleDayKind(kind);
+
+  // Content and stream events end on the day they start, full stop — the
+  // submitted value is never consulted. Work needs a real one.
+  const endDate = singleDay ? data.startDate : data.endDate;
+  if (!endDate) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["endDate"],
+      message: "Enter a valid end date",
+    });
+    return z.NEVER;
+  }
 
   let startsAt: Date | null;
   let endsAt: Date | null;
 
   if (data.allDay) {
     startsAt = parseAppDate(data.startDate);
-    endsAt = parseAppDate(data.endDate);
+    endsAt = parseAppDate(endDate);
   } else {
     if (!data.startTime) {
       ctx.addIssue({
@@ -86,7 +117,7 @@ export const eventFormSchema = rawEventSchema.transform((data, ctx) => {
     if (!data.startTime || !data.endTime) return z.NEVER;
 
     startsAt = parseAppDateTime(data.startDate, data.startTime);
-    endsAt = parseAppDateTime(data.endDate, data.endTime);
+    endsAt = parseAppDateTime(endDate, data.endTime);
   }
 
   // `DATE_RE` only checks the shape, so a well-formed but nonexistent day
@@ -108,7 +139,29 @@ export const eventFormSchema = rawEventSchema.transform((data, ctx) => {
   }
   if (!startsAt || !endsAt) return z.NEVER;
 
-  if (endsAt.getTime() < startsAt.getTime()) {
+  if (singleDay) {
+    // Timed content has to advance within its one day; an all-day content
+    // event is already exactly that day (`startsAt === endsAt`), so only the
+    // timed case can be wrong here.
+    if (!data.allDay && endsAt.getTime() <= startsAt.getTime()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["endTime"],
+        message: SINGLE_DAY_MESSAGE,
+      });
+      return z.NEVER;
+    }
+    // Belt and braces: `endDate` is derived from `startDate`, so this can only
+    // trip if a DST-shifted end time landed on the next wall-clock day.
+    if (!isSingleAppDay(startsAt, endsAt)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["endTime"],
+        message: SINGLE_DAY_MESSAGE,
+      });
+      return z.NEVER;
+    }
+  } else if (endsAt.getTime() < startsAt.getTime()) {
     ctx.addIssue({
       code: "custom",
       path: ["endDate"],
@@ -117,9 +170,6 @@ export const eventFormSchema = rawEventSchema.transform((data, ctx) => {
     return z.NEVER;
   }
 
-  // Guaranteed valid here: a failed `track` refine short-circuits parsing
-  // before this transform ever runs.
-  const kind = data.track as TrackKind;
   const result: EventInput = {
     title: data.title,
     track: trackForKind(kind),

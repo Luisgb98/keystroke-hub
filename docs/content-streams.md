@@ -66,7 +66,9 @@ the template.
   `searchLinkableIdeas` in `lib/data/idea-event-links.ts`.
 - **`lib/content/stream-actions.ts`**: `createStream` (title required;
   planning a date creates a content-track event with a fixed 2h duration —
-  or the same day, for all-day — rather than a second end-time picker),
+  or the same day, for all-day — rather than a second end-time picker; that
+  shape was already single-day, which #115 then made a rule everywhere, see
+  below),
   `updateStreamDetails` (title, prep notes and the retro — every editable
   field on the detail page, in one statement), `deleteStream` (hard delete,
   checklist cascades, and — since #104 — the linked event is deleted with it,
@@ -133,6 +135,24 @@ the "stream" idea format):
   checklist toggle doesn't discard in-progress typing.
 
 ## Streams on the calendar (#104)
+
+## A stream is a single day (#115)
+
+A stream begins and ends on the same day, so nothing in the app asks for a
+second date. The planner never did — `streamCaptureSchema` takes one `date`
+plus a start time and derives the end from a fixed 2h slot. #115 made that the
+rule rather than a habit, everywhere a stream's span can be set:
+
+- **The event editor** shows one **Date** plus **From**/**To** for a Stream
+  block, with no end-date input mounted at all.
+- **Dragging** a purple block moves it; **resizing** it clamps to 23:59 of its
+  own day rather than running into tomorrow.
+- **MCP** has no `endDate` parameter on either calendar write tool.
+
+The rule and its wording live in `lib/calendar/single-day.ts`; the full
+rationale — including why it is not a Postgres CHECK, and the accepted limit
+that a 23:00 → 01:00 stream can't be represented — is in
+[`calendar.md`](calendar.md#the-content-track-is-single-day-115).
 
 A scheduled stream's block is **Twitch purple**, its own track alongside work
 and content — see docs/calendar.md for how that kind is derived (it is not a

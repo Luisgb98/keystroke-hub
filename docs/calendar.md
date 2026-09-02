@@ -21,6 +21,46 @@ midnight. `lib/data/events.ts`'s range query uses an inclusive `gte` on
 `endsAt` specifically so this boundary case still matches its own day's
 `[from, to)` range.
 
+### The content track is single-day (#115)
+
+**Work events may span days; content and stream events may not.** A stream and
+a video release both begin and end on the same day — every one the owner has
+ever scheduled does — so the second date picker was pure friction, and its
+stale default (23:00 → the next day's 00:00) could produce a "two-day release"
+nobody asked for. Meetings, trips and multi-day work items, by contrast, are
+real.
+
+`lib/calendar/single-day.ts` holds the rule: `isSingleDayKind`,
+`isSingleAppDay`, `endOfStartDay`, `clampToStartDay` and the one wording
+(`SINGLE_DAY_MESSAGE`) that the editor, the calendar and MCP all speak. All
+four write paths route through it:
+
+| Path                  | What it does                                                                                                                         |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `eventFormSchema`     | For content/stream, **ignores any submitted `endDate`** and derives it from `startDate`; rejects an end time at or before the start. |
+| `EventEditor`         | Mounts no end-date input for those kinds — one Date plus From/To.                                                                    |
+| `rescheduleEventCore` | Reads the row's kind and **refuses** a multi-day span (the drag already clamped, so anything arriving multi-day ignored the rule).   |
+| `useEventReschedule`  | Clamps a resize to 23:59 of the start's day, in the gesture.                                                                         |
+
+`endOfStartDay` is deliberately **23:59, never the next day's midnight** — that
+instant reads as a different wall-clock day, which is exactly the state the
+rule exists to make unrepresentable.
+
+**Why not a Postgres CHECK.** "Same day" is an app-timezone wall-clock notion
+(see [timezone.md](timezone.md) and issue #95); expressing it in SQL would
+hardcode the timezone into a constraint. The rule lives at the one schema
+choke point instead, with the two calendar-gesture paths above clamping before
+they ever reach it.
+
+**Known limit, accepted deliberately.** A stream that genuinely runs past
+midnight (23:00 → 01:00) can't be represented. Flagged on the issue; there is
+no overnight escape hatch.
+
+Existing rows are audited and repaired by
+`scripts/fix-multi-day-content.mts` (`pnpm fix:multi-day-content`) — a dry run
+by default, `--apply` to clamp, `--revert` to undo. Unlike
+`fix-shifted-times.mts` it _is_ idempotent.
+
 ## Range and layout math (`lib/calendar/`)
 
 The genuinely tricky parts of a hand-built calendar are pure logic, so they
@@ -190,13 +230,21 @@ There's no optimistic UI: a single round-trip plus a `pending` flag from
 enough for a personal app. Delete is a hard delete — no audit trail.
 
 **Form surface**: `EventEditor` (`components/calendar/event-editor.tsx`) is
-the shared create/edit form, rendered inside the existing `Dialog` primitive
-for both mobile and desktop. This project's shadcn/Base UI setup has no
-drawer/sheet component, and `DialogContent` is already responsive enough
-for a mobile-first form — adding a bespoke bottom-sheet component wasn't
-worth the extra surface. `TrackPicker` never pre-selects a track; submit
-stays disabled until one is chosen, which is how "the track choice can
-never be ambiguous" is enforced.
+the shared create/edit form, in a `variant="sheet"` dialog — a bottom sheet on
+a phone, the centred panel on desktop (#114, see [mobile.md](mobile.md)).
+`TrackPicker` never pre-selects a track; submit stays disabled until one is
+chosen, which is how "the track choice can never be ambiguous" is enforced.
+
+**The date fields branch on the chosen track** (#115). Work gets the full
+Start/End range. Content and stream get a single **Date** plus **From**/**To**
+times, with no end-date input mounted at all — the value rides along in a
+hidden field that `setSpan` keeps equal to `startDate`, so flipping the picker
+back to Work can never submit a stale midnight-spanning end date. Switching
+_to_ a single-day kind also repairs the span: quick-add is track-agnostic, so
+tapping the 23:00 slot hands the dialog a 23:00 → next-day-00:00 default that
+is a real work meeting and an impossible stream — the end time moves to 23:59
+rather than the dialog opening on a form that is already invalid. A time the
+owner typed themselves is left alone for validation to speak to.
 
 **Making events tappable**: `EventChip` and `EventBlock` are each
 self-contained client components — a `<button>` wrapping the existing
@@ -215,8 +263,8 @@ helpers in `lib/calendar/quick-add.ts`:
 - Tapping an hour slot in the day/week time grid (`DayColumn` renders one
   button per hour, positioned behind the `EventBlock`s) — 1h duration
   starting on the hour.
-- A month cell's "+" affordance (visible on hover/focus — desktop-oriented;
-  mobile reaches quick-add via the day view or the header button) — an
+- A month cell's "+" affordance (hover-revealed on desktop, permanently
+  visible below `md` since #114 — a pointer can't reveal it on a phone) — an
   all-day default for that date. It doesn't intercept the cell's own
   day-navigation tap.
 - A persistent "+ New event" button in `CalendarHeader`, the universal

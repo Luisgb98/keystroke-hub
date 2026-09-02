@@ -88,3 +88,17 @@ describe("DayHeader", () => {
     expect(push).toHaveBeenCalledWith("/journal?date=2026-07-20");
   });
 });
+
+describe("phone layout (#114)", () => {
+  it("gives the long date its own row on a phone and puts it back beside the picker from md up", () => {
+    // Sharing a row with the 10rem picker at 390px left "Tuesday, August 25,
+    // 2026" wrapping mid-date.
+    render(<DayHeader logDate="2026-08-25" />);
+    const label = screen.getByText("Tuesday, August 25, 2026");
+    expect(label).toHaveClass("order-1");
+    expect(label).toHaveClass("w-full");
+    expect(label).toHaveClass("md:order-none");
+    expect(label).toHaveClass("md:ml-auto");
+    expect(label).toHaveClass("md:w-auto");
+  });
+});

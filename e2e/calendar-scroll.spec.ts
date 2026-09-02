@@ -334,7 +334,14 @@ test.describe("calendar scroll contract — phone", () => {
     expect(await nav.boundingBox()).toEqual(navBefore);
     await expect(nav).toBeInViewport();
 
-    await nav.getByRole("link", { name: /Inbox/ }).click();
+    // The bar is still reachable after the list scrolled — proven by driving
+    // it: More opens, and the Inbox row behind it navigates (#114 moved the
+    // Inbox tab into that sheet).
+    await nav.getByRole("button", { name: /More/ }).click();
+    await page
+      .getByRole("navigation", { name: "More" })
+      .getByRole("link", { name: /Inbox/ })
+      .click();
     await expect(page).toHaveURL(/\/inbox$/);
   });
 

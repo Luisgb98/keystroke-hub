@@ -14,6 +14,7 @@ import { TRACK_SURFACE_CLASSES } from "@/components/calendar/track-styles";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -118,7 +119,7 @@ export function TriageDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent variant="sheet">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <DialogHeader>
             <div className="flex items-center gap-2">
@@ -134,62 +135,62 @@ export function TriageDialog({
             </div>
             <DialogDescription>{meta.hint}.</DialogDescription>
           </DialogHeader>
+          <DialogBody>
+            {destination === "meeting_note" ? (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="triage-date">Date</Label>
+                <DatePicker
+                  id="triage-date"
+                  triggerLabel="Open meeting day calendar"
+                  value={values.date}
+                  onChange={(date) => setValues((v) => ({ ...v, date }))}
+                />
+              </div>
+            ) : null}
 
-          {destination === "meeting_note" ? (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="triage-date">Date</Label>
-              <DatePicker
-                id="triage-date"
-                triggerLabel="Open meeting day calendar"
-                value={values.date}
-                onChange={(date) => setValues((v) => ({ ...v, date }))}
-              />
-            </div>
-          ) : null}
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="triage-title">Title</Label>
-            <Input
-              id="triage-title"
-              autoFocus
-              value={values.title}
-              placeholder={
-                destination === "meeting_note"
-                  ? "What was the meeting?"
-                  : undefined
-              }
-              onChange={(e) =>
-                setValues((v) => ({ ...v, title: e.target.value }))
-              }
-            />
-          </div>
-
-          {destination !== "daily_log_item" ? (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="triage-secondary">
-                {destination === "content_idea"
-                  ? "Description"
-                  : destination === "improvement"
-                    ? "Rationale"
-                    : "Notes"}
-              </Label>
-              <Textarea
-                id="triage-secondary"
-                rows={4}
-                value={values.secondary}
+              <Label htmlFor="triage-title">Title</Label>
+              <Input
+                id="triage-title"
+                autoFocus
+                value={values.title}
+                placeholder={
+                  destination === "meeting_note"
+                    ? "What was the meeting?"
+                    : undefined
+                }
                 onChange={(e) =>
-                  setValues((v) => ({ ...v, secondary: e.target.value }))
+                  setValues((v) => ({ ...v, title: e.target.value }))
                 }
               />
             </div>
-          ) : null}
 
-          {error ? (
-            <p role="alert" className="text-small text-destructive">
-              {error}
-            </p>
-          ) : null}
+            {destination !== "daily_log_item" ? (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="triage-secondary">
+                  {destination === "content_idea"
+                    ? "Description"
+                    : destination === "improvement"
+                      ? "Rationale"
+                      : "Notes"}
+                </Label>
+                <Textarea
+                  id="triage-secondary"
+                  rows={4}
+                  value={values.secondary}
+                  onChange={(e) =>
+                    setValues((v) => ({ ...v, secondary: e.target.value }))
+                  }
+                />
+              </div>
+            ) : null}
 
+            {error ? (
+              <p role="alert" className="text-small text-destructive">
+                {error}
+              </p>
+            ) : null}
+          </DialogBody>
           <DialogFooter>
             <Button type="submit" disabled={pending}>
               {pending ? "Saving…" : `Send to ${meta.label}`}

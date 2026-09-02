@@ -59,6 +59,10 @@ Open [http://localhost:3000](http://localhost:3000) to see the result.
 | `pnpm test:e2e`     | Run end-to-end tests with Playwright        |
 | `pnpm build`        | Build the production app                    |
 
+Utility scripts: `pnpm auth:hash` (password hash),
+`pnpm icons:generate` (rewrite the PWA icon set into `public/`),
+`pnpm seed:events`, `pnpm fix:shifted-times`, `pnpm version:check`.
+
 ESLint (flat config, `eslint-config-next` + `eslint-config-prettier`) and
 Prettier (with `prettier-plugin-tailwindcss` for deterministic Tailwind class
 ordering) are configured to never disagree — ESLint defers all stylistic
@@ -81,13 +85,24 @@ Testing is mandatory for every feature — see `AGENTS.md`.
 - **E2e tests** live in `e2e/` as `*.spec.ts` files and exercise real user
   flows with [Playwright](https://playwright.dev) against the actual
   production build (`pnpm build && pnpm start`), not the dev server. Every
-  spec runs against both a desktop (`chromium`) and a mobile (`Pixel 7`)
-  project to enforce the mobile-first contract.
+  spec runs against a desktop (`chromium`) and a mobile (`Pixel 7`) project to
+  enforce the mobile-first contract, plus an `iphone` project (a 390×844 iPhone
+  viewport) that runs a curated read-only subset — the page-by-page mobile
+  audit, the shell navigation contract and PWA installability.
   - One-time setup: `pnpm exec playwright install --with-deps chromium`.
   - `pnpm test:e2e` — build, start, and run all e2e specs headlessly
     (CI-ready). If port 3000 is already in use by something other than your
     local dev server, stop it first — Playwright's `webServer` needs the
     port and only reuses an existing server outside of `CI`.
+
+## Mobile & installable
+
+The phone is the primary surface: a five-slot bottom tab bar (four
+destinations plus a "More" sheet holding the rest), bottom-sheet dialogs,
+44px touch targets, safe-area-aware layout, and an installable web app. Add it to an iPhone home screen or an Android launcher
+and it opens standalone — own icon, own window, no browser chrome. Run
+`pnpm icons:generate` after changing the brand accent and commit the PNGs. See
+[`docs/mobile.md`](docs/mobile.md) and [`docs/pwa.md`](docs/pwa.md).
 
 ## Authentication
 

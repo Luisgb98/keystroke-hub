@@ -104,14 +104,14 @@ happens in the prefilled triage form, keeping the inbox dumb.
 - **`triage-dialog.tsx`** — the destination-specific step, prefilled; a focused
   subset of the destination's own form, not the whole thing.
 - **Nav** carries the Inbox link and its count on both viewports: the sidebar
-  on desktop, the bottom nav on mobile, both rendering the shared
-  `components/shell/inbox-count-badge.tsx`. The badge is `aria-hidden` and the
-  link is named via `NavLink`'s `badgeLabel` ("Inbox, 3 to triage"), because the
-  bottom variant sits the pill on the tab icon — _before_ the label in DOM
-  order — which would otherwise be announced as "3Inbox". The command palette
-  lists **Inbox** (Navigate) and **Capture a thought** (Actions).
+  on desktop, the bottom nav's "More" sheet on mobile, both rendering the
+  shared `components/shell/inbox-count-badge.tsx`. The badge is `aria-hidden`
+  and the link is named via `badgeLabel` ("Inbox, 3 to triage"), so the count
+  is announced after the label rather than wherever the pill happens to sit.
+  The command palette lists **Inbox** (Navigate) and **Capture a thought**
+  (Actions).
 
-### Nav placement (revised by #85)
+### Nav placement (revised by #85, then #114)
 
 Originally the inbox stayed out of the dense mobile bottom nav and rode the
 floating dock instead. #85 removed that dock — it didn't fit the app's design
@@ -119,6 +119,13 @@ and got in the way on every page — which left mobile with no persistent inbox
 entry point, since the sidebar is `hidden md:flex`. So the bottom nav gained an
 Inbox tab (count badge included) after all, and capture-from-anywhere moved to
 the command palette action, with a dedicated button on the Inbox page itself.
+
+#114 then cut that bar from nine crammed slots to four destinations plus
+"More", and the Inbox tab moved into the sheet — still one tap from the bar.
+The promise this section exists to keep is "a persistent mobile inbox entry
+point with a visible count", and it still holds: the **More trigger mirrors the
+untriaged count as a dot**, permanently visible on the bar, and the number
+itself sits on the Inbox row one tap in. See [`docs/mobile.md`](mobile.md).
 
 ## Tests
 
@@ -132,8 +139,9 @@ the command palette action, with a dedicated button on the Inbox page itself.
   destinations, prefilled triage dialog, discard confirm), triage dialog
   (prefill, payload shape, error), inbox capture button (dispatches the
   open-capture event, owns no dialog), inbox count badge (renders the count,
-  silent at zero, `aria-hidden`), bottom nav (Inbox tab present, active on
-  `/inbox`, count in the link's accessible name).
+  silent at zero, `aria-hidden`), bottom nav (the untriaged dot on the More
+  trigger, silent at inbox zero) and the More sheet (Inbox row present, active
+  on `/inbox`, count in the link's accessible name).
 - **e2e (`e2e/inbox.spec.ts`, Playwright, `chromium` + a `test.use`-scoped
   mobile-viewport describe — so the file is in the `mobile-chrome`
   `testIgnore` in `playwright.config.ts`):** capture from a non-inbox page in
@@ -146,4 +154,6 @@ the command palette action, with a dedicated button on the Inbox page itself.
   bottom nav's Inbox tab showing the fresh count and reaching the list. Skipped
   without `DATABASE_URL`, same guard as every other DB-backed spec
   (`docs/database.md`). The dock-absent and bottom-nav-Inbox checks that need
-  no database live in `e2e/shell-navigation.spec.ts`.
+  no database live in `e2e/shell-navigation.spec.ts`. Since #114 the mobile
+  path runs through the "More" sheet — bottom-nav More → Search → the palette
+  action, then the trigger's dot, then More → Inbox.

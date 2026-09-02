@@ -26,18 +26,25 @@ const buttonVariants = cva(
         // No surface of its own, so focus has to show as an underline too.
         link: "text-primary underline-offset-4 hover:underline active:text-[color-mix(in_oklch,var(--primary),var(--foreground)_20%)] focus-visible:underline",
       },
+      // Every size is a touch target first and a dense desktop control
+      // second: below `md` the ordinary sizes are 44px — Apple's minimum, and
+      // the bar #114's audit found almost nothing in the app clearing — and
+      // from `md` up they collapse back to the desktop scale unchanged. The
+      // `xs` pair is the deliberate exception: it's the inline-chip size, used
+      // *inside* rows of text where a 44px control would out-shout the content
+      // it belongs to, so it settles at 36px on a phone instead.
       size: {
         default:
-          "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        xs: "h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
-        lg: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        icon: "size-8",
+          "h-11 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 md:h-8",
+        xs: "h-9 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 md:h-6 [&_svg:not([class*='size-'])]:size-3",
+        sm: "h-11 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 md:h-7 [&_svg:not([class*='size-'])]:size-3.5",
+        lg: "h-11 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 md:h-9",
+        icon: "size-11 md:size-8",
         "icon-xs":
-          "size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
+          "size-9 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg md:size-6 [&_svg:not([class*='size-'])]:size-3",
         "icon-sm":
-          "size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
-        "icon-lg": "size-9",
+          "size-11 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg md:size-7",
+        "icon-lg": "size-11 md:size-9",
       },
     },
     defaultVariants: {
