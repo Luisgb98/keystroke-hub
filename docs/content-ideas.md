@@ -249,11 +249,25 @@ Mobile-first, one-handed capture is the design center:
   status, greyed out while pending, until the revalidated page landed. A failed
   action needs no rollback code: the transition settling without a revalidated
   prop reverts the optimistic value itself.
-- **Filters**: `IdeaFilters` — debounced search plus horizontally-scrollable
-  chip rows for format/status/tag. Holds a local optimistic copy of every
-  filter (not just search text) so rapid successive chip clicks compose
-  correctly instead of racing the server round-trip that updates the
-  `searchParams`-derived prop.
+- **Filters**: `IdeaFilters` — debounced search plus chip groups for
+  format/status/game/tag. From `md` up the groups render inline and **wrap**;
+  on a phone they live in a bottom sheet (`components/ui/sheet.tsx`) behind
+  one **Filters** button beside the search box, which carries a count of the
+  active chip filters, and the active ones are echoed under the search box
+  as removable chips (#122). Four horizontally-scrolling rows — two of which
+  grow with the game library and the tag set — used to fill a phone screen
+  above the first idea. Tapping a chip in the sheet applies it immediately
+  and keeps the sheet open; "Clear all" in the sheet and "Reset filters" on
+  the page both go to the bare `/content/ideas`. Inline, the tag row starts
+  collapsed to its first dozen (`visibleTags`, always including the active
+  tag) behind a "Show all N tags" toggle — a library's worth of hashtags
+  would otherwise push the first idea below the fold on desktop too; the
+  sheet shows them all, since it scrolls. The URL contract is unchanged. Only one copy of the groups is in the DOM at a time (the inline
+  one is `display: none` below `md`, the sheet unmounts when closed), so the
+  `Filter by …` group labels stay unique for role queries. Holds a local
+  optimistic copy of every filter (not just search text) so rapid successive
+  chip clicks compose correctly instead of racing the server round-trip that
+  updates the `searchParams`-derived prop.
 - **Track identity**: content-track tokens (`track-content*`) +
   `Clapperboard`/`Lightbulb` iconography throughout, per the dual-track rule
   in `docs/design-system.md` — color is never the only signal.

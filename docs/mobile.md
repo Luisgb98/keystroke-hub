@@ -78,6 +78,10 @@ focus trapping, scroll locking and Esc behave identically to every other modal
 padded past the home indicator. `svh` rather than `vh` so a mobile browser's
 collapsing toolbar can't push the bottom of the sheet off-screen.
 
+Used by the "More" tab above and by the ideas list's filters (#122, see
+`docs/content-ideas.md`): on a phone the four chip groups sit in a sheet
+behind one **Filters** button instead of four scrolling rows on the page.
+
 ## Dialogs: bottom sheets on a phone
 
 `DialogContent` takes a `variant`:
