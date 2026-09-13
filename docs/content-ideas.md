@@ -268,7 +268,9 @@ Mobile-first, one-handed capture is the design center:
 ## Detail page (issue #73)
 
 `app/(app)/content/ideas/[id]/page.tsx` — a per-idea page reached by clicking a
-card's title. Shows **everything** about one idea on a single finished page:
+card's title, or a linked idea's title in the calendar event editor and on a
+project page (#123 — those used to open the list filtered by `?q=title`, one
+tap short of the idea). Shows **everything** about one idea on a single finished page:
 title, description (paragraph breaks preserved via `whitespace-pre-line`, no
 clamp), tags with the `n/5` standard hint, format, status, release date/time,
 linked calendar events and project, the four publish copy blocks, and the

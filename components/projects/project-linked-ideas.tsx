@@ -89,7 +89,7 @@ export function ProjectLinkedIdeas({
               className="flex items-center gap-2 rounded-md bg-background/70 px-2 py-1.5"
             >
               <Link
-                href={`/content/ideas?q=${encodeURIComponent(idea.title)}`}
+                href={`/content/ideas/${idea.id}`}
                 className="flex flex-1 items-center gap-2 overflow-hidden text-small hover:underline"
               >
                 <span className="truncate">{idea.title}</span>
