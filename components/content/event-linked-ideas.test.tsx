@@ -58,6 +58,21 @@ describe("EventLinkedIdeas", () => {
     expect(screen.getByText("Glitch tutorial")).toBeInTheDocument();
   });
 
+  it("links the title straight to the idea's detail page (#123)", () => {
+    // Not a `?q=` search on the ideas list: that was one tap too many on the
+    // calendar → idea path, and the detail page has existed since #73.
+    render(
+      <EventLinkedIdeas
+        eventId="evt-1"
+        linkedIdeas={[makeIdea({ id: "idea-9", title: "Boss rush" })]}
+      />
+    );
+    expect(screen.getByText("Boss rush").closest("a")).toHaveAttribute(
+      "href",
+      "/content/ideas/idea-9"
+    );
+  });
+
   it("deep-links the script indicator, labeled by whether a script exists", () => {
     render(
       <EventLinkedIdeas
