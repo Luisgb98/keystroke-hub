@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { formatDateParam } from "../lib/calendar/range";
 import {
@@ -295,6 +295,20 @@ test.describe("idea filters", () => {
     await clearTestIdeas(PREFIX);
   });
 
+  /**
+   * The inline tag row starts collapsed to its first dozen (#122); against
+   * the shared dev database the seeded tag sorts well past them.
+   */
+  async function clickTagChip(page: Page, tag: string) {
+    const row = page.getByRole("group", { name: "Filter by tag" });
+    // Wait for the row itself before probing for the toggle: `isVisible()`
+    // doesn't wait, and the toggle ships in the same server-rendered HTML.
+    await expect(row).toBeVisible();
+    const showAll = row.getByRole("button", { name: /^Show all \d+ tags$/ });
+    if ((await showAll.count()) > 0) await showAll.click();
+    await row.getByRole("button", { name: `#${tag}`, exact: true }).click();
+  }
+
   test("search filters by title, reflects in the URL, and survives a reload", async ({
     page,
   }) => {
@@ -355,7 +369,7 @@ test.describe("idea filters", () => {
 
   test("filtering by tag shows only matching ideas", async ({ page }) => {
     await page.goto("/content/ideas");
-    await page.getByText("#speedrun").click();
+    await clickTagChip(page, "speedrun");
 
     await expect(page).toHaveURL(/tag=speedrun/);
     await expect(
@@ -374,7 +388,7 @@ test.describe("idea filters", () => {
       .getByRole("group", { name: "Filter by format" })
       .getByRole("button", { name: "Video" })
       .click();
-    await page.getByText("#speedrun").click();
+    await clickTagChip(page, "speedrun");
 
     await expect(page).toHaveURL(/format=video/);
     await expect(page).toHaveURL(/tag=speedrun/);
@@ -396,6 +410,118 @@ test.describe("idea filters", () => {
     await expect(page.getByText("No matching ideas")).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Reset filters" })
+    ).toBeVisible();
+  });
+});
+
+test.describe("idea filters mobile viewport (#122)", () => {
+  test.use({ viewport: { width: 375, height: 812 } });
+  test.skip(skip, skipReason);
+  test.describe.configure({ mode: "serial" });
+
+  // Its own prefix rather than the desktop describe's, so the two suites'
+  // afterAll cleanups can't delete each other's rows mid-assertion.
+  const PREFIX = "[e2e-idea-filters-mobile]";
+  // App Router commits the URL only once the navigation's RSC payload lands;
+  // under a parallel run against the shared dev database the ideas page can
+  // take longer than the 5s default.
+  const NAV_TIMEOUT = { timeout: 15000 };
+  const videoTitle = `${PREFIX} Video only idea`;
+  const streamTitle = `${PREFIX} Stream only idea`;
+
+  test.beforeAll(async () => {
+    await seedTestIdea({
+      title: videoTitle,
+      format: "video",
+      tags: ["mobile-speedrun"],
+    });
+    await seedTestIdea({
+      title: streamTitle,
+      format: "stream",
+      status: "scripted",
+    });
+  });
+
+  test.afterAll(async () => {
+    await clearTestIdeas(PREFIX);
+  });
+
+  test("keeps the chip rows off the page and behind one Filters button", async ({
+    page,
+  }) => {
+    await page.goto("/content/ideas");
+
+    // On a phone the only filter UI above the list is the search box and the
+    // trigger — the four chip rows aren't rendered visibly at all.
+    await expect(page.getByLabel("Search ideas")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Filters", exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("group", { name: "Filter by format" })
+    ).toHaveCount(0);
+  });
+
+  test("applies filters from the sheet, counts them, and drops one from the active row", async ({
+    page,
+  }) => {
+    await page.goto("/content/ideas");
+    await page.getByRole("button", { name: "Filters", exact: true }).click();
+    const sheet = page.getByRole("dialog", { name: "Filters" });
+    await expect(sheet).toBeVisible();
+
+    // The sheet's chips wrap rather than scroll: every group is fully inside
+    // the viewport width.
+    const groups = sheet.getByRole("group");
+    const viewportWidth = page.viewportSize()!.width;
+    for (const group of await groups.all()) {
+      const box = await group.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x + box!.width).toBeLessThanOrEqual(viewportWidth);
+    }
+
+    await sheet
+      .getByRole("group", { name: "Filter by format" })
+      .getByRole("button", { name: "Video" })
+      .click();
+    await expect(page).toHaveURL(/format=video/, NAV_TIMEOUT);
+    // Still open after one pick — a second tap shouldn't cost re-opening it.
+    await expect(sheet).toBeVisible();
+    await sheet.getByRole("button", { name: "#mobile-speedrun" }).click();
+    await expect(page).toHaveURL(/tag=mobile-speedrun/, NAV_TIMEOUT);
+
+    await sheet.getByRole("button", { name: "Done" }).click();
+    await expect(sheet).not.toBeVisible();
+
+    await expect(page.getByRole("button", { name: "Filters 2" })).toBeVisible();
+    await expect(
+      page.locator(IDEA_CARD_SELECTOR, { hasText: videoTitle })
+    ).toBeVisible();
+    await expect(
+      page.locator(IDEA_CARD_SELECTOR, { hasText: streamTitle })
+    ).toHaveCount(0);
+
+    // Dropping one filter from the active row leaves the other in place.
+    await page
+      .getByRole("group", { name: "Active filters" })
+      .getByRole("button", { name: "Remove filter: Video" })
+      .click();
+    await expect(page).toHaveURL(/tag=mobile-speedrun/, NAV_TIMEOUT);
+    await expect(page).not.toHaveURL(/format=/, NAV_TIMEOUT);
+    await expect(page.getByRole("button", { name: "Filters 1" })).toBeVisible();
+  });
+
+  test("Clear all inside the sheet returns to the bare list", async ({
+    page,
+  }) => {
+    await page.goto("/content/ideas?format=stream&status=scripted");
+    await page.getByRole("button", { name: "Filters 2" }).click();
+    const sheet = page.getByRole("dialog", { name: "Filters" });
+    await sheet.getByRole("button", { name: "Clear all" }).click();
+
+    await expect(page).toHaveURL("/content/ideas", NAV_TIMEOUT);
+    await expect(
+      page.locator(IDEA_CARD_SELECTOR, { hasText: videoTitle })
     ).toBeVisible();
   });
 });
