@@ -29,6 +29,16 @@ The Today blocks:
   Fetches via `getDayLog(todayParam())` (`lib/data/daily-logs.ts`,
   `lib/journal/dates.ts`) and summarizes through the pure
   `buildLogSummary` (`lib/dashboard/log-summary.ts`).
+- **Ready to publish** — `ReadyToPublishCard`
+  (`components/dashboard/ready-to-publish-card.tsx`, #128). Every idea in
+  the `edited` stage, oldest-in-stage first (`getIdeasReadyToPublish()` in
+  `lib/data/ideas.ts`), each with a link to its detail page and the same
+  `IdeaCopyActions` the idea card carries — publishing day is open → copy →
+  paste, not Content → Ideas → filter → find. Sits above the pipeline tally
+  on purpose: when something is cut and waiting, it's what the owner opened
+  the app for. Renders an empty state rather than vanishing when nothing is
+  edited. `ReadyToPublishView` is the rendering half, split out so it's
+  unit-testable without a database.
 - **Content in flight** — `ContentSnapshotCard`
   (`components/dashboard/content-snapshot-card.tsx`). Fetches via
   `getIdeasInFlight()` (`lib/data/ideas.ts`) and tallies through the pure

@@ -17,6 +17,7 @@ import {
   PipelineCard,
   PipelineSkeleton,
 } from "@/components/dashboard/pipeline-card";
+import { ReadyToPublishCard } from "@/components/dashboard/ready-to-publish-card";
 import {
   TagRankingCard,
   TagRankingSkeleton,
@@ -66,6 +67,9 @@ export default async function DashboardPage({
           <UpcomingAgenda maxItems={5} />
           <div className="flex flex-col gap-6">
             <LogStatusCard />
+            {/* Above the pipeline tally: when something is cut and waiting,
+                copying its blocks is what the owner opened the app for (#128). */}
+            <ReadyToPublishCard />
             <ContentSnapshotCard />
           </div>
         </div>

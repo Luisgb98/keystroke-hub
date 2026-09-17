@@ -378,3 +378,122 @@ test.describe("dashboard mobile viewport", () => {
     expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
   });
 });
+
+test.describe("dashboard ready-to-publish block (#128)", () => {
+  // Clipboard access is origin-scoped and off by default under automation.
+  test.use({ permissions: ["clipboard-read", "clipboard-write"] });
+  test.skip(skip, skipReason);
+
+  // Own prefix: the main describe's afterAll clears `[e2e-dashboard]`, and
+  // a shared prefix would let it delete these rows mid-assertion.
+  const READY_PREFIX = "[e2e-dashboard-ready]";
+  const editedTitle = `${READY_PREFIX} Edited video`;
+  const recordedTitle = `${READY_PREFIX} Still recording`;
+  const description = "Cold open.\n\nThen the run.";
+  const tags = ["speedrun", "boss rush"];
+  const tagsText = "#speedrun #bossrush";
+
+  test.beforeAll(async () => {
+    await seedTestIdea({
+      title: editedTitle,
+      status: "edited",
+      description,
+      tags,
+    });
+    await seedTestIdea({ title: recordedTitle, status: "recorded" });
+  });
+
+  test.afterAll(async () => {
+    await clearTestIdeas(READY_PREFIX);
+  });
+
+  test("lists only the edited ideas, each linking to its detail page", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const block = page.locator('[data-slot="ready-to-publish"]');
+    await expect(block.getByText("Ready to publish")).toBeVisible();
+
+    const row = block.locator('[data-slot="ready-to-publish-item"]', {
+      hasText: editedTitle,
+    });
+    await expect(row).toBeVisible();
+    await expect(block.getByText(recordedTitle)).toHaveCount(0);
+
+    await row.getByRole("link", { name: editedTitle }).click();
+    await expect(page).toHaveURL(/\/content\/ideas\/[\w-]+$/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: editedTitle })
+    ).toBeVisible();
+  });
+
+  test("copies a publish block straight from the home screen", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const row = page.locator('[data-slot="ready-to-publish-item"]', {
+      hasText: editedTitle,
+    });
+    await expect(row).toBeVisible();
+
+    await row.getByRole("button", { name: "Copy Title", exact: true }).click();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+      editedTitle
+    );
+
+    await row
+      .getByRole("button", { name: "Copy Description + tags", exact: true })
+      .click();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+      `${description}\n\n${tagsText}`
+    );
+  });
+});
+
+test.describe("dashboard ready-to-publish block mobile viewport (#128)", () => {
+  test.use({ viewport: { width: 375, height: 812 } });
+  test.skip(skip, skipReason);
+
+  const READY_PREFIX = "[e2e-dashboard-ready-mobile]";
+  const editedTitle = `${READY_PREFIX} Edited video`;
+
+  test.beforeAll(async () => {
+    await seedTestIdea({ title: editedTitle, status: "edited", tags: ["x"] });
+  });
+
+  test.afterAll(async () => {
+    await clearTestIdeas(READY_PREFIX);
+  });
+
+  test("copy buttons keep their 2×2 grid at 44px, with no horizontal overflow", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const row = page.locator('[data-slot="ready-to-publish-item"]', {
+      hasText: editedTitle,
+    });
+    await row.scrollIntoViewIfNeeded();
+    await expect(row).toBeVisible();
+
+    const boxes = await row
+      .getByRole("button", { name: /^Copy / })
+      .evaluateAll((buttons) =>
+        buttons.map((b) => {
+          const r = b.getBoundingClientRect();
+          return { x: Math.round(r.x), y: Math.round(r.y), h: r.height };
+        })
+      );
+    expect(boxes).toHaveLength(4);
+    // Two rows of two: the first two share a row, the last two the next.
+    expect(boxes[0].y).toBe(boxes[1].y);
+    expect(boxes[2].y).toBe(boxes[3].y);
+    expect(boxes[2].y).toBeGreaterThan(boxes[0].y);
+    for (const box of boxes) expect(box.h).toBeGreaterThanOrEqual(40);
+
+    const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+  });
+});
