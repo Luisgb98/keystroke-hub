@@ -151,6 +151,35 @@ test.describe("idea <-> event links", () => {
     expect(scrollWidth).toBeGreaterThan(clientWidth);
   });
 
+  test("opens the linked idea itself from the event editor in one tap (#123)", async ({
+    page,
+  }) => {
+    const ideaTitle = `${PREFIX} Boss rush`;
+    const eventTitle = `${PREFIX} Record boss rush`;
+    await seedTestIdea({ title: ideaTitle });
+
+    await createContentEvent(page, eventTitle);
+    await page.locator(EVENT_BLOCK_SELECTOR, { hasText: eventTitle }).click();
+    const editDialog = page.getByRole("dialog", { name: "Edit event" });
+    await editDialog.getByRole("button", { name: "Link an idea" }).click();
+    const picker = page.getByRole("dialog", { name: "Link an idea" });
+    await picker.getByText(ideaTitle).click();
+    await expect(picker).not.toBeVisible({ timeout: 10000 });
+
+    // The title is a deep link to `/content/ideas/<id>` — not the ideas list
+    // filtered by title, which used to cost a second tap to get here.
+    // The script shortcut beside the title carries the title in its label
+    // too, so pick the row link by its text rather than by accessible name.
+    await editDialog
+      .locator('[data-slot="event-linked-ideas"] a', { hasText: ideaTitle })
+      .click();
+
+    await expect(page).toHaveURL(/\/content\/ideas\/[\w-]+$/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: ideaTitle })
+    ).toBeVisible();
+  });
+
   test("opens the linked idea's script from the event editor", async ({
     page,
   }) => {

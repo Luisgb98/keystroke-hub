@@ -97,9 +97,13 @@ test.describe("projects tracker", () => {
     await dialog.getByText(ideaTitle).click();
     await expect(dialog).not.toBeVisible({ timeout: 10000 });
 
-    await expect(page.getByRole("link", { name: ideaTitle })).toBeVisible();
-
-    await page.goto(`/content/ideas?q=${encodeURIComponent(ideaTitle)}`);
+    // The row is a deep link to the idea itself, not a filtered list (#123):
+    // one tap lands on the detail page, where the project chip is visible.
+    await page.getByRole("link", { name: ideaTitle }).click();
+    await expect(page).toHaveURL(/\/content\/ideas\/[\w-]+$/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: ideaTitle })
+    ).toBeVisible();
     await expect(page.getByRole("link", { name: projectName })).toBeVisible();
   });
 

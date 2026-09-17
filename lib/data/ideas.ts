@@ -99,3 +99,17 @@ export async function getIdeasInFlight(): Promise<Idea[]> {
     .where(notInArray(ideas.status, NOT_IN_FLIGHT_STATUSES))
     .orderBy(asc(ideas.stageEnteredAt));
 }
+
+/**
+ * Ideas cut and waiting to be uploaded — the `edited` stage, oldest first —
+ * feeding the dashboard's ready-to-publish block (#128). Oldest-in-stage
+ * matches the board's own ordering, so the list reads the same in both.
+ */
+export async function getIdeasReadyToPublish(): Promise<Idea[]> {
+  const db = getDb();
+  return db
+    .select()
+    .from(ideas)
+    .where(eq(ideas.status, "edited"))
+    .orderBy(asc(ideas.stageEnteredAt));
+}

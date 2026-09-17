@@ -84,7 +84,7 @@ export function EventLinkedIdeas({
               className="flex items-center gap-2 rounded-md bg-background/70 px-2 py-1.5"
             >
               <Link
-                href={`/content/ideas?q=${encodeURIComponent(idea.title)}`}
+                href={`/content/ideas/${idea.id}`}
                 // `min-w-0` is what lets the `truncate` below bite: without it
                 // this flex item's min-content floor is the title's full
                 // unwrapped width, which propagated all the way out and made
